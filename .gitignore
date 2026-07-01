@@ -1,6 +1,9 @@
 # 依赖（数据准备脚本用，勿提交）
 tools/node_modules/
 
+# 注释导入脚本的下载缓存与报告（勿提交）
+tools/.cache/
+
 # 系统文件
 .DS_Store
 
