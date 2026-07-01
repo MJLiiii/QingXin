@@ -1,12 +1,12 @@
 /* 极简静态文件服务器（仅本地预览用）。
    根目录由脚本位置推导，不依赖 cwd，规避 launcher 的 getcwd 限制。
-   用法：node tools/serve.mjs  （默认端口 8080，可 PORT=xxxx 覆盖）*/
+   用法：node tools/server/serve.mjs  （默认端口 8080，可 PORT=xxxx 覆盖）*/
 import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
-import { join, extname, normalize, dirname } from 'node:path';
+import { join, extname, normalize, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url))); // tools/.. = 仓库根
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PORT = process.env.PORT || 8080;
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
