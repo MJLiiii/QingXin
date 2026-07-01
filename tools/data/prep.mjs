@@ -5,7 +5,7 @@
 
    用法：
      cd tools && npm install
-     node prep.mjs --src ../../chinese-poetry-src
+     node data/prep.mjs --src ../../chinese-poetry-src
 
    产出（相对仓库根 QingXin/）：
      data/manifest.json          总数 / 分页信息 / 朝代分面
@@ -25,8 +25,8 @@ import { dirname, join, resolve } from 'node:path';
 import * as OpenCC from 'opencc-js';
 
 // ---------- 路径与参数 ----------
-const __dirname = dirname(fileURLToPath(import.meta.url)); // .../QingXin/tools
-const REPO = resolve(__dirname, '..');                     // .../QingXin
+const __dirname = dirname(fileURLToPath(import.meta.url)); // .../QingXin/tools/data
+const REPO = resolve(__dirname, '..', '..');               // .../QingXin
 const args = process.argv.slice(2);
 const argVal = (n, d) => {
   const i = args.indexOf(n);

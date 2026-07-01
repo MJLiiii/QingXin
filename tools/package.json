@@ -1,11 +1,13 @@
 {
-  "name": "qingxin-prep",
+  "name": "qingxin-tools",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "情心 · chinese-poetry 数据准备脚本（一次性本地运行，产出 ../data/**）",
+  "description": "情心 · 本地预览、数据准备与注释导入工具",
   "scripts": {
-    "prep": "node prep.mjs"
+    "serve": "node server/serve.mjs",
+    "prep": "node data/prep.mjs",
+    "annotate:import": "node annotations/annotate-import.mjs"
   },
   "dependencies": {
     "opencc-js": "^1.0.5"

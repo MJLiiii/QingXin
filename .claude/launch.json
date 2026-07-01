@@ -4,7 +4,7 @@
     {
       "name": "qingxin",
       "runtimeExecutable": "/opt/homebrew/bin/node",
-      "runtimeArgs": ["tools/serve.mjs"],
+      "runtimeArgs": ["tools/server/serve.mjs"],
       "port": 8080
     }
   ]

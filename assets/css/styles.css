@@ -413,6 +413,48 @@ body {
 .entry-head__rule--tight { margin-bottom: 32px; }
 .entry-head__rule--wide { margin-bottom: 56px; }
 
+/* 可折叠栏目（注释/译文/赏析/创作背景）：标题行是按钮，默认折叠 */
+
+.entry-head--toggle {
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.entry-head__chev {
+  margin-left: auto;
+  font-size: 18px;
+  color: var(--muted-2);
+  transition: color 0.2s ease;
+}
+
+.entry-head__chev::before { content: '＋'; }
+.entry--collapsible:not(.entry--collapsed) .entry-head__chev::before { content: '－'; }
+
+.entry-head--toggle:hover .entry-head__chev { color: var(--accent); }
+
+/* grid-rows 技巧：内容高度未知也能平滑展开/收起 */
+.entry-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.35s ease;
+}
+
+.entry--collapsed .entry-body { grid-template-rows: 0fr; }
+
+.entry-body__inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* 折叠态收紧细线下方留白，展开态保持原有节奏 */
+.entry--collapsed .entry-head__rule { margin-bottom: 0; }
+
 /* 原文 */
 
 .original { text-align: center; }

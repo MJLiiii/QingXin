@@ -1,125 +1,236 @@
 # 情心 · 慢读古典
 
-> 水墨留白的古诗文赏读站 —— 原文、注释、译文、赏析、创作背景，逐层深入。
+> 水墨留白风格的古典诗词阅读站。以静态 JSON 数据驱动，提供诗词原文、注释、译文、赏析、创作背景和诗人信息浏览。
 
-一个**纯静态、无后端**的古典诗词阅读网站。原生 HTML/CSS/JS，无框架、无打包工具、
-运行时零依赖。全站内容由 [chinese-poetry](https://github.com/chinese-poetry/chinese-poetry)
-数据集驱动，共约 **78,660 首**（全唐诗 + 宋词）。**诗词文字不写死在 HTML 里**，
-一律由前端 `fetch` 加载 `data/` 下的静态 JSON。
+情心是一个纯静态、无后端的古诗词阅读项目。前端使用原生 HTML、CSS、JavaScript 编写，不依赖框架或打包工具；运行时所有内容都由浏览器从 `data/` 目录下的 JSON 文件中 `fetch` 加载，诗词正文不写死在 `index.html` 里。
 
-## 特性
+线上地址：<https://mjliiii.github.io/QingXin/>
 
-- 📖 **海量诗词**：全唐诗（约 5.8 万）+ 宋词（约 2.1 万），全唐诗已繁→简。
-- 🎲 **首页随机推荐**：每次打开随缘一首，可"换一首"重抽。
-- 🔍 **全局搜索 + 小分页**：按标题 / 作者检索，诗集每页 25 首翻阅。
-- 🖋 **五段式详情页**：原文 / 注释 / 译文 / 赏析 / 创作背景，板块恒在，内容可逐首补。
-- 👤 **诗人浏览**：全部 5000+ 位诗人按作品数排序、可搜索，点入见小传与代表作。
-- 🎨 **宋代美学**：米纸底 + 软墨黑 + 朱砂点缀，Noto Serif SC / Cormorant Garamond。
-- ⚡ **零后端**：可直接部署到 GitHub Pages 等任意静态托管。
+## 功能特性
+
+- 收录约 78,660 首作品，包括全唐诗 57,607 首和宋词 21,053 首。
+- 首页随机推荐，每次进入或点击“换一首”都会重新抽取作品。
+- 诗集浏览支持分页、标题搜索和作者搜索。
+- 诗人页支持按作品数浏览全部作者，并可进入作者详情页。
+- 诗词详情页固定展示原文、注释、译文、赏析、创作背景五个板块。
+- 注释、译文、赏析、创作背景使用独立叠加层维护，不需要修改大体量原文数据。
+- 可直接部署到 GitHub Pages、Netlify、Vercel 或任意静态文件服务。
+
+## 技术栈
+
+- 原生 HTML/CSS/JavaScript
+- Hash Router：`#/home`、`#/list/:page`、`#/poem/:id`、`#/author/:slug`、`#/authors/:page`、`#/about`
+- 前端资源：`assets/css/`、`assets/js/`
+- 静态数据：`data/**/*.json`
+- 数据准备脚本：Node.js ESM
+- 繁简转换：`opencc-js`
+
+## 快速开始
+
+本项目没有构建步骤。由于浏览器会限制 `file://` 下的 `fetch()`，本地预览必须通过 HTTP 服务打开。
+
+```bash
+node tools/server/serve.mjs
+```
+
+然后访问：
+
+```text
+http://localhost:8080
+```
+
+如需更换端口：
+
+```bash
+PORT=4173 node tools/server/serve.mjs
+```
+
+## 常用命令
+
+```bash
+# 本地预览
+node tools/server/serve.mjs
+
+# 安装数据处理脚本依赖
+cd tools
+npm install
+
+# 重建 data/** 数据
+node data/prep.mjs --src ../../chinese-poetry-src
+
+# 试运行批量注释导入，不写文件
+node annotations/annotate-import.mjs --dry-run
+
+# 导入 chinese-gushiwen 的译文、注释、赏析
+node annotations/annotate-import.mjs
+```
+
+也可以使用 npm scripts：
+
+```bash
+cd tools
+npm run serve
+npm run prep -- --src ../../chinese-poetry-src
+npm run annotate:import -- --dry-run
+```
+
+说明：`tools/annotations/annotate-import.mjs` 会联网下载数据并缓存到 `tools/.cache/`。缓存目录、`tools/node_modules/` 以及 iCloud 产生的冲突副本都已在 `.gitignore` 中排除。
 
 ## 目录结构
 
-```
+```text
 QingXin/
-├── index.html          页眉/页脚 + 空页面容器（无诗文）
-├── app.js              hash 路由 + fetch/渲染层
-├── styles.css          设计系统与样式
-├── data/               站点数据（已提交，由 tools/prep.mjs 生成）
-│   ├── manifest.json         总数 / 分页信息
-│   ├── search.json           全局搜索索引（紧凑 [id,标题,作者]）
-│   ├── authors-index.json    诗人总索引（按作品数排序，供“诗人”页）
-│   ├── about.json            “关于”页文案（可手工编辑）
-│   ├── index/page-*.json     浏览索引，500 条/页
-│   ├── poems/*.json          原文详情块，1000 首/文件（只读）
-│   ├── authors/*.json        作者简介
-│   └── annotations/*.json    注释叠加层（手工编辑）
+├── index.html                # 页面骨架：页眉、页脚和空容器
+├── assets/                   # 浏览器直接加载的前端资源
+│   ├── css/
+│   │   └── styles.css        # 视觉样式和设计变量
+│   └── js/
+│       └── app.js            # 客户端路由、数据加载和页面渲染
+├── data/
+│   ├── manifest.json         # 数据总量、分页、分块信息
+│   ├── search.json           # 全局搜索索引：[id, title, author]
+│   ├── authors-index.json    # 作者索引，按作品数排序
+│   ├── about.json            # 关于页文案
+│   ├── index/page-*.json     # 诗集浏览索引，500 条/文件
+│   ├── poems/*.json          # 诗词原文详情，1000 首/文件
+│   ├── authors/*.json        # 作者简介和代表作
+│   └── annotations/          # 注释、译文、赏析、创作背景叠加层
 └── tools/
-    ├── prep.mjs        数据准备脚本
-    ├── serve.mjs       本地静态服务器
-    └── README.md       数据重建说明
+    ├── server/
+    │   └── serve.mjs         # 本地静态服务器
+    ├── data/
+    │   └── prep.mjs          # 从 chinese-poetry 生成 data/**
+    ├── annotations/
+    │   ├── annotate-import.mjs
+    │   └── annotate-lib.mjs
+    └── package.json          # 工具脚本入口与依赖
 ```
 
-## 本地预览
+分类规则：
 
-`fetch()` 在 `file://` 下会被拦截，必须用 HTTP 服务器打开：
+- 根目录保留站点入口、项目说明和部署配置，例如 `index.html`、`README.md`、`.nojekyll`。
+- `assets/` 放浏览器直接加载的前端资源，按类型拆分为 `css/` 和 `js/`。
+- `data/` 放站点运行所需的静态内容数据，包含可重建数据和手工注释叠加层。
+- `tools/server/` 放本地静态服务器。
+- `tools/data/` 放主数据生成脚本。
+- `tools/annotations/` 放注释导入、匹配和归一化脚本。
 
-```bash
-node tools/serve.mjs
-# 打开 http://localhost:8080
+## 数据模型
+
+诗词 ID 直接编码存储位置：
+
+```text
+t<chunk>-<index>  # 唐诗
+c<chunk>-<index>  # 宋词
 ```
 
-> 请勿用 `python -m http.server`：本机预览环境的工作目录限制会使其崩溃。
+例如 `c59-66` 表示宋词数据第 `0059.json` 个分块中的第 `66` 首。`assets/js/app.js` 会根据 ID 直接定位到：
 
-## 给某首诗补内容
+```text
+data/poems/0059.json[66]
+```
 
-数据源只提供原文与作者简介；注释 / 译文 / 赏析 / 创作背景需手工补。方法：
+核心数据分为三层：
 
-1. 打开任意诗的详情页，记下地址栏里的 id（如 `#/poem/c59-66` 中的 `c59-66`）。
-2. 在 `data/annotations/` 新建 `<id>.json`：
+- `data/index/page-*.json`：轻量列表索引，用于诗集分页浏览。
+- `data/poems/*.json`：只读原文数据，用于详情页。
+- `data/annotations/<id>.json`：可手工维护的内容叠加层，用于补充注释、译文、赏析和创作背景。
 
-   ```json
-   {
-     "id": "c59-66",
-     "preface": "词序原文（可选）",
-     "notes": [ { "term": "词语", "def": "释义" } ],
-     "prefaceTranslation": "词序白话（作译文首段淡墨，可选）",
-     "translation": [ "译文第一段", "第二段" ],
-     "appreciation": [ "赏析" ],
-     "background": [ "创作背景" ]
-   }
-   ```
+## 补充单首诗词内容
 
-3. 保存刷新即生效 —— **无需重跑脚本，也不改动任何大文件**。留空的字段会显示
-   “尚未收录，敬请期待。”占位。详见 `data/annotations/README.md`。
+进入任意诗词详情页，地址栏会显示对应 ID，例如：
 
-## 重建数据（一般无需）
+```text
+#/poem/c59-66
+```
 
-只有在刷新 / 重建 `data/**` 时才需要：
+在 `data/annotations/` 中新建同名 JSON 文件：
+
+```json
+{
+  "id": "c59-66",
+  "preface": "",
+  "notes": [
+    {
+      "term": "明月几时有",
+      "def": "化用前人诗意，以问月起兴。"
+    }
+  ],
+  "prefaceTranslation": "",
+  "translation": [
+    "译文第一段。"
+  ],
+  "appreciation": [
+    "赏析第一段。"
+  ],
+  "background": [
+    "创作背景第一段。"
+  ]
+}
+```
+
+保存后刷新页面即可生效，不需要重跑数据脚本。字段可留空，前端会显示“尚未收录，敬请期待。”占位。更详细的格式说明见 `data/annotations/README.md`。
+
+如果某个注释文件来自批量导入，文件中可能带有 `"source": "gushiwen"`。手工改好后建议删除这个字段，避免以后使用 `--force` 重新导入时覆盖。
+
+## 重建诗词数据
+
+只有在需要刷新原始诗词数据时才需要执行本步骤。先把源数据仓库克隆到 `QingXin` 的同级目录：
 
 ```bash
-# 1. 克隆源数据到本仓库同级目录（约 450MB，勿提交）
 git clone --depth 1 https://github.com/chinese-poetry/chinese-poetry ../chinese-poetry-src
-
-# 2. 安装依赖并生成
-cd tools && npm install && node prep.mjs --src ../../chinese-poetry-src
 ```
 
-脚本会做繁→简（全唐诗）、剔除孤立代理字符、为宋词合成标题与 id，并**保留**
-`data/annotations/`（你手写的注释不会丢），仅重建索引 / 原文 / 作者 + 顶层 JSON +
-种子文件 `c59-66.json`（《水调歌头》）。`--include-song-shi` 预留开关可追加宋诗（约 25.5 万，默认关闭）。
+然后运行：
 
-## 实现要点
+```bash
+cd tools
+npm install
+node data/prep.mjs --src ../../chinese-poetry-src
+```
 
-- **id 编码存储位置**：`t<块>-<序>`（唐）/ `c<块>-<序>`（宋词）直接定位
-  `data/poems/<块>.json[序]`，无需查找表。
-- **路由**：`#/home | #/list/:page | #/poem/:id | #/author/:slug`，各渲染函数复用既有 CSS 类，
-  注入对应 `#page-<name>` 容器；`fetchJSON()` 用 `Map` 缓存。
-- **设计令牌**在 `styles.css` `:root`（`--paper` #F5F1E8、`--ink` #221F1A、`--accent` #9A3B2E、
-  `--serif`、`--latin`），新增 UI 一律沿用，不引入新配色。
+脚本会重新生成：
 
-## 部署（GitHub Pages）
+- `data/manifest.json`
+- `data/search.json`
+- `data/authors-index.json`
+- `data/index/`
+- `data/poems/`
+- `data/authors/`
 
-本站已按 GitHub Pages 直发配置，线上地址：
+脚本会保留 `data/annotations/` 目录，因此手工补充的注释不会被清空。内置种子文件 `c59-66.json` 可能会被重写。
 
-**https://mjliiii.github.io/QingXin/**
+## 批量导入注释
 
-启用方式（一次性，仓库设置里点一下）：
+`tools/annotations/annotate-import.mjs` 可从 `aopao/chinese-gushiwen` 数据集中导入译文、注释和赏析，并通过作者、正文前缀和 Dice 相似度匹配到本项目的诗词 ID。
 
-1. 打开 GitHub 仓库 → **Settings** → **Pages**。
-2. **Build and deployment** → Source 选 **Deploy from a branch**。
-3. Branch 选 **`main`** ，目录选 **`/ (root)`** → **Save**。
-4. 约 1 分钟后上面的地址即生效。
+```bash
+cd tools
+node annotations/annotate-import.mjs --dry-run
+node annotations/annotate-import.mjs
+```
 
-说明：
+安全规则：
 
-- 仓库根有一个空的 **`.nojekyll`** 文件，禁用 Jekyll 构建，让 Pages 原样服务全部
-  静态文件（含 `data/` 下数千个 JSON 与中文文件名的作者文件）。
-- 所有资源与 `fetch` 路径均为相对路径，站点在 `/QingXin/` 子路径下可直接工作，无需改动。
-- 采用 hash 路由（`#/…`），真实 HTTP 路径始终是 `index.html`，深链不会 404，无需额外兜底。
-- `data/**` 已提交入库即为站点内容；`tools/node_modules` 与外部的
-  `../chinese-poetry-src` 不纳入版本库。
+- 默认跳过已存在的注释文件。
+- `--force` 只会覆盖带 `"source": "gushiwen"` 的旧导入文件。
+- 手写注释不会被自动覆盖。
+- 数据集中没有创作背景时，`background` 会保持为空数组。
+
+## 部署
+
+项目可直接作为静态站点部署。使用 GitHub Pages 时推荐配置：
+
+- Source：Deploy from a branch
+- Branch：`main`
+- Folder：`/ (root)`
+
+根目录中的 `.nojekyll` 用于让 GitHub Pages 原样服务 `data/` 目录中的 JSON 文件和中文文件名。项目使用相对路径和 hash 路由，部署在 `/QingXin/` 子路径下不需要额外 rewrite 配置。
 
 ## 数据来源与致谢
 
-诗词数据来自 [chinese-poetry/chinese-poetry](https://github.com/chinese-poetry/chinese-poetry)。
-繁简转换使用 [opencc-js](https://github.com/nk2028/opencc-js)。诗词原文均为公有领域作品。
+- 诗词原文来自 [chinese-poetry/chinese-poetry](https://github.com/chinese-poetry/chinese-poetry)。
+- 部分译文、注释和赏析可由 [aopao/chinese-gushiwen](https://github.com/aopao/chinese-gushiwen) 导入。
+- 繁简转换使用 [opencc-js](https://github.com/nk2028/opencc-js)。
+
+诗词原文为公有领域作品。复用本项目代码或整理后的数据前，请根据实际发布需求补充清晰的许可证说明。

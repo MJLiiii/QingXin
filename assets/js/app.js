@@ -1,6 +1,6 @@
 /* ===========================================================
    情心 — 客户端路由 + 数据渲染层
-   数据来自 data/**（由 tools/prep.mjs 生成），诗文不写死在 HTML。
+   数据来自 data/**（由 tools/data/prep.mjs 生成），诗文不写死在 HTML。
    路由：#/home | #/list/:page | #/poem/:id | #/author/:slug
    =========================================================== */
 
@@ -94,16 +94,28 @@
       + '</div>';
   }
 
-  function entryShell(title, roman, inner, ruleClass) {
-    return '<section class="section entry">'
-      + '<div class="entry-head"><span class="entry-head__title">' + esc(title) + '</span>'
-      + '<span class="entry-head__num latin">' + roman + '</span></div>'
-      + '<div class="entry-head__rule' + (ruleClass ? ' ' + ruleClass : '') + '"></div>'
-      + inner
+  function entryShell(title, roman, inner, ruleClass, collapsible) {
+    var rule = '<div class="entry-head__rule' + (ruleClass ? ' ' + ruleClass : '') + '"></div>';
+    if (!collapsible) {
+      return '<section class="section entry">'
+        + '<div class="entry-head"><span class="entry-head__title">' + esc(title) + '</span>'
+        + '<span class="entry-head__num latin">' + roman + '</span></div>'
+        + rule + inner
+        + '</section>';
+    }
+    // 可折叠版：标题行是按钮（默认折叠），点击经委托处理器切换
+    return '<section class="section entry entry--collapsible entry--collapsed">'
+      + '<button class="entry-head entry-head--toggle" data-toggle aria-expanded="false">'
+      + '<span class="entry-head__title">' + esc(title) + '</span>'
+      + '<span class="entry-head__num latin">' + roman + '</span>'
+      + '<span class="entry-head__chev" aria-hidden="true"></span>'
+      + '</button>'
+      + rule
+      + '<div class="entry-body"><div class="entry-body__inner">' + inner + '</div></div>'
       + '</section>';
   }
 
-  // 译文/赏析/背景：有内容渲染段落，无则显示标题 + 占位（保留板块）
+  // 译文/赏析/背景：有内容渲染段落，无则显示标题 + 占位（保留板块，默认折叠）
   function proseEntry(title, roman, paras, faintFirst) {
     var body;
     if (paras && paras.length) {
@@ -114,7 +126,7 @@
     } else {
       body = '<p class="prose--faint">尚未收录，敬请期待。</p>';
     }
-    return entryShell(title, roman, '<div class="prose">' + body + '</div>');
+    return entryShell(title, roman, '<div class="prose">' + body + '</div>', '', true);
   }
 
   function errorSection(msg) {
@@ -315,7 +327,7 @@
     } else {
       notesInner = '<div class="notes"><p class="prose--faint">尚未收录，敬请期待。</p></div>';
     }
-    html += entryShell('注释', 'ii', notesInner, 'entry-head__rule--tight');
+    html += entryShell('注释', 'ii', notesInner, 'entry-head__rule--tight', true);
 
     // 译文（词序译文作首段淡墨）/ 赏析 / 创作背景
     var trans = (ann.prefaceTranslation ? [ann.prefaceTranslation] : []).concat(ann.translation || []);
@@ -505,6 +517,13 @@
   }
 
   document.addEventListener('click', function (e) {
+    var toggle = e.target.closest('[data-toggle]');
+    if (toggle) {
+      var entry = toggle.closest('.entry');
+      var collapsed = entry.classList.toggle('entry--collapsed');
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      return;
+    }
     var trigger = e.target.closest('[data-nav]');
     if (!trigger) return;
     e.preventDefault();
