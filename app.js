@@ -131,10 +131,34 @@
     return '<div class="pager" id="pager">'
       + btn(0, '«', page > 0)
       + btn(page - 1, '← 上一页', page > 0)
-      + '<span class="pager__info latin">' + (page + 1) + ' / ' + pages + '</span>'
+      + '<span class="pager__jump">第 '
+      + '<input class="pager__input" id="pager-input" type="number" min="1" max="' + pages + '"'
+      + ' value="' + (page + 1) + '" data-route="' + route + '" aria-label="跳转到页码">'
+      + ' / ' + pages + ' 页 '
+      + '<button class="pager__go" id="pager-go">跳转</button>'
+      + '</span>'
       + btn(page + 1, '下一页 →', page < pages - 1)
       + btn(pages - 1, '»', page < pages - 1)
       + '</div>';
+  }
+
+  // 跳转到指定页（诗集 / 诗人 共用）
+  function wirePager(host) {
+    var input = host.querySelector('#pager-input');
+    if (!input) return;
+    var route = input.getAttribute('data-route');
+    var max = parseInt(input.getAttribute('max'), 10) || 1;
+    function jump() {
+      var n = parseInt(input.value, 10);
+      if (isNaN(n)) { input.value = ''; return; }
+      n = Math.max(1, Math.min(max, n));
+      go(route + '/' + (n - 1));
+    }
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); jump(); }
+    });
+    var goBtn = host.querySelector('#pager-go');
+    if (goBtn) goBtn.addEventListener('click', jump);
   }
 
   function searchBoxHTML() {
@@ -202,7 +226,8 @@
     var start = (dp % perFile) * DISPLAY;
     var slice = entries.slice(start, start + DISPLAY);
 
-    document.getElementById('page-list').innerHTML =
+    var host = document.getElementById('page-list');
+    host.innerHTML =
       '<section class="section section--top">'
       + '<div class="section-head"><span class="section-head__title">诗集</span>'
       + '<span class="section-head__tag latin">' + manifest.total + '</span></div>'
@@ -212,14 +237,15 @@
       + pagerHTML('list', dp, totalPages)
       + '</section>';
 
-    wireSearch(slice);
+    wireSearch(host, slice);
+    wirePager(host);
   }
 
-  function wireSearch(pageEntries) {
-    var input = document.getElementById('search-input');
+  function wireSearch(host, pageEntries) {
+    var input = host.querySelector('#search-input');
     if (!input) return;
-    var rows = document.getElementById('list-rows');
-    var pager = document.getElementById('pager');
+    var rows = host.querySelector('#list-rows');
+    var pager = host.querySelector('#pager');
 
     input.addEventListener('input', debounce(async function () {
       var q = input.value.trim();
@@ -362,7 +388,8 @@
     if (page > totalPages - 1) page = totalPages - 1;
     var slice = idx.slice(page * DISPLAY, page * DISPLAY + DISPLAY);
 
-    document.getElementById('page-authors').innerHTML =
+    var host = document.getElementById('page-authors');
+    host.innerHTML =
       '<section class="section section--top">'
       + '<div class="section-head"><span class="section-head__title">诗人</span>'
       + '<span class="section-head__tag latin">' + idx.length + '</span></div>'
@@ -376,14 +403,15 @@
       + pagerHTML('authors', page, totalPages)
       + '</section>';
 
-    wireAuthorSearch(idx, slice);
+    wireAuthorSearch(host, idx, slice);
+    wirePager(host);
   }
 
-  function wireAuthorSearch(idx, pageSlice) {
-    var input = document.getElementById('author-search');
+  function wireAuthorSearch(host, idx, pageSlice) {
+    var input = host.querySelector('#author-search');
     if (!input) return;
-    var rows = document.getElementById('authors-rows');
-    var pager = document.getElementById('pager');
+    var rows = host.querySelector('#authors-rows');
+    var pager = host.querySelector('#pager');
     input.addEventListener('input', debounce(function () {
       var q = input.value.trim();
       if (!q) {
