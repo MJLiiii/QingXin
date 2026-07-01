@@ -4,5 +4,9 @@ tools/node_modules/
 # 系统文件
 .DS_Store
 
+# iCloud 同步产生的冲突副本（如 manifest 2.json、poems 3/、苏轼 2.json）
+# 本仓库正常文件名均无空格，此规则可安全排除这些垃圾副本
+* [0-9]*
+
 # 说明：data/** 是网站运行所需，应当提交入库；
 # 源仓库 ../chinese-poetry-src 在本仓库之外，不受此文件影响。

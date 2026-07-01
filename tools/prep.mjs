@@ -92,26 +92,20 @@ function groupStanzas(paras) {
 // ---------- 输出目录重置 ----------
 // 仅清理“可再生”产物，保留 annotations/（用户手写的注释叠加层不能丢）
 for (const d of ['index', 'poems', 'authors']) rmSync(join(OUT, d), { recursive: true, force: true });
-for (const f of ['manifest.json', 'featured.json', 'search.json']) rmSync(join(OUT, f), { force: true });
+for (const f of ['manifest.json', 'featured.json', 'search.json', 'authors-index.json']) rmSync(join(OUT, f), { force: true });
 for (const d of ['index', 'poems', 'authors', 'annotations']) mkdirSync(join(OUT, d), { recursive: true });
 
 // ---------- 累加器 ----------
 let chunkBuf = [];    // 当前原文块缓冲
 let chunkNum = 0;     // 当前块号（= 输出文件号）
 const indexAll = [];  // 全部索引条目
-const authors = new Map(); // slug -> { slug, name, dynasty, works:[] }
+const authors = new Map(); // slug -> { slug, name, dynasty, count, works:[] }
 let total = 0;
 const dynasties = { 唐: 0, 宋: 0 };
 
-// 首页精选目标（保留原站 5 首）
-const FEATURED = [
-  { kind: 'ci',  author: '苏轼',   rhythmic: '水调歌头', head: '明月几时有' },
-  { kind: 'shi', author: '李白',   title: '静夜思' },
-  { kind: 'shi', author: '杜甫',   title: '春望' },
-  { kind: 'shi', author: '王维',   title: '山居秋暝' },
-  { kind: 'ci',  author: '李清照', rhythmic: '声声慢', head: '寻寻觅觅' },
-];
-const featuredFound = new Map();
+// 《水调歌头》种子识别：仅用于定位其 id，写种子注释 c59-66.json
+const SEED = { kind: 'ci', author: '苏轼', rhythmic: '水调歌头', head: '明月几时有' };
+let seedHit = null;
 
 function flushChunk() {
   if (!chunkBuf.length) return;
@@ -152,22 +146,20 @@ function addPoem(rec, kind) {
     excerpt,
   });
 
-  // 作者作品归并（代表作品上限 50）
+  // 作者作品归并：count 为真实作品数（不截断），works 仅存代表作前 50
   let a = authors.get(slug);
-  if (!a) { a = { slug, name: rec.author, dynasty, works: [] }; authors.set(slug, a); }
+  if (!a) { a = { slug, name: rec.author, dynasty, count: 0, works: [] }; authors.set(slug, a); }
+  a.count += 1;
   if (a.works.length < 50) {
     a.works.push({ id, title: rec.title, kind: kind === 'ci' ? '词' : '诗' });
   }
 
-  // 精选匹配
-  FEATURED.forEach((tg, ti) => {
-    if (featuredFound.has(ti)) return;
-    if (tg.kind !== kind || rec.author !== tg.author) return;
-    if (tg.title && rec.title !== tg.title) return;
-    if (tg.rhythmic && rec.rhythmic !== tg.rhythmic) return;
-    if (tg.head && !String(rec.paragraphs[0] || '').startsWith(tg.head)) return;
-    featuredFound.set(ti, { id, title: rec.title, author: rec.author, dynasty, excerpt });
-  });
+  // 种子（水调歌头）识别
+  if (!seedHit && kind === SEED.kind && rec.author === SEED.author
+      && rec.rhythmic === SEED.rhythmic
+      && String(rec.paragraphs[0] || '').startsWith(SEED.head)) {
+    seedHit = { id, title: rec.title, author: rec.author, dynasty, excerpt };
+  }
 
   total += 1;
   dynasties[dynasty] += 1;
@@ -282,6 +274,7 @@ for (const a of loadJSON(join(tangDir, 'authors.tang.json'))) {
   bioBySlug.set(slug, { bio: toParagraphs(text), ...parseMeta(text) });
 }
 
+const authorsIndex = [];
 for (const [slug, info] of authors) {
   const b = bioBySlug.get(slug) || { bio: [], style: '', life: '', origin: '' };
   writeFileSync(join(OUT, 'authors', `${slug}.json`), JSON.stringify({
@@ -295,25 +288,16 @@ for (const [slug, info] of authors) {
     bio: b.bio || [],
     works: info.works,
   }));
+  authorsIndex.push({ slug, name: info.name, dynasty: info.dynasty, count: info.count });
 }
 
-// ---------- 首页精选 ----------
-const featured = [];
-for (let ti = 0; ti < FEATURED.length; ti++) {
-  const hit = featuredFound.get(ti);
-  if (hit) featured.push(hit);
-  else console.warn(`  ⚠ 精选未匹配：${FEATURED[ti].author} ${FEATURED[ti].title || FEATURED[ti].rhythmic}`);
-}
-// 不足 5 首用索引前列补齐
-for (let i = 0; featured.length < 5 && i < indexAll.length; i++) {
-  const e = indexAll[i];
-  if (featured.some((f) => f.id === e.id)) continue;
-  featured.push({ id: e.id, title: e.title, author: e.author, dynasty: e.dynasty, excerpt: e.excerpt });
-}
-writeFileSync(join(OUT, 'featured.json'), JSON.stringify(featured, null, 2));
+// ---------- 作者总索引（按作品数降序，供“诗人”页浏览/搜索） ----------
+authorsIndex.sort((a, b) => (b.count - a.count) || a.name.localeCompare(b.name, 'zh'));
+writeFileSync(join(OUT, 'authors-index.json'), JSON.stringify(authorsIndex));
+console.log(`  作者索引 ${authorsIndex.length} 位`);
 
 // ---------- 《水调歌头》种子注释 ----------
-const sd = featuredFound.get(0);
+const sd = seedHit;
 if (sd) {
   writeFileSync(join(OUT, 'annotations', `${sd.id}.json`), JSON.stringify({
     id: sd.id,

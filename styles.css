@@ -204,6 +204,31 @@ body {
 
 .hero__cta:hover { gap: 16px; }
 
+/* 首页操作行：品读全文 + 换一首 */
+.hero__actions {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  margin-top: 48px;
+  flex-wrap: wrap;
+}
+
+.hero__actions .hero__cta { margin-top: 0; }
+
+.hero__shuffle {
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 6px 0;
+  font-family: inherit;
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  color: var(--muted-2);
+  transition: color 0.25s;
+}
+
+.hero__shuffle:hover { color: var(--accent); }
+
 /* ---------- 区块标题 ---------- */
 
 .section {

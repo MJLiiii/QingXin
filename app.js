@@ -7,7 +7,7 @@
 (function () {
   'use strict';
 
-  var PAGES = ['home', 'list', 'poem', 'author'];
+  var PAGES = ['home', 'list', 'poem', 'author', 'authors', 'about'];
   var cache = new Map();
 
   /* ---------- 基础工具 ---------- */
@@ -122,16 +122,18 @@
       + esc(msg) + '</p></div></section>';
   }
 
-  function pagerHTML(page, pages) {
+  function pagerHTML(route, page, pages) {
     function btn(target, label, on) {
       return on
-        ? '<button class="pager__btn" data-nav="list/' + target + '">' + label + '</button>'
+        ? '<button class="pager__btn" data-nav="' + route + '/' + target + '">' + label + '</button>'
         : '<span class="pager__btn pager__btn--off">' + label + '</span>';
     }
     return '<div class="pager" id="pager">'
+      + btn(0, '«', page > 0)
       + btn(page - 1, '← 上一页', page > 0)
       + '<span class="pager__info latin">' + (page + 1) + ' / ' + pages + '</span>'
       + btn(page + 1, '下一页 →', page < pages - 1)
+      + btn(pages - 1, '»', page < pages - 1)
       + '</div>';
   }
 
@@ -145,13 +147,26 @@
 
   /* ---------- 各页渲染 ---------- */
 
+  // 全库随机：随机取一个索引页，从中抽 hero + 5 首随机列表
   async function renderHome() {
-    var featured = await fetchJSON('data/featured.json');
-    var hero = featured[0];
-    var heroPoem = await loadPoem(hero.id);
+    var manifest = await fetchJSON('data/manifest.json');
+    var p = Math.floor(Math.random() * manifest.pages);
+    var entries = await fetchJSON('data/index/page-' + pad4(p) + '.json');
+    var pick = entries.slice();
+    for (var k = pick.length - 1; k > 0; k--) {
+      var j = Math.floor(Math.random() * (k + 1)), t = pick[k]; pick[k] = pick[j]; pick[j] = t;
+    }
+    // hero：取首个正文非空者，避免空白封面
+    var hero = null, heroPoem = null;
+    for (var m = 0; m < pick.length && m < 8; m++) {
+      var poem = await loadPoem(pick[m].id);
+      if (poem && poem.paragraphs && poem.paragraphs.length) { hero = pick[m]; heroPoem = poem; break; }
+    }
+    if (!hero) { hero = pick[0]; heroPoem = await loadPoem(hero.id); }
     var lines = ((heroPoem && heroPoem.paragraphs) || []).slice(0, 2).map(esc).join('<br>');
     var cipai = (heroPoem && heroPoem.rhythmic) || hero.title;
     var kindLabel = hero.id.charAt(0) === 'c' ? '词' : '诗';
+    var list = pick.filter(function (e) { return e.id !== hero.id; }).slice(0, 5);
 
     document.getElementById('page-home').innerHTML =
       '<section class="hero">'
@@ -160,23 +175,32 @@
       + '<div class="hero__eyebrow">' + esc(hero.dynasty) + ' · ' + kindLabel + '</div>'
       + '<h1 class="hero__title">' + lines + '</h1>'
       + '<div class="hero__meta">《' + esc(cipai) + '》　' + esc(hero.author) + '〔' + esc(hero.dynasty) + '〕</div>'
+      + '<div class="hero__actions">'
       + '<button class="hero__cta" data-nav="poem/' + esc(hero.id) + '"><span>品读全文</span><span>→</span></button>'
+      + '<button class="hero__shuffle" data-nav="home">换一首 ↻</button>'
+      + '</div>'
       + '</div>'
       + '</section>'
       + '<section class="section section--list">'
-      + '<div class="section-head"><span class="section-head__title">精选诗词</span>'
-      + '<span class="section-head__tag latin">selected</span></div>'
+      + '<div class="section-head"><span class="section-head__title">随机诗词</span>'
+      + '<span class="section-head__tag latin">random</span></div>'
       + '<div class="rule"></div>'
-      + featured.map(poemRow).join('')
+      + list.map(poemRow).join('')
       + '</section>';
   }
 
-  async function renderList(page) {
-    page = page || 0;
+  // 诗集：底层索引文件仍 500/个，但每屏只显示 DISPLAY 首（小分页）
+  async function renderList(dp) {
+    dp = dp || 0;
     var manifest = await fetchJSON('data/manifest.json');
-    if (page < 0) page = 0;
-    if (page > manifest.pages - 1) page = manifest.pages - 1;
-    var entries = await fetchJSON('data/index/page-' + pad4(page) + '.json');
+    var DISPLAY = 25, perFile = manifest.pageSize / DISPLAY; // 500/25 = 20 显示页/文件
+    var totalPages = Math.ceil(manifest.total / DISPLAY);
+    if (dp < 0) dp = 0;
+    if (dp > totalPages - 1) dp = totalPages - 1;
+    var file = Math.floor(dp / perFile);
+    var entries = await fetchJSON('data/index/page-' + pad4(file) + '.json');
+    var start = (dp % perFile) * DISPLAY;
+    var slice = entries.slice(start, start + DISPLAY);
 
     document.getElementById('page-list').innerHTML =
       '<section class="section section--top">'
@@ -184,11 +208,11 @@
       + '<span class="section-head__tag latin">' + manifest.total + '</span></div>'
       + searchBoxHTML()
       + '<div class="rule"></div>'
-      + '<div id="list-rows">' + entries.map(poemRow).join('') + '</div>'
-      + pagerHTML(page, manifest.pages)
+      + '<div id="list-rows">' + slice.map(poemRow).join('') + '</div>'
+      + pagerHTML('list', dp, totalPages)
       + '</section>';
 
-    wireSearch(entries);
+    wireSearch(slice);
   }
 
   function wireSearch(pageEntries) {
@@ -320,6 +344,88 @@
       + '</section>';
   }
 
+  /* ---------- 诗人列表 ---------- */
+
+  function authorRow(a) {
+    return '<div class="poem-list__item poem-list__item--link" data-nav="author/' + esc(a.slug) + '">'
+      + '<div><div class="poem-list__title">' + esc(a.name) + '</div></div>'
+      + '<div class="poem-list__by">' + esc(a.dynasty) + ' · ' + a.count + ' 首</div>'
+      + '</div>';
+  }
+
+  async function renderAuthors(page) {
+    page = page || 0;
+    var idx = await fetchJSON('data/authors-index.json');
+    var DISPLAY = 25;
+    var totalPages = Math.ceil(idx.length / DISPLAY);
+    if (page < 0) page = 0;
+    if (page > totalPages - 1) page = totalPages - 1;
+    var slice = idx.slice(page * DISPLAY, page * DISPLAY + DISPLAY);
+
+    document.getElementById('page-authors').innerHTML =
+      '<section class="section section--top">'
+      + '<div class="section-head"><span class="section-head__title">诗人</span>'
+      + '<span class="section-head__tag latin">' + idx.length + '</span></div>'
+      + '<div class="search">'
+      + '<input class="search__input" id="author-search" type="search" autocomplete="off"'
+      + ' placeholder="搜索诗人…" aria-label="搜索诗人">'
+      + '<span class="search__tag latin">poets</span>'
+      + '</div>'
+      + '<div class="rule"></div>'
+      + '<div id="authors-rows">' + slice.map(authorRow).join('') + '</div>'
+      + pagerHTML('authors', page, totalPages)
+      + '</section>';
+
+    wireAuthorSearch(idx, slice);
+  }
+
+  function wireAuthorSearch(idx, pageSlice) {
+    var input = document.getElementById('author-search');
+    if (!input) return;
+    var rows = document.getElementById('authors-rows');
+    var pager = document.getElementById('pager');
+    input.addEventListener('input', debounce(function () {
+      var q = input.value.trim();
+      if (!q) {
+        rows.innerHTML = pageSlice.map(authorRow).join('');
+        if (pager) pager.style.display = '';
+        return;
+      }
+      var hits = [];
+      for (var k = 0; k < idx.length && hits.length < 120; k++) {
+        if (idx[k].name.indexOf(q) >= 0) hits.push(idx[k]);
+      }
+      rows.innerHTML = hits.length
+        ? hits.map(authorRow).join('')
+        : '<div class="poem-list__item"><div><div class="poem-list__title">无匹配</div>'
+          + '<div class="poem-list__excerpt">换个名字试试</div></div></div>';
+      if (pager) pager.style.display = 'none';
+    }, 200));
+  }
+
+  /* ---------- 关于 ---------- */
+
+  async function renderAbout() {
+    var about = await fetchJSON('data/about.json');
+    var proseOf = function (paras) {
+      return '<div class="prose">'
+        + (paras || []).map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('')
+        + '</div>';
+    };
+    var html = '<section class="poem-hero"><div class="moon"></div><div class="poem-hero__body">'
+      + '<div class="poem-hero__cipai">关 于</div>'
+      + '<h1 class="poem-hero__title">' + esc(about.title) + '</h1>'
+      + (about.subtitle ? '<div class="poem-hero__sub">' + esc(about.subtitle) + '</div>' : '')
+      + '</div></section>';
+    if (about.lead && about.lead.length) {
+      html += '<section class="author-bio">' + proseOf(about.lead) + '</section>';
+    }
+    (about.sections || []).forEach(function (s) {
+      html += entryShell(s.heading, s.roman || '', proseOf(s.paragraphs));
+    });
+    document.getElementById('page-about').innerHTML = html;
+  }
+
   /* ---------- 路由 ---------- */
 
   var RENDERERS = {
@@ -327,6 +433,8 @@
     list: function (p) { return renderList(parseInt(p || '0', 10) || 0); },
     poem: renderPoem,
     author: renderAuthor,
+    authors: function (p) { return renderAuthors(parseInt(p || '0', 10) || 0); },
+    about: renderAbout,
   };
 
   function show(name) {
