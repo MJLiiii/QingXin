@@ -34,17 +34,21 @@ There is no build, lint, or test step. Two things you actually run:
    global search) and `data/manifest.json` (counts/pagination).
 2. `data/poems/*.json` — **read-only** full 原文 detail, 1000 poems/file.
 3. `data/annotations/<id>.json` — **hand-editable** overlay carrying 注释/译文/赏析/创作背景.
-   Plus `data/authors/<slug>.json` (bios + up to 50 works) and `data/featured.json` (home picks).
+   Plus `data/authors/<slug>.json` (bios + up to 50 works), `data/authors-index.json`
+   (all poets sorted by output, for the 诗人 browse page), and `data/about.json` (关于 page copy).
 
 **Poem IDs encode storage location:** `t<chunk>-<i>` (唐) / `c<chunk>-<i>` (宋词) resolves
 directly to `data/poems/<chunk>.json[i]` — no lookup table. See `parseId()`/`loadPoem()` in
 `app.js`. The flagship 水调歌头 is `c59-66`.
 
 **`app.js`** is an IIFE hash router (extends the original 3-page toggle):
-routes `#/home | #/list/:page | #/poem/:id | #/author/:slug` → `RENDERERS` map →
-`renderHome/renderList/renderPoem/renderAuthor`. Each renderer builds HTML strings **reusing
-the existing CSS classes** and injects into `#page-<name>`; `fetchJSON()` memoizes via a `Map`.
-`data-nav="poem/<id>"`-style attributes drive navigation through one delegated click handler.
+routes `#/home | #/list/:page | #/poem/:id | #/author/:slug | #/authors/:page | #/about` →
+`RENDERERS` map → `renderHome/renderList/renderPoem/renderAuthor/renderAuthors/renderAbout`.
+Home picks a **random** poem each render (换一首 re-invokes it via `data-nav="home"`); 诗集
+paginates 25/page (`DISPLAY`) over the 500-row index files; 诗人 lists all poets from
+`authors-index.json`. Each renderer builds HTML strings **reusing the existing CSS classes**
+and injects into `#page-<name>`; `fetchJSON()` memoizes via a `Map`. `data-nav="poem/<id>"`-style
+attributes drive navigation through one delegated click handler.
 
 **Detail-page invariant:** all five section headings (原文/注释/译文/赏析/创作背景) always
 render. Only 原文 + author bio come from source data; the other four come from the annotation
