@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "qingxin",
+      "runtimeExecutable": "/opt/homebrew/bin/node",
+      "runtimeArgs": ["tools/serve.mjs"],
+      "port": 8080
+    }
+  ]
+}

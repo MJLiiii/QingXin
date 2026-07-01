@@ -1,0 +1,12 @@
+{
+  "total": 78660,
+  "pageSize": 500,
+  "pages": 158,
+  "chunkSize": 1000,
+  "chunks": 79,
+  "dynasties": {
+    "唐": 57607,
+    "宋": 21053
+  },
+  "generatedAt": "2026-07-01T17:49:19.267Z"
+}

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>情心 · 慢读古典</title>
+  <meta name="description" content="情心 — 水墨留白的古诗文赏读。原文、注释、译文、赏析、创作背景，逐层深入。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ============ 页眉 ============ -->
+  <header class="site-header">
+    <div class="site-header__inner">
+      <button class="brand" data-nav="home" aria-label="返回首页">
+        <span class="brand__mark"></span>
+        <span class="brand__name">情心</span>
+      </button>
+      <nav class="site-nav">
+        <button class="site-nav__link" data-nav="list">诗集</button>
+        <button class="site-nav__link" data-nav="author/苏轼">诗人</button>
+        <button class="site-nav__link" data-nav="home">关于</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ============ 页面容器（内容由 app.js 按数据渲染，不写死诗文） ============ -->
+  <main class="page" id="page-home"></main>
+  <main class="page" id="page-list"></main>
+  <main class="page" id="page-poem"></main>
+  <main class="page" id="page-author"></main>
+
+  <!-- 首屏加载态：数据就绪后被替换 -->
+  <div id="boot" class="boot"><span class="boot__mark">情心</span></div>
+
+  <!-- ============ 页脚 ============ -->
+  <footer class="site-footer">
+    <div class="site-footer__mark">情心</div>
+    <div class="site-footer__tagline">慢 读 古 典 · 一 日 一 诗</div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
