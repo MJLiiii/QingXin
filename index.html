@@ -45,5 +45,13 @@
   </footer>
 
   <script src="assets/js/app.js"></script>
+  <script>
+    // 离线/跨刷新缓存；相对路径注册，作用域随部署子路径（/QingXin/）。特性检测 + 静默失败。
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      });
+    }
+  </script>
 </body>
 </html>
