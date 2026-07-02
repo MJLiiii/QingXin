@@ -27,7 +27,7 @@ There is no build, lint, or test step. Two things you actually run:
   `--include-song-shi` is a stub flag to also import 宋诗 (~255k, off by default).
 
 - **Fetch annotations** (optional, only when expanding 注释/译文/赏析/创作背景 coverage):
-  `cd tools && node annotations/annotate-scrape.mjs <backfill|expand|id …>` scrapes 古诗文网
+  `cd tools && node annotations/annotate-scrape.mjs <backfill|expand|id|authors …>` scrapes 古诗文网
   (see the web-scraped-annotations note under Conventions). Long, polite (2.5s/request), and
   fully resumable via `tools/.cache/`. Start with `--dry-run`/`--limit`.
 
@@ -90,11 +90,15 @@ overlay (`loadAnnotation()` merges it over the read-only poem) and show a
   existing files; `--force` only overwrites `source:"gushiwen"` files — hand-written annotations
   (e.g. the c59-66 seed) are never clobbered. To hand-improve an imported poem, edit its JSON and
   drop the `source` field.
-- **Web-scraped annotations:** `node tools/annotations/annotate-scrape.mjs <backfill|expand|id …>`
+- **Web-scraped annotations:** `node tools/annotations/annotate-scrape.mjs <backfill|expand|id|authors …>`
   pulls fuller 注释/译文/赏析/**创作背景** live from 古诗文网 (gushiwen.cn), tagged
   `"source": "gushiwen-web"`. `backfill` refreshes the dataset-imported files section-by-section;
   `expand` crawls 唐/宋 catalog listings to annotate new poems (only writes ids with no existing
-  file, unless `--force`); `id <poemId>` does one. Shares the corpus matcher / field transforms
+  file, unless `--force`); `authors [作者名…] [--top N]` crawls each poet's `astr=` listing (same
+  `default.aspx` endpoint/parser as `expand`, per-author resumable `catalog-author-<name>.json`) to
+  reach the long tail beyond the featured catalog — author names are explicit and/or the top-N most
+  prolific from `authors-index.json` (unioned, deduped by `normAuthor`; skips 无名氏/不详); `id
+  <poemId>` does one. Shares the corpus matcher / field transforms
   with the importer (both in `annotate-lib.mjs`). Three collaborating files under
   `tools/annotations/`: `gushiwen-client.mjs` (polite cached HTTP: 2.5s throttle, retries,
   `BlockedError` on login-wall/403, disk cache = resume), `gushiwen-parse.mjs` (pure HTML→struct
@@ -111,8 +115,10 @@ overlay (`loadAnnotation()` merges it over the read-only poem) and show a
   (`data/annotations/`): 1,037 `gushiwen-web` (backfill refresh + a small `expand` pass over the
   ~600-poem featured 唐诗/宋词 catalogs), 40 residual `gushiwen` (乐府/歌辞 titles search can't
   resolve), 1 hand-written seed; **892 carry 创作背景** (the dataset had none). The featured
-  catalog is largely exhausted — further growth needs by-author crawls, which the tooling doesn't
-  do yet.
+  catalog is largely exhausted; further growth now runs through the `authors` mode (by-author
+  `astr=` crawls). Note prolific poets are mostly un-annotated on 古诗文网, so each corpus-matched
+  poem still costs one detail fetch to confirm before it either writes or counts 转换后为空 — bound
+  each run with `--limit` / `--pages`.
 - `data/**` (~67MB) is committed and is what the site serves; `tools/node_modules` and the
   external `../chinese-poetry-src` clone are gitignored.
 - **Deploy** is GitHub Pages "Deploy from a branch" (`main` / root — no workflow; `.github/`

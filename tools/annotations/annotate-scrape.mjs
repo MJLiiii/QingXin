@@ -5,6 +5,7 @@
      node annotations/annotate-scrape.mjs backfill [--limit N] [--dry-run] [--delay 2500] [--verbose]
      node annotations/annotate-scrape.mjs expand   [--dynasty 唐|宋|all] [--crawl-only] [--limit N] [--force] [--dry-run]
      node annotations/annotate-scrape.mjs id <poemId> [--force] [--dry-run] [--verbose]
+     node annotations/annotate-scrape.mjs authors [作者名…] [--top N] [--pages N] [--limit N] [--force] [--dry-run]
 
    模式：
    - backfill：把现有 source 以 "gushiwen" 开头的注释文件（数据集导入的 ~1045 首）
@@ -12,6 +13,10 @@
    - expand：爬唐/宋目录列表页 → 匹配语料 → 为尚无注释文件的 id 新建。
      --force 额外允许逐节替换 source 以 "gushiwen" 开头的文件。
    - id：单首。有 gushiwen* 文件走 backfill 语义，无文件走 expand 语义。
+   - authors：按作者抓 astr 列表页 → 匹配语料 → 为该作者尚无注释的 id 新建（与 expand 同写策略，
+     用于扩展精选目录之外的长尾覆盖）。作者名可显式传入，也可用 --top N 自动取产量最高的前 N 位。
+     注意：高产作者（如白居易 3009 首）古诗文网多数无注释，每首命中语料的诗仍需一次详情请求
+     才能确认「转换后为空」，成本随之上升——用 --limit / --pages 控制单轮规模。勿传无名氏/佚名/不详。
 
    安全约定：无 source 字段的手写文件（如 c59-66《水调歌头》）任何模式、任何路径永不触碰。
    只写 data/annotations/，绝不改动 data/poems/** 原文。 */
@@ -46,8 +51,11 @@ const detailUrl = (hexid) => `${BASE}/shiwenv_${hexid}.aspx`;
 const searchUrl = (q) => `${BASE}/search.aspx?value=${encodeURIComponent(q)}`;
 const ajaxUrl = (kind, n, idjm, hexid) =>
   `${BASE}/nocdn/ajax${kind}.aspx?id=${n}&idjm=${idjm}&idStr=${hexid}`;
-const catalogUrl = (cstr, xstr, page) =>
-  `${BASE}/shiwens/default.aspx?page=${page}&tstr=&astr=&cstr=${encodeURIComponent(cstr)}&xstr=${encodeURIComponent(xstr)}`;
+const shiwensUrl = ({ tstr = '', astr = '', cstr = '', xstr = '', page = 1 }) =>
+  `${BASE}/shiwens/default.aspx?page=${page}&tstr=${encodeURIComponent(tstr)}` +
+  `&astr=${encodeURIComponent(astr)}&cstr=${encodeURIComponent(cstr)}&xstr=${encodeURIComponent(xstr)}`;
+const catalogUrl = (cstr, xstr, page) => shiwensUrl({ cstr, xstr, page });
+const authorUrl = (astr, page) => shiwensUrl({ astr, page });
 
 const ANN_FILE_RE = /^[tc]\d+-\d+\.json$/; // 排除 README 与 iCloud 冲突副本
 
@@ -68,6 +76,23 @@ const LIMIT = parseInt(opt('--limit', ''), 10) || Infinity;
 const PAGES = parseInt(opt('--pages', ''), 10) || Infinity;
 const DELAY = parseInt(opt('--delay', ''), 10) || 2500;
 const DYNASTY = opt('--dynasty', 'all');
+const TOP = parseInt(opt('--top', ''), 10) || 0;
+
+/* 取值型开关（其后紧跟的非 -- token 是它的值，不是位置参数）。 */
+const VALUE_FLAGS = new Set(['--limit', '--pages', '--delay', '--dynasty', '--top']);
+/* 位置参数（authors 模式的作者名）：跳过 MODE、所有 --flag 及取值型开关吞掉的值。 */
+function positionals() {
+  const out = [];
+  for (let i = 1; i < argv.length; i++) {
+    const tok = argv[i];
+    if (tok.startsWith('--')) {
+      if (VALUE_FLAGS.has(tok) && argv[i + 1] && !argv[i + 1].startsWith('--')) i++;
+      continue;
+    }
+    out.push(tok);
+  }
+  return out;
+}
 
 /* ---------- 断点资产 ---------- */
 
@@ -372,6 +397,44 @@ async function* crawlPages(client, dyn) {
   }
 }
 
+/* ---------- authors ---------- */
+
+/* 作者名 → 断点文件名：归一化（去尾数字、佚名/无名折叠）后剔除文件系统敏感字符，
+   使显式传入的「李白」与 --top 取到的「李白」共用同一进度文件。 */
+const cacheKeyForAuthor = (name) =>
+  (normAuthor(name).replace(/[\/\\?%*:|"<>\s、，,\[\]（）()□]/g, '_') || 'author');
+
+/* 逐页爬某作者的 astr 列表页（与 crawlPages 同构，但按作者而非朝代分页/断点）。
+   列表页与目录页结构一致，故复用 parseCatalogPage；--pages 限制本次单作者翻页数。 */
+async function* crawlAuthorPages(client, name) {
+  const progressPath = join(WEB_CACHE, `catalog-author-${cacheKeyForAuthor(name)}.json`);
+  const prog = await readJson(progressPath, { seen: [], lastPage: 0, done: false, count: 0 });
+  const seen = new Set(prog.seen);
+  let page = prog.lastPage + 1;
+  let pagesThisRun = 0;
+  console.log(`爬 ${name} 作者页（astr=${name}），从第 ${page} 页起，已知 ${prog.count} 条${prog.done ? '（上次已抓完）' : ''}`);
+  while (!prog.done && pagesThisRun < PAGES) {
+    const res = await client.fetchHtml(authorUrl(name, page));
+    if (res.status === 404 || !res.html) { prog.done = true; break; }
+    const { items, nextPage } = parseCatalogPage(res.html);
+    pagesThisRun++;
+    const fresh = [];
+    for (const it of items) {
+      if (seen.has(it.hexid)) continue;
+      seen.add(it.hexid);
+      fresh.push(it); // 列表条目自带 dynasty
+    }
+    prog.seen = [...seen];
+    prog.lastPage = page;
+    prog.count = seen.size;
+    if (!nextPage || nextPage <= page || !items.length) prog.done = true;
+    if (!DRY) { await mkdir(WEB_CACHE, { recursive: true }); await writeFile(progressPath, JSON.stringify(prog), 'utf8'); }
+    if (VERBOSE || page % 25 === 0) console.log(`  ${name} 第 ${page} 页：+${fresh.length} 新（累计 ${seen.size}）`);
+    for (const it of fresh) yield it;
+    page = nextPage;
+  }
+}
+
 /* 处理一个目录条目：先用**列表页已带的正文**（it.blocks）做语料匹配（省请求关键——
    列表页 .contson 是全文，无需先抓详情），匹配通过才抓详情页 + 片段并写全部 fanout 兄弟 id。
    非命中条目零额外请求（正文随目录页免费到手）。 */
@@ -430,6 +493,59 @@ async function runExpand(client, idx) {
       }
       if (processed >= LIMIT) break outer;
     }
+  }
+  T.targets = processed;
+}
+
+/* ---------- authors 驱动 ---------- */
+
+/* 目标作者名单：位置参数在前，再补 --top N 位（authors-index.json 已按产量降序）。
+   按 normAuthor 去重；--top 跳过无名氏/不详及含数字/顿号/括号等杂名。 */
+async function authorTargets() {
+  const map = new Map(); // normAuthor -> 展示名，保序去重
+  for (const n of positionals()) {
+    const na = normAuthor(n);
+    if (!map.has(na)) map.set(na, n);
+  }
+  if (TOP > 0) {
+    const idxAuthors = await readJson(join(DATA, 'authors-index.json'), []);
+    let added = 0;
+    for (const a of idxAuthors) {
+      if (added >= TOP) break;
+      const na = normAuthor(a.name);
+      if (na === '无名氏' || na === '不详') continue;        // 匿名桶：量大值低，不占排名位
+      if (/[、，,\[\]（）()□\s0-9]/.test(a.name)) continue;   // 多作者/编号/杂名：astr 查询与文件名都不友好，不占排名位
+      added++;                                               // 计入排名位（不论是否已在名单，故与位置参数重叠时自然并合）
+      if (!map.has(na)) map.set(na, a.name);
+    }
+  }
+  return [...map.values()];
+}
+
+async function runAuthors(client, idx) {
+  const targets = await authorTargets();
+  if (!targets.length) { console.error('authors 模式需提供作者名或 --top N'); return; }
+  console.log(`authors 目标作者：${targets.join('、')}`);
+  const resolvedHexids = new Set(Object.values(resolved).map((r) => r.hexid));
+  let processed = 0;
+  outer: for (const name of targets) {
+    if (!(idx.byAuthor.get(normAuthor(name)) || []).length) {
+      console.warn(`  跳过：语料中无「${name}」的诗，astr 抓取将全部落空`);
+      continue;
+    }
+    const b = { matched: T.matchedFromCatalog, written: T.written, empty: T.emptyAfterTransform };
+    for await (const it of crawlAuthorPages(client, name)) {
+      if (resolvedHexids.has(it.hexid)) continue;
+      resolvedHexids.add(it.hexid); // 防同名重出诗在本轮重复处理
+      await processCatalogItem(client, idx, it);
+      processed++;
+      if (processed % 50 === 0) {
+        await saveResolved(); await flushReport(client);
+        console.log(`  已处理新条目 ${processed}，写入 ${T.written}`);
+      }
+      if (processed >= LIMIT) break outer;
+    }
+    console.log(`  [${name}] 匹配 ${T.matchedFromCatalog - b.matched}，${DRY ? '将写入' : '写入'} ${T.written - b.written}，转换后为空 ${T.emptyAfterTransform - b.empty}`);
   }
   T.targets = processed;
 }
@@ -506,8 +622,8 @@ async function processIds(client, idx, ids, mode, verbose = VERBOSE) {
 /* ---------- 主流程 ---------- */
 
 async function main() {
-  if (!['backfill', 'expand', 'id'].includes(MODE)) {
-    console.error('用法：annotate-scrape.mjs <backfill|expand|id> [选项]（详见文件头注释）');
+  if (!['backfill', 'expand', 'id', 'authors'].includes(MODE)) {
+    console.error('用法：annotate-scrape.mjs <backfill|expand|id|authors> [选项]（详见文件头注释）');
     process.exit(1);
   }
   console.log('载入情心诗库索引 …');
@@ -521,6 +637,7 @@ async function main() {
   try {
     if (MODE === 'backfill') await runBackfill(client, idx);
     else if (MODE === 'expand') await runExpand(client, idx);
+    else if (MODE === 'authors') await runAuthors(client, idx);
     else if (MODE === 'id') {
       const id = argv[1];
       if (!id || id.startsWith('--')) { console.error('id 模式需提供 poemId'); process.exit(1); }
