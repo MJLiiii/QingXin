@@ -107,7 +107,12 @@ overlay (`loadAnnotation()` merges it over the read-only poem) and show a
   fragment against the always-inline preview and **drops any diverging section**, so 赏析 is either
   complete-and-clean or absent — never garbled. 译文/注释/创作背景 are unaffected. Precedence:
   the importer's `--force` only overwrites `source:"gushiwen"`, so `gushiwen-web` files are never
-  back-filled by the (thinner) dataset version.
+  back-filled by the (thinner) dataset version. **Current coverage:** ~1,078 poems annotated
+  (`data/annotations/`): 1,037 `gushiwen-web` (backfill refresh + a small `expand` pass over the
+  ~600-poem featured 唐诗/宋词 catalogs), 40 residual `gushiwen` (乐府/歌辞 titles search can't
+  resolve), 1 hand-written seed; **892 carry 创作背景** (the dataset had none). The featured
+  catalog is largely exhausted — further growth needs by-author crawls, which the tooling doesn't
+  do yet.
 - `data/**` (~67MB) is committed and is what the site serves; `tools/node_modules` and the
   external `../chinese-poetry-src` clone are gitignored.
 - **Deploy** is GitHub Pages "Deploy from a branch" (`main` / root — no workflow; `.github/`
