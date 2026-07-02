@@ -26,6 +26,11 @@ There is no build, lint, or test step. Two things you actually run:
   ```
   `--include-song-shi` is a stub flag to also import 宋诗 (~255k, off by default).
 
+- **Fetch annotations** (optional, only when expanding 注释/译文/赏析/创作背景 coverage):
+  `cd tools && node annotations/annotate-scrape.mjs <backfill|expand|id …>` scrapes 古诗文网
+  (see the web-scraped-annotations note under Conventions). Long, polite (2.5s/request), and
+  fully resumable via `tools/.cache/`. Start with `--dry-run`/`--limit`.
+
 ## Architecture
 
 **Three-layer static data model** (all produced by `tools/data/prep.mjs`, committed under `data/`):
@@ -85,6 +90,24 @@ overlay (`loadAnnotation()` merges it over the read-only poem) and show a
   existing files; `--force` only overwrites `source:"gushiwen"` files — hand-written annotations
   (e.g. the c59-66 seed) are never clobbered. To hand-improve an imported poem, edit its JSON and
   drop the `source` field.
+- **Web-scraped annotations:** `node tools/annotations/annotate-scrape.mjs <backfill|expand|id …>`
+  pulls fuller 注释/译文/赏析/**创作背景** live from 古诗文网 (gushiwen.cn), tagged
+  `"source": "gushiwen-web"`. `backfill` refreshes the dataset-imported files section-by-section;
+  `expand` crawls 唐/宋 catalog listings to annotate new poems (only writes ids with no existing
+  file, unless `--force`); `id <poemId>` does one. Shares the corpus matcher / field transforms
+  with the importer (both in `annotate-lib.mjs`). Three collaborating files under
+  `tools/annotations/`: `gushiwen-client.mjs` (polite cached HTTP: 2.5s throttle, retries,
+  `BlockedError` on login-wall/403, disk cache = resume), `gushiwen-parse.mjs` (pure HTML→struct
+  parser), `annotate-scrape.mjs` (CLI orchestration). Zero third-party deps. Caches pages +
+  `resolved.json` (poemId→hexid) under gitignored `tools/.cache/gushiwen-web/`; report at
+  `.cache/annotate/scrape-report.json`. Requests carry a `gsw2017user=1` cookie — the site's own
+  boolean presence-flag (not a credential; no login/account) that its JS sets to unlock search and
+  serve un-scrambled text. **赏析投毒:** the site scrambles some 赏析 AJAX full-text via
+  character substitution (的→屈, 一→楼, 情→隋); the scraper detects this by diffing each AJAX
+  fragment against the always-inline preview and **drops any diverging section**, so 赏析 is either
+  complete-and-clean or absent — never garbled. 译文/注释/创作背景 are unaffected. Precedence:
+  the importer's `--force` only overwrites `source:"gushiwen"`, so `gushiwen-web` files are never
+  back-filled by the (thinner) dataset version.
 - `data/**` (~67MB) is committed and is what the site serves; `tools/node_modules` and the
   external `../chinese-poetry-src` clone are gitignored.
 - **Deploy** is GitHub Pages "Deploy from a branch" (`main` / root — no workflow; `.github/`
