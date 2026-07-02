@@ -27,7 +27,10 @@ There is no build, lint, or test step. Two things you actually run:
   `--include-song-shi` is a stub flag to also import 宋诗 (~255k, off by default).
 
 - **Fetch annotations** (optional, only when expanding 注释/译文/赏析/创作背景 coverage):
-  `cd tools && node annotations/annotate-scrape.mjs <backfill|expand|id|authors …>` scrapes 古诗文网
+  `cd tools && node annotations/annotate-scrape.mjs <backfill|expand|id|authors …>` scrapes 古诗文网;
+  `node annotations/crawl-all-authors.mjs [--pause 30]` is the long-running driver that crawls every
+  eligible author one at a time with a pause between each (resumable; `touch tools/.cache/annotate/STOP`
+  to stop gracefully after the current author)
   (see the web-scraped-annotations note under Conventions). Long, polite (2.5s/request), and
   fully resumable via `tools/.cache/`. Start with `--dry-run`/`--limit`.
 
