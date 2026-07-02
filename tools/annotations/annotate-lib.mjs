@@ -60,8 +60,10 @@ export function dice(a, b) {
 }
 
 /* 载入情心诗库并建索引。
-   重要：chunk 文件名按 manifest 计算（0000.json…），绝不 readdir——
-   目录里可能有 iCloud 冲突副本（如 "0057 3.json"）。
+   重要：chunk 文件名按 manifest 计算（0000-0.json…），绝不 readdir——
+   目录里可能有 iCloud 冲突副本（如 "0057 3.json"）。原文按 100 首/子文件存
+   （poems/<块>-<子>.json，见 tools/data/reshard-poems.mjs），故逐块读其各子文件，
+   子文件读尽即 ENOENT 停（末块不足 10 个子文件）。
    返回 { byKey, byAuthor, byId, total }：
    - byKey:    "作者|正文归一化前12字" -> entry[]（全唐诗重出诗会有多条）
    - byAuthor: 作者 -> entry[]
@@ -72,16 +74,23 @@ export async function loadQingxinIndex(dataDir) {
     await readFile(join(dataDir, 'manifest.json'), 'utf8'),
   );
   const chunks = manifest.chunks;
+  const subSize = manifest.subChunkSize || 100;
+  const subsPerChunk = Math.ceil((manifest.chunkSize || 1000) / subSize);
   const byKey = new Map();
   const byAuthor = new Map();
   const byId = new Map();
   let total = 0;
   for (let c = 0; c < chunks; c++) {
-    const name = String(c).padStart(4, '0') + '.json';
-    const poems = JSON.parse(
-      await readFile(join(dataDir, 'poems', name), 'utf8'),
-    );
-    for (const p of poems) {
+    for (let s = 0; s < subsPerChunk; s++) {
+      const name = String(c).padStart(4, '0') + '-' + s + '.json';
+      let poems;
+      try {
+        poems = JSON.parse(await readFile(join(dataDir, 'poems', name), 'utf8'));
+      } catch (e) {
+        if (e.code === 'ENOENT') break; // 该块子文件已读尽（末块不足 subsPerChunk）
+        throw e;
+      }
+      for (const p of poems) {
       const paras = p.paragraphs || [];
       const normFull = normText(paras.join(''));
       if (!normFull) continue;
@@ -102,6 +111,7 @@ export async function loadQingxinIndex(dataDir) {
       byAuthor.get(entry.author).push(entry);
       byId.set(entry.id, entry);
       total++;
+      }
     }
   }
   return { byKey, byAuthor, byId, total };

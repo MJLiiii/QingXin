@@ -10,7 +10,7 @@
    产出（相对仓库根 QingXin/）：
      data/manifest.json          总数 / 分页信息 / 朝代分面
      data/index/page-XXXX.json   浏览索引（500 条/页）
-     data/poems/XXXX.json        原文详情块（1000 首/文件，只读）
+     data/poems/XXXX-S.json      原文详情子块（100 首/文件，只读；每 1000 首 id 块拆 10 个子文件）
      data/authors/<slug>.json    作者简介（一人一文件）
      data/featured.json          首页精选（保留原站 5 首）
      data/annotations/<id>.json  注释叠加层（含《水调歌头》种子）
@@ -38,7 +38,9 @@ const OUT = resolve(REPO, 'data');
 const INCLUDE_SONG_SHI = args.includes('--include-song-shi'); // 宋诗 25 万，暂不启用
 
 const PAGE_SIZE = 500;   // 索引分页
-const CHUNK_SIZE = 1000; // 原文详情分块
+const CHUNK_SIZE = 1000; // id 分块（id 仍为 t<块>-<0..999>，保持稳定，勿改）
+const SUBCHUNK_SIZE = 100; // 落盘子文件粒度：每块拆为 poems/<块>-<0..9>.json，按需只取 100 首
+                           // 前端 loadPoem 用相同的 100 反解，改此值须同步 assets/js 里的除数
 
 if (!existsSync(SRC)) {
   console.error(`✗ 源目录不存在：${SRC}\n  请先：git clone --depth 1 https://github.com/chinese-poetry/chinese-poetry ${SRC}`);
@@ -109,7 +111,12 @@ let seedHit = null;
 
 function flushChunk() {
   if (!chunkBuf.length) return;
-  writeFileSync(join(OUT, 'poems', `${pad4(chunkNum)}.json`), JSON.stringify(chunkBuf));
+  // 每个 id 块（1000 首）拆成若干 100 首的子文件：poems/<块>-<子>.json。
+  // id 不变（仍 t<块>-<0..999>）；loadPoem 以 floor(i/100) 定位子文件、i%100 取项。
+  for (let s = 0; s * SUBCHUNK_SIZE < chunkBuf.length; s++) {
+    const slice = chunkBuf.slice(s * SUBCHUNK_SIZE, (s + 1) * SUBCHUNK_SIZE);
+    writeFileSync(join(OUT, 'poems', `${pad4(chunkNum)}-${s}.json`), JSON.stringify(slice));
+  }
   chunkBuf = [];
   chunkNum += 1;
 }
@@ -227,6 +234,7 @@ writeFileSync(join(OUT, 'manifest.json'), JSON.stringify({
   pageSize: PAGE_SIZE,
   pages,
   chunkSize: CHUNK_SIZE,
+  subChunkSize: SUBCHUNK_SIZE,
   chunks: chunkNum,
   dynasties,
   generatedAt: new Date().toISOString(),

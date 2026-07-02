@@ -37,14 +37,17 @@ There is no build, lint, or test step. Two things you actually run:
 1. `data/index/page-*.json` — lightweight paginated browse index (500/page): id, title,
    author, dynasty, kind, excerpt. Also `data/search.json` (compact `[id,title,author]` for
    global search) and `data/manifest.json` (counts/pagination).
-2. `data/poems/*.json` — **read-only** full 原文 detail, 1000 poems/file.
+2. `data/poems/<chunk>-<sub>.json` — **read-only** full 原文 detail, **100 poems/file**
+   (each 1000-poem id-block is split into ten 100-poem sub-files so one poem view fetches ~40KB,
+   not a ~470KB whole chunk). See `tools/data/reshard-poems.mjs`.
 3. `data/annotations/<id>.json` — **hand-editable** overlay carrying 注释/译文/赏析/创作背景.
    Plus `data/authors/<slug>.json` (bios + up to 50 works), `data/authors-index.json`
    (all poets sorted by output, for the 诗人 browse page), and `data/about.json` (关于 page copy).
 
-**Poem IDs encode storage location:** `t<chunk>-<i>` (唐) / `c<chunk>-<i>` (宋词) resolves
-directly to `data/poems/<chunk>.json[i]` — no lookup table. See `parseId()`/`loadPoem()` in
-`assets/js/app.js`. The flagship 水调歌头 is `c59-66`.
+**Poem IDs encode storage location:** `t<chunk>-<i>` (唐) / `c<chunk>-<i>` (宋词), where `i` is the
+0–999 position within the id-block, resolves to `data/poems/<chunk>-<⌊i/100⌋>.json[i%100]` — no
+lookup table. Ids are unchanged by the sub-file split, so annotations/index/search still key off them.
+See `parseId()`/`loadPoem()` in `assets/js/app.js`. The flagship 水调歌头 is `c59-66`.
 
 **`assets/js/app.js`** is an IIFE hash router (extends the original 3-page toggle):
 routes `#/home | #/list/:page | #/poem/:id | #/author/:slug | #/authors/:page | #/about` →

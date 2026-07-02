@@ -45,11 +45,14 @@
     return { kind: m[1] === 't' ? 'shi' : 'ci', chunk: +m[2], i: +m[3] };
   }
 
+  // 原文按 100 首/子文件存储：poems/<块>-<子>.json，子 = ⌊i/100⌋，取项 i%100。
+  // id 仍编码块内序号 i(0..999)，故 id/注释/索引均不受影响（见 tools/data/reshard-poems.mjs）。
   async function loadPoem(id) {
     var loc = parseId(id);
     if (!loc) return null;
-    var chunk = await fetchJSON('data/poems/' + pad4(loc.chunk) + '.json');
-    return chunk[loc.i] || null;
+    var sub = Math.floor(loc.i / 100);
+    var slice = await fetchJSON('data/poems/' + pad4(loc.chunk) + '-' + sub + '.json');
+    return slice[loc.i % 100] || null;
   }
 
   async function loadAnnotation(id) {
@@ -192,13 +195,14 @@
     for (var k = pick.length - 1; k > 0; k--) {
       var j = Math.floor(Math.random() * (k + 1)), t = pick[k]; pick[k] = pick[j]; pick[j] = t;
     }
-    // hero：取首个正文非空者，避免空白封面
-    var hero = null, heroPoem = null;
-    for (var m = 0; m < pick.length && m < 8; m++) {
-      var poem = await loadPoem(pick[m].id);
-      if (poem && poem.paragraphs && poem.paragraphs.length) { hero = pick[m]; heroPoem = poem; break; }
+    // hero：借索引自带的 excerpt 先选正文非空者（零请求），再只为选中者取一次全文——
+    // 避免旧写法为挑封面而顺序拉多块原文。
+    var hero = null;
+    for (var m = 0; m < pick.length; m++) {
+      if (pick[m].excerpt && pick[m].excerpt.length) { hero = pick[m]; break; }
     }
-    if (!hero) { hero = pick[0]; heroPoem = await loadPoem(hero.id); }
+    if (!hero) hero = pick[0];
+    var heroPoem = await loadPoem(hero.id);
     var lines = ((heroPoem && heroPoem.paragraphs) || []).slice(0, 2).map(esc).join('<br>');
     var cipai = (heroPoem && heroPoem.rhythmic) || hero.title;
     var kindLabel = hero.id.charAt(0) === 'c' ? '词' : '诗';

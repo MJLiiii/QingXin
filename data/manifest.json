@@ -3,6 +3,7 @@
   "pageSize": 500,
   "pages": 158,
   "chunkSize": 1000,
+  "subChunkSize": 100,
   "chunks": 79,
   "dynasties": {
     "唐": 57607,
