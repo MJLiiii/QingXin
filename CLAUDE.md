@@ -41,7 +41,9 @@ There is no build, lint, or test step. Two things you actually run:
    (each 1000-poem id-block is split into ten 100-poem sub-files so one poem view fetches ~40KB,
    not a ~470KB whole chunk). See `tools/data/reshard-poems.mjs`.
 3. `data/annotations/<id>.json` — **hand-editable** overlay carrying 注释/译文/赏析/创作背景.
-   Plus `data/authors/<slug>.json` (bios + up to 50 works), `data/authors-index.json`
+   Plus `data/authors/bucket-<000..255>.json` (author records `{slug: {bio, up to 50 works, …}}`,
+   bundled into 256 hash-shards — `loadAuthor` resolves `slug`→bucket; see `tools/data/bundle-authors.mjs`),
+   `data/authors-index.json`
    (all poets sorted by output, for the 诗人 browse page), and `data/about.json` (关于 page copy).
 
 **Poem IDs encode storage location:** `t<chunk>-<i>` (唐) / `c<chunk>-<i>` (宋词), where `i` is the

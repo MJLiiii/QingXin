@@ -282,10 +282,21 @@ for (const a of loadJSON(join(tangDir, 'authors.tang.json'))) {
   bioBySlug.set(slug, { bio: toParagraphs(text), ...parseMeta(text) });
 }
 
+// 作者按 256 桶打包为 authors/bucket-<000..255>.json（对象 {slug: 记录}），削减小文件数。
+// authorBucket 须与 app.js loadAuthor / bundle-authors.mjs 完全一致（改动三处需同步）。
+const AUTHOR_BUCKETS = 256;
+const authorBucket = (slug) => {
+  let h = 0;
+  for (let i = 0; i < slug.length; i++) h = (h * 31 + slug.charCodeAt(i)) >>> 0;
+  return h % AUTHOR_BUCKETS;
+};
+const pad3 = (n) => ('00' + n).slice(-3);
+
 const authorsIndex = [];
+const authorBucketsOut = new Map(); // bucket -> {slug: 记录}
 for (const [slug, info] of authors) {
   const b = bioBySlug.get(slug) || { bio: [], style: '', life: '', origin: '' };
-  writeFileSync(join(OUT, 'authors', `${slug}.json`), JSON.stringify({
+  const rec = {
     slug,
     name: info.name,
     dynasty: info.dynasty,
@@ -295,8 +306,14 @@ for (const [slug, info] of authors) {
     seal: (info.name || '')[0] || '',
     bio: b.bio || [],
     works: info.works,
-  }));
+  };
+  const bk = authorBucket(slug);
+  if (!authorBucketsOut.has(bk)) authorBucketsOut.set(bk, {});
+  authorBucketsOut.get(bk)[slug] = rec;
   authorsIndex.push({ slug, name: info.name, dynasty: info.dynasty, count: info.count });
+}
+for (const [bk, obj] of authorBucketsOut) {
+  writeFileSync(join(OUT, 'authors', `bucket-${pad3(bk)}.json`), JSON.stringify(obj));
 }
 
 // ---------- 作者总索引（按作品数降序，供“诗人”页浏览/搜索） ----------

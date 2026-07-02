@@ -60,9 +60,18 @@
     catch (e) { return null; }
   }
 
+  // 作者记录打包在 authors/bucket-<000..255>.json 里，按 slug 索引。
+  // authorBucket 须与 tools/data/prep.mjs、bundle-authors.mjs 完全一致（改动三处需同步）。
+  function authorBucket(slug) {
+    var h = 0;
+    for (var i = 0; i < slug.length; i++) h = (h * 31 + slug.charCodeAt(i)) >>> 0;
+    return h % 256;
+  }
   async function loadAuthor(slug) {
-    try { return await fetchJSON('data/authors/' + encodeURIComponent(slug) + '.json'); }
-    catch (e) { return null; }
+    try {
+      var bundle = await fetchJSON('data/authors/bucket-' + ('00' + authorBucket(slug)).slice(-3) + '.json');
+      return bundle[slug] || null;
+    } catch (e) { return null; }
   }
 
   // 原文按空串分节；无空串则整首一节
