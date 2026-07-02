@@ -7,7 +7,8 @@
   "scripts": {
     "serve": "node server/serve.mjs",
     "prep": "node data/prep.mjs",
-    "annotate:import": "node annotations/annotate-import.mjs"
+    "annotate:import": "node annotations/annotate-import.mjs",
+    "annotate:scrape": "node annotations/annotate-scrape.mjs"
   },
   "dependencies": {
     "opencc-js": "^1.0.5"

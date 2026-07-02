@@ -16,7 +16,7 @@ import { mkdir, readFile, writeFile, readdir, stat } from 'node:fs/promises';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  normText, normAuthor, normTitle, dice, loadQingxinIndex,
+  loadQingxinIndex, matchToCorpus, splitParas, parseNotes, parseTranslation,
 } from './annotate-lib.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -105,135 +105,10 @@ function contentBlocks(rec) {
     .filter(Boolean);
 }
 
-/* 候选正文：全文，以及（可能去掉序的）后续块 */
-function candidateBodies(blocks) {
-  const bodies = [{ text: blocks.join('\n'), preface: null }];
-  if (blocks.length > 1) {
-    bodies.push({ text: blocks.slice(1).join('\n'), preface: blocks[0] });
-  }
-  return bodies;
-}
-
-/* 返回 {matches:[{entry,score,preface,tier}]} 或 {ambiguous:{…}} 或 {matches:[]} */
-function matchRecord(rec, idx) {
-  const author = normAuthor(rec.writer);
-  const blocks = contentBlocks(rec);
-  if (!blocks.length) return { matches: [] };
-  const bodies = candidateBodies(blocks);
-  const titleNorms = normTitle(rec.title);
-  const anon = author === '无名氏';
-
-  /* Tier A：作者 + 正文前12字 精确键，再 Dice/长度比验证 */
-  const perEntry = new Map(); // entry -> {entry,score,preface,tier}
-  for (const b of bodies) {
-    const norm = normText(b.text);
-    if (norm.length < 4) continue;
-    const minDice = anon ? 0.90 : 0.75;
-    for (const e of idx.byKey.get(author + '|' + norm.slice(0, 12)) || []) {
-      const ratio = norm.length / e.normFull.length;
-      if (ratio < 0.6 || ratio > 1.5) continue;
-      const s = dice(norm, e.normFull);
-      if (s < minDice) continue;
-      const prev = perEntry.get(e);
-      if (!prev || s > prev.score) {
-        perEntry.set(e, { entry: e, score: s, preface: b.preface, tier: 'A' });
-      }
-    }
-  }
-  if (perEntry.size) return { matches: [...perEntry.values()] };
-  if (anon) return { matches: [] }; // 佚名只走 Tier A
-
-  /* Tier B：同作者全集模糊扫描 */
-  for (const b of bodies) {
-    const norm = normText(b.text);
-    if (norm.length < 4) continue;
-    for (const e of idx.byAuthor.get(author) || []) {
-      const ratio = norm.length / e.normFull.length;
-      if (ratio < 0.5 || ratio > 2) continue;
-      const s = dice(norm, e.normFull);
-      const prev = perEntry.get(e);
-      if (!prev || s > prev.score) {
-        perEntry.set(e, { entry: e, score: s, preface: b.preface, tier: 'B' });
-      }
-    }
-  }
-  const ranked = [...perEntry.values()].sort((a, b) => b.score - a.score);
-  if (!ranked.length) return { matches: [] };
-  const best = ranked[0];
-  const titleHit = titleNorms.some((t) => best.entry.titleNorms.includes(t));
-  if (!(best.score >= 0.85 || (best.score >= 0.70 && titleHit))) {
-    return { matches: [] };
-  }
-  /* 歧义检查：次优解太接近且不是重出诗则放弃。
-     同作者两首正文 Dice ≥ 0.80 几乎必为重出异文（组诗兄弟篇远低于此），
-     视为同一首诗的多个拷贝，全部接受 */
-  const accepted = [best];
-  for (let i = 1; i < ranked.length; i++) {
-    const r = ranked[i];
-    if (best.score - r.score > 0.05) break;
-    if (dice(best.entry.normFull, r.entry.normFull) >= 0.80) accepted.push(r);
-    else {
-      return {
-        ambiguous: {
-          title: rec.title, writer: rec.writer,
-          best: { id: best.entry.id, title: best.entry.title, score: +best.score.toFixed(3) },
-          runner: { id: r.entry.id, title: r.entry.title, score: +r.score.toFixed(3) },
-        },
-      };
-    }
-  }
-  return { matches: accepted };
-}
-
 /* ---------- 字段转换 ---------- */
 
-function cleanLine(s) {
-  return s
-    .replace(/▲/g, '')
-    /* 爬虫黏连的标题头，如 "《核舟记》 　　苏东坡的词…"——
-       书名号短标题后紧跟全角缩进才剥（正常行文不会这样开头） */
-    .replace(/^《[^《》]{1,12}》\s*　+/, '')
-    .replace(/^[　\s]+|[　\s]+$/g, '');
-}
-
-function splitParas(s) {
-  return String(s || '').split(/\n+/).map(cleanLine).filter(Boolean);
-}
-
-/* remark → notes[{term,def}]：全/半角冒号在第1~30字符处开新词条，
-   无冒号行是上一条释义的续行 */
-function parseRemark(remark) {
-  const notes = [];
-  for (const raw of String(remark || '').split('\n')) {
-    const line = cleanLine(raw);
-    if (!line) continue;
-    const m = line.match(/^(.{1,30}?)[：:]\s*(.*)$/);
-    if (m && m[1].trim()) notes.push({ term: m[1].trim(), def: m[2].trim() });
-    else if (notes.length) notes[notes.length - 1].def += line;
-  }
-  return notes.filter((n) => n.def);
-}
-
-/* translation → prefaceTranslation? + translation[]。
-   「韵译/意译/直译」等备选译文从标签行起丢弃 */
-const LABEL_RE = /^[（(【\[]?(韵译|意译|直译|韵意译)[】\])）]?[：:]?$/;
-function parseTranslation(s, hasPreface) {
-  let paras = splitParas(s);
-  const li = paras.findIndex((p) => LABEL_RE.test(p));
-  if (li > 0) paras = paras.slice(0, li);
-  else if (li === 0) {
-    paras = paras.slice(1);
-    const li2 = paras.findIndex((p) => LABEL_RE.test(p));
-    if (li2 >= 0) paras = paras.slice(0, li2);
-  }
-  if (hasPreface && paras.length >= 2) {
-    return { prefaceTranslation: paras[0], translation: paras.slice(1) };
-  }
-  return { prefaceTranslation: '', translation: paras };
-}
-
 function toAnnotation(rec, id, preface) {
-  const notes = parseRemark(rec.remark);
+  const notes = parseNotes(rec.remark);
   const { prefaceTranslation, translation } = parseTranslation(rec.translation, !!preface);
   const appreciation = splitParas(rec.shangxi);
   if (!notes.length && !translation.length && !appreciation.length) return null;
@@ -271,7 +146,9 @@ async function main() {
   const fanouts = [];
   let tierA = 0; let tierB = 0;
   for (const rec of usable) {
-    const res = matchRecord(rec, idx);
+    const res = matchToCorpus(
+      { title: rec.title, author: rec.writer, blocks: contentBlocks(rec) }, idx,
+    );
     if (res.ambiguous) { ambiguous.push(res.ambiguous); continue; }
     if (!res.matches.length) {
       if (rec.dynasty === '唐代' || rec.dynasty === '宋代') {
