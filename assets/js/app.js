@@ -78,23 +78,31 @@
 
   /* ---------- 片段模板（复用现有 CSS 类） ---------- */
 
-  function poemRow(e) {
-    return '<div class="poem-list__item poem-list__item--link" data-nav="poem/' + esc(e.id) + '">'
-      + '<div>'
-      + '<div class="poem-list__title">' + esc(e.title) + '</div>'
-      + (e.excerpt ? '<div class="poem-list__excerpt">' + esc(e.excerpt) + '</div>' : '')
+  // 列表行通用骨架（诗集/搜索/诗人共用）。nav 已含前缀且调用方自行 esc；
+  // title 由本函数 esc；by 是调用方拼好的 HTML（其中动态部分已 esc）；excerpt 可选。
+  function listRow(nav, title, by, excerpt) {
+    return '<div class="poem-list__item poem-list__item--link" data-nav="' + nav + '">'
+      + '<div><div class="poem-list__title">' + esc(title) + '</div>'
+      + (excerpt ? '<div class="poem-list__excerpt">' + esc(excerpt) + '</div>' : '')
       + '</div>'
-      + '<div class="poem-list__by">' + esc(e.author) + ' · ' + esc(e.dynasty) + '</div>'
+      + '<div class="poem-list__by">' + by + '</div>'
       + '</div>';
   }
 
-  // 搜索结果行（search.json 为紧凑数组 [id,title,author]）
+  function poemRow(e) {
+    return listRow('poem/' + esc(e.id), e.title, esc(e.author) + ' · ' + esc(e.dynasty), e.excerpt);
+  }
+
+  // 搜索结果行（search.json 为紧凑数组 [id,title,author]；朝代由 id 首字符推断）
   function searchRow(a) {
-    var id = a[0], dyn = id.charAt(0) === 't' ? '唐' : '宋';
-    return '<div class="poem-list__item poem-list__item--link" data-nav="poem/' + esc(id) + '">'
-      + '<div><div class="poem-list__title">' + esc(a[1]) + '</div></div>'
-      + '<div class="poem-list__by">' + esc(a[2]) + ' · ' + dyn + '</div>'
-      + '</div>';
+    var id = a[0];
+    return listRow('poem/' + esc(id), a[1], esc(a[2]) + ' · ' + (id.charAt(0) === 't' ? '唐' : '宋'));
+  }
+
+  // 无匹配占位（两处搜索共用）
+  function emptyState(hint) {
+    return '<div class="poem-list__item"><div><div class="poem-list__title">无匹配</div>'
+      + '<div class="poem-list__excerpt">' + esc(hint) + '</div></div></div>';
   }
 
   function entryShell(title, roman, inner, ruleClass, collapsible) {
@@ -176,11 +184,13 @@
     if (goBtn) goBtn.addEventListener('click', jump);
   }
 
-  function searchBoxHTML() {
+  // 搜索框（诗集/诗人共用；诗人页覆写 id/占位/角标）
+  function searchBoxHTML(o) {
+    o = o || {};
     return '<div class="search">'
-      + '<input class="search__input" id="search-input" type="search" autocomplete="off"'
-      + ' placeholder="搜索诗词标题、作者…" aria-label="搜索">'
-      + '<span class="search__tag latin">search</span>'
+      + '<input class="search__input" id="' + (o.id || 'search-input') + '" type="search" autocomplete="off"'
+      + ' placeholder="' + (o.placeholder || '搜索诗词标题、作者…') + '" aria-label="' + (o.aria || '搜索') + '">'
+      + '<span class="search__tag latin">' + (o.tag || 'search') + '</span>'
       + '</div>';
   }
 
@@ -257,32 +267,41 @@
     wirePager(host);
   }
 
-  function wireSearch(host, pageEntries) {
-    var input = host.querySelector('#search-input');
+  /* 即时搜索通用装配（诗集全局搜 / 诗人名搜共用）。
+     o: { host, inputSel, rowsSel, restore()→html, match(q)→Promise<html> }。
+     空查询恢复本页行并显示分页；有查询用 match 结果替换并隐藏分页。 */
+  function wireLiveSearch(o) {
+    var input = o.host.querySelector(o.inputSel);
     if (!input) return;
-    var rows = host.querySelector('#list-rows');
-    var pager = host.querySelector('#pager');
-
+    var rows = o.host.querySelector(o.rowsSel);
+    var pager = o.host.querySelector('#pager');
     input.addEventListener('input', debounce(async function () {
       var q = input.value.trim();
       if (!q) {
-        rows.innerHTML = pageEntries.map(poemRow).join('');
+        rows.innerHTML = o.restore();
         if (pager) pager.style.display = '';
         return;
       }
-      var idx;
-      try { idx = await fetchJSON('data/search.json'); }
-      catch (e) { rows.innerHTML = errorSection('搜索索引加载失败'); return; }
-      var hits = [];
-      for (var k = 0; k < idx.length && hits.length < 120; k++) {
-        if (idx[k][1].indexOf(q) >= 0 || idx[k][2].indexOf(q) >= 0) hits.push(idx[k]);
-      }
-      rows.innerHTML = hits.length
-        ? hits.map(searchRow).join('')
-        : '<div class="poem-list__item"><div><div class="poem-list__title">无匹配</div>'
-          + '<div class="poem-list__excerpt">换个关键词试试</div></div></div>';
+      rows.innerHTML = await o.match(q);
       if (pager) pager.style.display = 'none';
     }, 200));
+  }
+
+  function wireSearch(host, pageEntries) {
+    wireLiveSearch({
+      host: host, inputSel: '#search-input', rowsSel: '#list-rows',
+      restore: function () { return pageEntries.map(poemRow).join(''); },
+      match: async function (q) {
+        var idx;
+        try { idx = await fetchJSON('data/search.json'); }
+        catch (e) { return errorSection('搜索索引加载失败'); }
+        var hits = [];
+        for (var k = 0; k < idx.length && hits.length < 120; k++) {
+          if (idx[k][1].indexOf(q) >= 0 || idx[k][2].indexOf(q) >= 0) hits.push(idx[k]);
+        }
+        return hits.length ? hits.map(searchRow).join('') : emptyState('换个关键词试试');
+      },
+    });
   }
 
   async function renderPoem(id) {
@@ -389,10 +408,7 @@
   /* ---------- 诗人列表 ---------- */
 
   function authorRow(a) {
-    return '<div class="poem-list__item poem-list__item--link" data-nav="author/' + esc(a.slug) + '">'
-      + '<div><div class="poem-list__title">' + esc(a.name) + '</div></div>'
-      + '<div class="poem-list__by">' + esc(a.dynasty) + ' · ' + a.count + ' 首</div>'
-      + '</div>';
+    return listRow('author/' + esc(a.slug), a.name, esc(a.dynasty) + ' · ' + a.count + ' 首');
   }
 
   async function renderAuthors(page) {
@@ -409,11 +425,7 @@
       '<section class="section section--top">'
       + '<div class="section-head"><span class="section-head__title">诗人</span>'
       + '<span class="section-head__tag latin">' + idx.length + '</span></div>'
-      + '<div class="search">'
-      + '<input class="search__input" id="author-search" type="search" autocomplete="off"'
-      + ' placeholder="搜索诗人…" aria-label="搜索诗人">'
-      + '<span class="search__tag latin">poets</span>'
-      + '</div>'
+      + searchBoxHTML({ id: 'author-search', placeholder: '搜索诗人…', aria: '搜索诗人', tag: 'poets' })
       + '<div class="rule"></div>'
       + '<div id="authors-rows">' + slice.map(authorRow).join('') + '</div>'
       + pagerHTML('authors', page, totalPages)
@@ -424,27 +436,17 @@
   }
 
   function wireAuthorSearch(host, idx, pageSlice) {
-    var input = host.querySelector('#author-search');
-    if (!input) return;
-    var rows = host.querySelector('#authors-rows');
-    var pager = host.querySelector('#pager');
-    input.addEventListener('input', debounce(function () {
-      var q = input.value.trim();
-      if (!q) {
-        rows.innerHTML = pageSlice.map(authorRow).join('');
-        if (pager) pager.style.display = '';
-        return;
-      }
-      var hits = [];
-      for (var k = 0; k < idx.length && hits.length < 120; k++) {
-        if (idx[k].name.indexOf(q) >= 0) hits.push(idx[k]);
-      }
-      rows.innerHTML = hits.length
-        ? hits.map(authorRow).join('')
-        : '<div class="poem-list__item"><div><div class="poem-list__title">无匹配</div>'
-          + '<div class="poem-list__excerpt">换个名字试试</div></div></div>';
-      if (pager) pager.style.display = 'none';
-    }, 200));
+    wireLiveSearch({
+      host: host, inputSel: '#author-search', rowsSel: '#authors-rows',
+      restore: function () { return pageSlice.map(authorRow).join(''); },
+      match: async function (q) {
+        var hits = [];
+        for (var k = 0; k < idx.length && hits.length < 120; k++) {
+          if (idx[k].name.indexOf(q) >= 0) hits.push(idx[k]);
+        }
+        return hits.length ? hits.map(authorRow).join('') : emptyState('换个名字试试');
+      },
+    });
   }
 
   /* ---------- 关于 ---------- */
