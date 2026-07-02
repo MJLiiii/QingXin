@@ -65,6 +65,7 @@ const FORCE = flag('--force');
 const VERBOSE = flag('--verbose');
 const CRAWL_ONLY = flag('--crawl-only');
 const LIMIT = parseInt(opt('--limit', ''), 10) || Infinity;
+const PAGES = parseInt(opt('--pages', ''), 10) || Infinity;
 const DELAY = parseInt(opt('--delay', ''), 10) || 2500;
 const DYNASTY = opt('--dynasty', 'all');
 
@@ -337,94 +338,100 @@ async function runBackfill(client, idx) {
 
 const DYN_QUERIES = { 唐: ['唐代', '诗'], 宋: ['宋代', '词'] };
 
-async function crawlCatalog(client, dyn) {
+/* 逐页爬某朝代目录（按热度排序），产出未见过的条目。断点：progress 文件存
+   {seen, lastPage, done, count}，每页落盘；--pages 限制本次翻页数。
+   目录条目量级巨大（数千页），故以生成器流式产出，由调用方决定处理多少。 */
+async function* crawlPages(client, dyn) {
   const [cstr, xstr] = DYN_QUERIES[dyn];
   const progressPath = join(WEB_CACHE, `catalog-${dyn}.json`);
-  const prog = await readJson(progressPath, { items: [], seen: [], lastPage: 0, done: false });
+  const prog = await readJson(progressPath, { seen: [], lastPage: 0, done: false, count: 0 });
   const seen = new Set(prog.seen);
   let page = prog.lastPage + 1;
-  console.log(`爬 ${dyn} 目录（cstr=${cstr} xstr=${xstr}），从第 ${page} 页起，已有 ${prog.items.length} 条`);
-  while (!prog.done) {
+  let pagesThisRun = 0;
+  console.log(`爬 ${dyn} 目录（cstr=${cstr} xstr=${xstr}），从第 ${page} 页起，已知 ${prog.count} 条${prog.done ? '（上次已抓完）' : ''}`);
+  while (!prog.done && pagesThisRun < PAGES) {
     const url = catalogUrl(cstr, xstr, page);
     const res = await client.fetchHtml(url);
-    if (res.status === 404 || !res.html) break;
+    if (res.status === 404 || !res.html) { prog.done = true; break; }
     const { items, nextPage } = parseCatalogPage(res.html);
-    let added = 0;
+    pagesThisRun++;
+    const fresh = [];
     for (const it of items) {
       if (seen.has(it.hexid)) continue;
       seen.add(it.hexid);
-      prog.items.push({ hexid: it.hexid, title: it.title, author: it.author });
-      added++;
+      fresh.push({ ...it, dynasty: dyn });
     }
     prog.seen = [...seen];
     prog.lastPage = page;
+    prog.count = seen.size;
     if (!nextPage || nextPage <= page || !items.length) prog.done = true;
-    if (VERBOSE || page % 20 === 0) {
-      console.log(`  第 ${page} 页：+${added}（累计 ${prog.items.length}）`);
-    }
-    if (!DRY) await writeFile(progressPath, JSON.stringify(prog), 'utf8');
-    if (prog.items.length >= LIMIT) { console.log(`  已达 --limit ${LIMIT}，停止`); break; }
+    if (!DRY) { await mkdir(WEB_CACHE, { recursive: true }); await writeFile(progressPath, JSON.stringify(prog), 'utf8'); }
+    if (VERBOSE || page % 25 === 0) console.log(`  第 ${page} 页：+${fresh.length} 新（累计 ${seen.size}）`);
+    for (const it of fresh) yield it;
     page = nextPage;
   }
-  console.log(`${dyn} 目录：共 ${prog.items.length} 条${prog.done ? '（已抓完）' : ''}`);
-  return prog.items;
+}
+
+/* 处理一个目录条目：先用**列表页已带的正文**（it.blocks）做语料匹配（省请求关键——
+   列表页 .contson 是全文，无需先抓详情），匹配通过才抓详情页 + 片段并写全部 fanout 兄弟 id。
+   非命中条目零额外请求（正文随目录页免费到手）。 */
+async function processCatalogItem(client, idx, it) {
+  try {
+    const matchRes = matchToCorpus({ title: it.title, author: it.author, blocks: it.blocks }, idx);
+    if (matchRes.ambiguous) {
+      T.ambiguous++; report.ambiguousList.push({ hexid: it.hexid, ...matchRes.ambiguous }); return;
+    }
+    if (!matchRes.matches.length) { T.notOnGushiwen++; return; }
+    T.matchedFromCatalog++;
+    const first = matchRes.matches[0].entry;
+    const { ann, meta } = await scrapeContent(client, it.hexid, first);
+    if (!ann) {
+      if (meta.reason === 'bodyMismatch') T.bodyMismatch++; else T.notOnGushiwen++;
+      return;
+    }
+    T.verified++;
+    if (!meta.hasBackground) T.noBackgroundOnPage++;
+    if (meta.poisonedSections) T.poisonedDropped++;
+    for (const m of matchRes.matches) { // 一次抓取写全部 fanout 兄弟 id
+      resolved[m.entry.id] = { hexid: it.hexid, score: +m.score.toFixed(3), method: 'catalog', at: new Date().toISOString() };
+      recordOutcome(await commit(m.entry.id, { ...ann, id: m.entry.id }, 'expand'), m.entry.id);
+    }
+  } catch (e) {
+    if (e instanceof BlockedError) throw e;
+    report.validationWarnList.push({ hexid: it.hexid, error: String(e.message || e) });
+    T.errors++;
+  }
 }
 
 async function runExpand(client, idx) {
   const dyns = DYNASTY === 'all' ? ['唐', '宋'] : [DYNASTY];
-  let catalog = [];
-  for (const dyn of dyns) catalog = catalog.concat(await crawlCatalog(client, dyn));
-  await flushReport(client);
+  const resolvedHexids = new Set(Object.values(resolved).map((r) => r.hexid));
+
   if (CRAWL_ONLY) {
-    console.log(`crawl-only：目录合计 ${catalog.length} 条，未抓详情`);
+    let total = 0;
+    for (const dyn of dyns) for await (const _it of crawlPages(client, dyn)) total++; // eslint-disable-line no-unused-vars
+    await flushReport(client);
+    console.log(`crawl-only：本次新增目录条目 ${total}（累计见 catalog-*.json），未抓详情`);
     return;
   }
 
-  const resolvedHexids = new Set(Object.values(resolved).map((r) => r.hexid));
+  /* 流式：逐页爬目录，只处理未 resolved 的新条目，处理满 --limit 即止
+     （目录按热度排序，前 ~1045 与 backfill 重叠会被 resolved 跳过、零成本）。 */
   let processed = 0;
-  for (const it of catalog) {
-    if (processed >= LIMIT) break;
-    if (resolvedHexids.has(it.hexid)) continue;
-    processed++;
-    let matchRes;
-    try {
-      const referer = detailUrl(it.hexid);
-      const res = await client.fetchHtml(referer);
-      if (res.status === 404 || !res.html) { T.notOnGushiwen++; continue; }
-      const detail = parseDetailPage(res.html, it.hexid);
-      matchRes = matchToCorpus(
-        { title: detail.title || it.title, author: detail.author || it.author, blocks: detail.blocks },
-        idx,
-      );
-      if (matchRes.ambiguous) {
-        T.ambiguous++; report.ambiguousList.push({ hexid: it.hexid, ...matchRes.ambiguous }); continue;
+  outer: for (const dyn of dyns) {
+    for await (const it of crawlPages(client, dyn)) {
+      if (resolvedHexids.has(it.hexid)) continue;
+      resolvedHexids.add(it.hexid); // 防同名重出诗在本轮重复处理
+      await processCatalogItem(client, idx, it);
+      processed++;
+      if (processed % 50 === 0) {
+        await saveResolved(); await flushReport(client);
+        console.log(`  已处理新条目 ${processed}，写入 ${T.written}`);
       }
-      if (!matchRes.matches.length) { T.notOnGushiwen++; continue; }
-      T.matchedFromCatalog++;
-      /* 一次抓取写全部 fanout 兄弟 id */
-      const first = matchRes.matches[0].entry;
-      const { ann, meta } = await scrapeContent(client, it.hexid, first);
-      if (!ann) {
-        if (meta.reason === 'bodyMismatch') { T.bodyMismatch++; }
-        else { T.notOnGushiwen++; }
-        continue;
-      }
-      T.verified++;
-      if (!meta.hasBackground) T.noBackgroundOnPage++;
-      if (meta.poisonedSections) T.poisonedDropped++;
-      for (const m of matchRes.matches) {
-        resolved[m.entry.id] = { hexid: it.hexid, score: +m.score.toFixed(3), method: 'catalog', at: new Date().toISOString() };
-        const outcome = await commit(m.entry.id, { ...ann, id: m.entry.id }, 'expand');
-        recordOutcome(outcome, m.entry.id);
-      }
-    } catch (e) {
-      if (e instanceof BlockedError) { throw e; }
-      report.validationWarnList.push({ hexid: it.hexid, error: String(e.message || e) });
-      T.errors++;
-      continue;
+      if (processed >= LIMIT) break outer;
     }
-    if (processed % 50 === 0) { await saveResolved(); await flushReport(client); console.log(`  已处理 ${processed} 条目，写入 ${T.written}`); }
   }
+  T.targets = processed;
 }
 
 /* ---------- id 单首 ---------- */
