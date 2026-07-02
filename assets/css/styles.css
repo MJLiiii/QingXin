@@ -6,13 +6,14 @@
 :root {
   --paper: #F5F1E8;   /* 米纸底 */
   --ink: #221F1A;     /* 软墨黑 */
+  --ink-rgb: 34, 31, 26; /* = --ink 的 RGB 分量，供半透明墨色 rgba(var(--ink-rgb), α) 复用 */
   --accent: #9A3B2E;  /* 朱砂 */
   --body: #3B372F;    /* 正文墨 */
   --muted: #8E8676;   /* 淡墨 */
   --muted-2: #6B655A; /* 次淡墨 */
   --muted-3: #5C574C; /* 注释墨 */
-  --line: rgba(34, 31, 26, 0.08);
-  --line-strong: rgba(34, 31, 26, 0.12);
+  --line: rgba(var(--ink-rgb), 0.08);
+  --line-strong: rgba(var(--ink-rgb), 0.12);
   --serif: 'Noto Serif SC', serif;
   --latin: 'Cormorant Garamond', serif;
 }
@@ -55,8 +56,8 @@ body {
 .moon {
   position: absolute;
   border-radius: 50%;
-  background: rgba(34, 31, 26, 0.035);
-  box-shadow: inset 0 0 0 1px rgba(34, 31, 26, 0.06);
+  background: rgba(var(--ink-rgb), 0.035);
+  box-shadow: inset 0 0 0 1px rgba(var(--ink-rgb), 0.06);
   pointer-events: none;
   z-index: 0;
 }
@@ -257,8 +258,6 @@ body {
   color: var(--accent);
 }
 
-.section-head--divider { margin-bottom: 8px; }
-
 /* ---------- 诗词列表 ---------- */
 
 .poem-list__item {
@@ -275,9 +274,7 @@ body {
   transition: background 0.25s;
 }
 
-.poem-list__item--link:hover { background: rgba(34, 31, 26, 0.025); }
-
-.poem-list__item--muted { opacity: 0.62; }
+.poem-list__item--link:hover { background: rgba(var(--ink-rgb), 0.025); }
 
 .poem-list__title {
   font-size: 21px;
@@ -352,7 +349,7 @@ body {
   font-size: 16px;
   color: var(--muted-3);
   letter-spacing: 0.12em;
-  border-bottom: 1px solid rgba(34, 31, 26, 0.18);
+  border-bottom: 1px solid rgba(var(--ink-rgb), 0.18);
   padding-bottom: 2px;
   background: none;
   font-family: inherit;
@@ -365,7 +362,7 @@ body {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: rgba(34, 31, 26, 0.28);
+  background: rgba(var(--ink-rgb), 0.28);
   display: inline-block;
 }
 
@@ -472,7 +469,7 @@ body {
   font-size: 11px;
   letter-spacing: 0.34em;
   color: var(--muted-2);
-  border: 1px solid rgba(34, 31, 26, 0.2);
+  border: 1px solid rgba(var(--ink-rgb), 0.2);
   padding: 3px 10px;
   margin-bottom: 20px;
 }
@@ -496,7 +493,7 @@ body {
   display: flex;
   gap: 28px;
   padding: 16px 0;
-  border-bottom: 1px solid rgba(34, 31, 26, 0.07);
+  border-bottom: 1px solid rgba(var(--ink-rgb), 0.07);
 }
 
 .notes__row:last-child { border-bottom: 0; }
@@ -666,9 +663,7 @@ body {
   transition: background 0.25s;
 }
 
-.works-list__item--link:hover { background: rgba(34, 31, 26, 0.025); }
-
-.works-list__item--muted { opacity: 0.62; }
+.works-list__item--link:hover { background: rgba(var(--ink-rgb), 0.025); }
 
 .works-list__title {
   font-size: 19px;
@@ -688,7 +683,7 @@ body {
   max-width: 720px;
   margin: 140px auto 0;
   padding: 56px 32px 72px;
-  border-top: 1px solid rgba(34, 31, 26, 0.1);
+  border-top: 1px solid rgba(var(--ink-rgb), 0.1);
   text-align: center;
 }
 
@@ -786,14 +781,8 @@ body {
 .pager__btn:hover { color: var(--accent); }
 
 .pager__btn--off {
-  color: rgba(34, 31, 26, 0.22);
+  color: rgba(var(--ink-rgb), 0.22);
   cursor: default;
-}
-
-.pager__info {
-  font-size: 15px;
-  color: var(--muted);
-  letter-spacing: 0.1em;
 }
 
 /* 跳转到指定页 */
