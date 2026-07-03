@@ -7,6 +7,9 @@ tools/.cache/
 # 系统文件
 .DS_Store
 
+# 全量爬取驱动的运行日志（crawl-all-authors.mjs 的 nohup 输出及轮转件）
+crawl-all.log*
+
 # iCloud 同步产生的冲突副本（如 manifest 2.json、poems 3/、苏轼 2.json）
 # 本仓库正常文件名均无空格，此规则可安全排除这些垃圾副本
 * [0-9]*
