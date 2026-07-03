@@ -5,7 +5,7 @@
      node annotations/annotate-scrape.mjs backfill [--limit N] [--dry-run] [--delay 2500] [--verbose]
      node annotations/annotate-scrape.mjs expand   [--dynasty 唐|宋|all] [--crawl-only] [--limit N] [--force] [--dry-run]
      node annotations/annotate-scrape.mjs id <poemId> [--force] [--dry-run] [--verbose]
-     node annotations/annotate-scrape.mjs authors [作者名…] [--top N] [--pages N] [--limit N] [--force] [--dry-run]
+     node annotations/annotate-scrape.mjs authors [作者名…] [--top N] [--pages N] [--limit N] [--force] [--dry-run] [--report 路径]
 
    模式：
    - backfill：把现有 source 以 "gushiwen" 开头的注释文件（数据集导入的 ~1045 首）
@@ -20,7 +20,7 @@
 
    安全约定：无 source 字段的手写文件（如 c59-66《水调歌头》）任何模式、任何路径永不触碰。
    只写 data/annotations/，绝不改动 data/poems/** 原文。 */
-import { mkdir, readFile, writeFile, readdir } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, readdir, rename } from 'node:fs/promises';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -44,7 +44,6 @@ const CACHE = join(TOOLS, '.cache');
 const WEB_CACHE = join(CACHE, 'gushiwen-web');
 const PAGE_CACHE = join(WEB_CACHE, 'pages');
 const RESOLVED_PATH = join(WEB_CACHE, 'resolved.json');
-const REPORT_PATH = join(CACHE, 'annotate', 'scrape-report.json');
 
 const BASE = 'https://www.gushiwen.cn';
 const detailUrl = (hexid) => `${BASE}/shiwenv_${hexid}.aspx`;
@@ -77,9 +76,11 @@ const PAGES = parseInt(opt('--pages', ''), 10) || Infinity;
 const DELAY = parseInt(opt('--delay', ''), 10) || 2500;
 const DYNASTY = opt('--dynasty', 'all');
 const TOP = parseInt(opt('--top', ''), 10) || 0;
+/* --report：报表输出路径，多进程并发时每路传独立路径以免互相覆盖。 */
+const REPORT_PATH = opt('--report', join(CACHE, 'annotate', 'scrape-report.json'));
 
 /* 取值型开关（其后紧跟的非 -- token 是它的值，不是位置参数）。 */
-const VALUE_FLAGS = new Set(['--limit', '--pages', '--delay', '--dynasty', '--top']);
+const VALUE_FLAGS = new Set(['--limit', '--pages', '--delay', '--dynasty', '--top', '--report']);
 /* 位置参数（authors 模式的作者名）：跳过 MODE、所有 --flag 及取值型开关吞掉的值。 */
 function positionals() {
   const out = [];
@@ -101,10 +102,17 @@ async function readJson(fp, dflt) {
 }
 
 let resolved = {};      // poemId -> {hexid, score, method, at}
+/* 并发安全：先与磁盘版合并再经临时文件原子替换，多进程并跑时不会互相覆盖对方
+   新增的条目，也不会让对方读到写了一半的 JSON。合并非原子仍有极小竞态窗口，
+   最坏只丢缓存条目（下轮重新定位），不影响已写出的注释文件。 */
 async function saveResolved() {
   if (DRY) return;
   await mkdir(WEB_CACHE, { recursive: true });
-  await writeFile(RESOLVED_PATH, JSON.stringify(resolved, null, 0) + '\n', 'utf8');
+  const disk = await readJson(RESOLVED_PATH, {});
+  resolved = { ...disk, ...resolved };
+  const tmp = `${RESOLVED_PATH}.tmp-${process.pid}`;
+  await writeFile(tmp, JSON.stringify(resolved, null, 0) + '\n', 'utf8');
+  await rename(tmp, RESOLVED_PATH);
 }
 
 /* ---------- 报表 ---------- */
