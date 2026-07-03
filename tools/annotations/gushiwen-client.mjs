@@ -3,7 +3,8 @@
    - 缓存 <cacheDir>/<sha1(url)>.html + .meta.json（url/status/fetchedAt）；
      命中即免网络——这就是断点续爬机制。疑似封锁的响应体不入缓存。
    - 404 作为类型化结果返回（页面确实不存在，不重试、入缓存）。
-   - 403/验证页/登录墙弹回 → 抛 BlockedError，调用方应立即中止并提示稍后续跑。 */
+   - 403/验证页/登录墙弹回，以及 5xx/429/网络错误重试耗尽 → 抛 BlockedError，
+     调用方应立即中止并提示稍后续跑（crawl-all 驱动对退出码 2 全体暂停 60 分钟重试）。 */
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -101,6 +102,7 @@ export function createClient({ cacheDir, delayMs = 2500, verbose = false }) {
       return { ...cached, fromCache: true };
     }
     let lastErr = null;
+    let pushback = false; // 最后一次失败是否 5xx/429/网络错误（服务器侧推开）
     for (let attempt = 0; attempt <= RETRY_BACKOFF.length; attempt++) {
       if (attempt > 0) {
         stats.retries++;
@@ -126,6 +128,7 @@ export function createClient({ cacheDir, delayMs = 2500, verbose = false }) {
         });
       } catch (e) {
         lastErr = e;
+        pushback = true;
         continue; // 网络错误 → 重试
       }
       if (res.status === 404) {
@@ -135,6 +138,7 @@ export function createClient({ cacheDir, delayMs = 2500, verbose = false }) {
       if (res.status === 403) throw new BlockedError(url, '403');
       if (res.status >= 500 || res.status === 429) {
         lastErr = new Error(`HTTP ${res.status}`);
+        pushback = true;
         continue;
       }
       const html = await res.text();
@@ -142,12 +146,17 @@ export function createClient({ cacheDir, delayMs = 2500, verbose = false }) {
       if (blocked) throw new BlockedError(url, blocked); // 不入缓存
       if (!res.ok) {
         lastErr = new Error(`HTTP ${res.status}`);
+        pushback = false;
         continue;
       }
       await writeCache(url, res.status, html);
       return { status: res.status, html, fromCache: false };
     }
     stats.errors++;
+    /* 重试耗尽仍是 5xx/429/网络错误 = 服务器在推开我们，按封锁语义上抛：
+       调用方以退出码 2 结束，驱动的「全体暂停 60 分钟再重试」接管，而非崩溃停摆。
+       其余（持续 4xx 等确定性失败）仍走普通异常 → 退出码 1，避免对坏 URL 无限循环。 */
+    if (pushback) throw new BlockedError(url, lastErr ? lastErr.message : '重试耗尽');
     throw lastErr || new Error(`请求失败：${url}`);
   }
 
