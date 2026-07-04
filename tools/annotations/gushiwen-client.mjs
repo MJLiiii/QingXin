@@ -141,7 +141,14 @@ export function createClient({ cacheDir, delayMs = 2500, verbose = false }) {
         pushback = true;
         continue;
       }
-      const html = await res.text();
+      let html;
+      try {
+        html = await res.text();
+      } catch (e) {
+        lastErr = e;      // 读响应体途中连接被掐断（如 HTTP/2 流错误）→ 重试
+        pushback = true;
+        continue;
+      }
       const blocked = looksBlocked(res.status, html);
       if (blocked) throw new BlockedError(url, blocked); // 不入缓存
       if (!res.ok) {
