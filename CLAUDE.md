@@ -121,14 +121,17 @@ overlay (`loadAnnotation()` merges it over the read-only poem) and show a
   fragment against the always-inline preview and **drops any diverging section**, so 赏析 is either
   complete-and-clean or absent — never garbled. 译文/注释/创作背景 are unaffected. Precedence:
   the importer's `--force` only overwrites `source:"gushiwen"`, so `gushiwen-web` files are never
-  back-filled by the (thinner) dataset version. **Current coverage:** ~1,078 poems annotated
-  (`data/annotations/`): 1,037 `gushiwen-web` (backfill refresh + a small `expand` pass over the
-  ~600-poem featured 唐诗/宋词 catalogs), 40 residual `gushiwen` (乐府/歌辞 titles search can't
-  resolve), 1 hand-written seed; **892 carry 创作背景** (the dataset had none). The featured
-  catalog is largely exhausted; further growth now runs through the `authors` mode (by-author
-  `astr=` crawls). Note prolific poets are mostly un-annotated on 古诗文网, so each corpus-matched
-  poem still costs one detail fetch to confirm before it either writes or counts 转换后为空 — bound
-  each run with `--limit` / `--pages`.
+  back-filled by the (thinner) dataset version. **Current coverage:** 4,120 poems annotated
+  (`data/annotations/`): 4,079 `gushiwen-web`, 40 residual `gushiwen` (乐府/歌辞 titles search
+  can't resolve), 1 hand-written seed; **2,740 carry 创作背景** (the dataset had none). The full
+  by-author crawl (all 5,053 eligible authors, `crawl-all-authors.mjs --workers 3 --pause 1`,
+  2026-07) is **complete** — gushiwen's annotated stock for this corpus is essentially exhausted;
+  re-running the driver is cheap (done authors skip instantly) and only picks up site additions.
+  **Duplicate annotations are intentional:** 148 id-groups share one gushiwen page because 全唐诗
+  re-collects 乐府 poems under both category juan (t0/t1/t2) and per-poet juan; the scraper's
+  fanout writes all sibling ids so every poem page renders annotations. Before hand-editing any
+  annotation, run `node annotations/check-dups.mjs` (read-only) — it lists sibling groups and
+  flags content divergence (exit 1) so hand edits can be applied to all siblings together.
 - `data/**` (~67MB) is committed and is what the site serves; `tools/node_modules` and the
   external `../chinese-poetry-src` clone are gitignored.
 - **Deploy** is GitHub Pages "Deploy from a branch" (`main` / root — no workflow; `.github/`
