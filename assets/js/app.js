@@ -205,11 +205,10 @@
 
   /* ---------- 各页渲染 ---------- */
 
-  // 全库随机：随机取一个索引页，从中抽 hero + 5 首随机列表
+  // 精选随机：池 = 有注释赏析的诗（data/featured.json，由 tools/data/build-featured.mjs
+  // 从注释覆盖生成，行结构同索引行），从中抽 hero + 5 首随机列表
   async function renderHome() {
-    var manifest = await fetchJSON('data/manifest.json');
-    var p = Math.floor(Math.random() * manifest.pages);
-    var entries = await fetchJSON('data/index/page-' + pad4(p) + '.json');
+    var entries = await fetchJSON('data/featured.json');
     var pick = entries.slice();
     for (var k = pick.length - 1; k > 0; k--) {
       var j = Math.floor(Math.random() * (k + 1)), t = pick[k]; pick[k] = pick[j]; pick[j] = t;
@@ -241,8 +240,8 @@
       + '</div>'
       + '</section>'
       + '<section class="section section--list">'
-      + '<div class="section-head"><span class="section-head__title">随机诗词</span>'
-      + '<span class="section-head__tag latin">random</span></div>'
+      + '<div class="section-head"><span class="section-head__title">精选诗词</span>'
+      + '<span class="section-head__tag latin">curated</span></div>'
       + '<div class="rule"></div>'
       + list.map(poemRow).join('')
       + '</section>';

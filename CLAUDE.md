@@ -49,7 +49,9 @@ There is no build, lint, or test step. Two things you actually run:
    Plus `data/authors/bucket-<000..255>.json` (author records `{slug: {bio, up to 50 works, …}}`,
    bundled into 256 hash-shards — `loadAuthor` resolves `slug`→bucket; see `tools/data/bundle-authors.mjs`),
    `data/authors-index.json`
-   (all poets sorted by output, for the 诗人 browse page), and `data/about.json` (关于 page copy).
+   (all poets sorted by output, for the 诗人 browse page), `data/about.json` (关于 page copy),
+   and `data/featured.json` (home-page pool: index rows of the ~3,200 poems whose annotation has
+   赏析 + 注释/译文 — regenerate with `node tools/data/build-featured.mjs` after coverage changes).
 
 **Poem IDs encode storage location:** `t<chunk>-<i>` (唐) / `c<chunk>-<i>` (宋词), where `i` is the
 0–999 position within the id-block, resolves to `data/poems/<chunk>-<⌊i/100⌋>.json[i%100]` — no
@@ -59,7 +61,8 @@ See `parseId()`/`loadPoem()` in `assets/js/app.js`. The flagship 水调歌头 is
 **`assets/js/app.js`** is an IIFE hash router (extends the original 3-page toggle):
 routes `#/home | #/list/:page | #/poem/:id | #/author/:slug | #/authors/:page | #/about` →
 `RENDERERS` map → `renderHome/renderList/renderPoem/renderAuthor/renderAuthors/renderAbout`.
-Home picks a **random** poem each render (换一首 re-invokes it via `data-nav="home"`); 诗集
+Home picks a **random annotated** poem each render from `data/featured.json`
+(换一首 re-invokes it via `data-nav="home"`); 诗集
 paginates 25/page (`DISPLAY`) over the 500-row index files; 诗人 lists all poets from
 `authors-index.json`. Both pagers come from `pagerHTML()` — prev/next buttons plus a
 page-number input + 跳转 button, wired by `wirePager()` (Enter or click, clamped to range).
@@ -92,7 +95,8 @@ overlay (`loadAnnotation()` merges it over the read-only poem) and show a
 - **To annotate a poem:** create `data/annotations/<id>.json` (id is in the URL `#/poem/<id>`);
   fill `notes:[{term,def}]`, `translation:[…]`, `appreciation:[…]`, `background:[…]`,
   optional `preface`/`prefaceTranslation`. Save + reload; no rebuild. See
-  `data/annotations/README.md`.
+  `data/annotations/README.md`. (Detail pages need no rebuild; only the home-page featured pool
+  does — run `node tools/data/build-featured.mjs` when coverage changes so new poems join it.)
 - **Bulk-imported annotations:** ~1,045 famous 唐诗/宋词 have 译文/注释/赏析 imported from the
   chinese-gushiwen dataset via `node tools/annotations/annotate-import.mjs` (fuzzy-matches by author +
   body-text Dice similarity; caches downloads in gitignored `tools/.cache/`). Imported files
