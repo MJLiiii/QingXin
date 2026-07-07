@@ -27,7 +27,7 @@
     </div>
   </header>
 
-  <!-- ============ 页面容器（内容由 assets/js/app.js 按数据渲染，不写死诗文） ============ -->
+  <!-- ============ 页面容器（内容由 assets/js/*.js 按数据渲染，不写死诗文） ============ -->
   <main class="page" id="page-home"></main>
   <main class="page" id="page-list"></main>
   <main class="page" id="page-poem"></main>
@@ -44,7 +44,7 @@
     <div class="site-footer__tagline">慢 读 古 典 · 一 日 一 诗</div>
   </footer>
 
-  <script src="assets/js/app.js"></script>
+  <script type="module" src="assets/js/app.js"></script>
   <script>
     // 离线/跨刷新缓存；相对路径注册，作用域随部署子路径（/QingXin/）。特性检测 + 静默失败。
     if ('serviceWorker' in navigator) {

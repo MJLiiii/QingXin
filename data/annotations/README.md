@@ -24,13 +24,17 @@
 
 ## `source` 字段与自动导入
 
-带 `source` 字段的文件是脚本自动生成的，可被对应脚本覆盖刷新；**无 `source` 字段
-的文件视为手写，任何脚本都永不触碰**（如 `c59-66.json`）。三种来源标记：
+带 `source` 字段的文件是脚本自动生成的，可被对应脚本按优先级覆盖刷新；**无 `source`
+字段的文件视为手写，任何脚本都永不触碰**（如 `c59-66.json`）。来源标记：
 
 - `"gushiwen"` — `annotate-import.mjs` 从 chinese-gushiwen **数据集**导入，无创作背景。
 - `"gushiwen-web"` — `annotate-scrape.mjs` 从**古诗文网**实时抓取，更全，含创作背景。
-  覆盖优先级最高：`annotate-import.mjs --force` 只覆盖 `"gushiwen"`，绝不回灌覆盖它。
+  覆盖优先级高于 `"gushiwen"`：`annotate-import.mjs --force` 只覆盖 `"gushiwen"`，绝不回灌覆盖它。
+- `"ai"` — AI 批量生成内容，只允许包含注释、译文、赏析；`background` 必须保持空数组。
+  前端会显示 AI 免责声明，`build-featured.mjs` 会把它排除在首页精选池之外。
 - 无 `source` — 手写，最高保护级别。
+
+优先级：手写 > `gushiwen-web` > `gushiwen` > `ai`。人工来源脚本可以替换 AI 内容；AI 生成脚本不得覆盖任何人工来源或手写文件。
 
 **赏析投毒**：古诗文网对部分诗词的赏析 AJAX 全文做了字符替换（如 的→屈、一→楼、
 情→隋），使抓取到的乱码在浏览器里靠自定义无法逆转的方式显示。`annotate-scrape.mjs`

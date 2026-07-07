@@ -10,10 +10,11 @@
    模式：
    - backfill：把现有 source 以 "gushiwen" 开头的注释文件（数据集导入的 ~1045 首）
      用网站版逐节替换刷新（爬到的非空则替换、爬空则保留）。
-   - expand：爬唐/宋目录列表页 → 匹配语料 → 为尚无注释文件的 id 新建。
-     --force 额外允许逐节替换 source 以 "gushiwen" 开头的文件。
-   - id：单首。有 gushiwen* 文件走 backfill 语义，无文件走 expand 语义。
-   - authors：按作者抓 astr 列表页 → 匹配语料 → 为该作者尚无注释的 id 新建（与 expand 同写策略，
+   - expand：爬唐/宋目录列表页 → 匹配语料 → 为尚无人工注释文件的 id 新建。
+     source==="ai" 视为低优先级自动生成内容，可被本脚本替换；--force 额外允许逐节替换
+     source 以 "gushiwen" 开头的文件。
+   - id：单首。有 gushiwen* 文件走 backfill 语义；有 ai 文件按无人工文件处理。
+   - authors：按作者抓 astr 列表页 → 匹配语料 → 为该作者尚无人工注释的 id 新建（与 expand 同写策略，
      用于扩展精选目录之外的长尾覆盖）。作者名可显式传入，也可用 --top N 自动取产量最高的前 N 位。
      注意：高产作者（如白居易 3009 首）古诗文网多数无注释，每首命中语料的诗仍需一次详情请求
      才能确认「转换后为空」，成本随之上升——用 --limit / --pages 控制单轮规模。勿传无名氏/佚名/不详。
@@ -310,7 +311,7 @@ function orderAnnotation(a) {
   return out;
 }
 
-/* 写策略。mode: 'backfill'|'expand'。返回 'written'|'skippedExisting'|'skippedHandwritten'|'emptyAfterTransform' */
+/* 写策略。mode: 'backfill'|'expand'|'id'。返回 'written'|'skippedExisting'|'skippedHandwritten'|'emptyAfterTransform' */
 async function commit(id, scraped, mode) {
   const { ann: clean, warnings } = validateScrapedAnnotation(scraped);
   if (warnings.length) {
@@ -327,12 +328,14 @@ async function commit(id, scraped, mode) {
     try { existing = JSON.parse(existingRaw); } catch { existing = null; }
     const src = existing && existing.source;
     const isGushiwen = typeof src === 'string' && src.startsWith('gushiwen');
-    if (!isGushiwen) return 'skippedHandwritten'; // 手写文件永不触碰
-    if (mode === 'expand' && !FORCE) return 'skippedExisting';
+    const isAI = src === 'ai';
+    if (!isGushiwen && !isAI) return 'skippedHandwritten'; // 手写文件永不触碰
+    if (mode === 'expand' && isGushiwen && !FORCE) return 'skippedExisting';
   }
 
-  const merged = mode === 'backfill' || existing
-    ? mergeAnnotation(existing, clean)
+  const base = existing && existing.source !== 'ai' ? existing : null;
+  const merged = mode === 'backfill' || base
+    ? mergeAnnotation(base, clean)
     : orderAnnotation({ ...clean, source: 'gushiwen-web' });
 
   const finalNonEmpty = !isEmpty(merged.notes) || !isEmpty(merged.translation) ||

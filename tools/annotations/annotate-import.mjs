@@ -9,8 +9,10 @@
      node annotations/annotate-import.mjs --limit 100        # 只处理前 N 条（调试用）
 
    安全约定：
-   - 已存在的注释文件默认跳过；--force 也只覆盖 JSON 里带 "source":"gushiwen"
-     的文件——手写注释（如 c59-66《水调歌头》）永远不会被覆盖。
+   - 已存在的注释文件默认跳过；但 source==="ai" 视为低优先级自动生成内容，
+     可被本脚本的人工数据集结果替换。
+   - --force 也只额外覆盖 JSON 里带 "source":"gushiwen" 的旧导入；
+     source==="gushiwen-web" 与无 source 手写文件永远不会被本脚本覆盖。
    - 只写 data/annotations/，绝不改动 data/poems/** 原文。 */
 import { mkdir, readFile, writeFile, readdir, stat } from 'node:fs/promises';
 import { join, dirname, resolve } from 'node:path';
@@ -123,6 +125,15 @@ function toAnnotation(rec, id, preface) {
   return out;
 }
 
+function canOverwrite(existingRaw) {
+  if (existingRaw == null) return true;
+  let existing = null;
+  try { existing = JSON.parse(existingRaw); } catch { return false; }
+  if (existing.source === 'ai') return true;
+  if (FORCE && existing.source === 'gushiwen') return true;
+  return false;
+}
+
 /* ---------- 主流程 ---------- */
 
 function fieldCount(rec) {
@@ -178,12 +189,9 @@ async function main() {
     if (!ann) { emptyAfterTransform++; continue; }
     const fp = join(ANN_DIR, id + '.json');
     const existing = await readFile(fp, 'utf8').catch(() => null);
-    if (existing != null) {
-      let overwritable = false;
-      if (FORCE) {
-        try { overwritable = JSON.parse(existing).source === 'gushiwen'; } catch { /* 非法 JSON 也不覆盖 */ }
-      }
-      if (!overwritable) { skippedExisting++; continue; }
+    if (!canOverwrite(existing)) {
+      skippedExisting++;
+      continue;
     }
     if (!DRY) await writeFile(fp, JSON.stringify(ann, null, 2) + '\n', 'utf8');
     written++;

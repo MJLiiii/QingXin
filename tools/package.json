@@ -8,7 +8,8 @@
     "serve": "node server/serve.mjs",
     "prep": "node data/prep.mjs",
     "annotate:import": "node annotations/annotate-import.mjs",
-    "annotate:scrape": "node annotations/annotate-scrape.mjs"
+    "annotate:scrape": "node annotations/annotate-scrape.mjs",
+    "check": "node --check ../assets/js/app.js && node --check ../assets/js/data.js && node --check ../assets/js/pages.js && node --check ../assets/js/router.js && node --check ../assets/js/search.js && node --check ../assets/js/search-worker.js && node --check ../assets/js/templates.js && node --check ../assets/js/utils.js && node --check ../sw.js && node --check data/validate.mjs && node --check data/build-featured.mjs && node --check data/prep.mjs && node --check annotations/annotate-import.mjs && node --check annotations/annotate-scrape.mjs && node data/validate.mjs"
   },
   "dependencies": {
     "opencc-js": "^1.0.5"
