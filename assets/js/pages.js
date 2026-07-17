@@ -1,6 +1,7 @@
 import { fetchJSON, loadAnnotation, loadAuthor, loadPoem } from './data.js';
+import { searchAuthorIndex } from './search-core.js';
 import { searchPoems } from './search.js';
-import { debounce, esc, groupStanzas, pad4 } from './utils.js';
+import { esc, groupStanzas, pad4 } from './utils.js';
 import {
   authorRow, emptyState, entryShell, errorSection, pagerHTML,
   poemRow, proseEntry, searchBoxHTML, searchRow,
@@ -34,33 +35,85 @@ function wireLiveSearch(o) {
   var input = o.host.querySelector(o.inputSel);
   if (!input) return;
   var rows = o.host.querySelector(o.rowsSel);
+  if (!rows) return;
   var pager = o.host.querySelector('#pager');
-  input.addEventListener('input', debounce(async function () {
+  var status = o.host.querySelector(o.statusSel || ('#' + input.id + '-status'));
+  var revision = 0;
+  var timer = null;
+
+  function setState(state, message) {
+    var loading = state === 'loading';
+    input.setAttribute('aria-busy', String(loading));
+    rows.setAttribute('aria-busy', String(loading));
+    rows.classList.toggle('search-results--loading', loading);
+    if (!status) return;
+    status.dataset.state = state;
+    status.textContent = message || '';
+  }
+
+  function countMessage(result) {
+    var count = Number(result.count) || 0;
+    var hasTotal = Number.isFinite(result.total);
+    var total = hasTotal ? result.total : count;
+    if (!count) return '未找到相关结果';
+    if (total > count) return '找到 ' + total + ' 条，显示前 ' + count + ' 条结果';
+    if (!hasTotal && result.mayBeTruncated) return '显示前 ' + count + ' 条相关结果';
+    return '显示 ' + count + ' 条相关结果';
+  }
+
+  async function run(q, token) {
+    try {
+      var result = await o.match(q);
+      if (token !== revision || !input.isConnected || input.value.trim() !== q) return;
+      rows.innerHTML = result.html;
+      setState(result.count ? 'results' : 'empty', countMessage(result));
+    } catch (e) {
+      if (token !== revision || !input.isConnected || input.value.trim() !== q) return;
+      rows.innerHTML = emptyState(
+        '请稍后重试，或重新输入关键词。',
+        o.errorTitle || '搜索暂不可用'
+      );
+      setState('error', o.errorMessage || '搜索失败，请稍后重试');
+    }
+  }
+
+  input.addEventListener('input', function () {
+    var token = ++revision;
     var q = input.value.trim();
+    window.clearTimeout(timer);
     if (!q) {
       rows.innerHTML = o.restore();
-      if (pager) pager.style.display = '';
+      if (pager) pager.hidden = false;
+      setState('idle', '');
       return;
     }
-    rows.innerHTML = await o.match(q);
-    if (pager) pager.style.display = 'none';
-  }, 200));
+    if (pager) pager.hidden = true;
+    setState('loading', o.loadingMessage || '正在搜索…');
+    timer = window.setTimeout(function () { run(q, token); }, 200);
+  });
 }
 
 function wireSearch(host, pageEntries) {
+  var limit = 120;
   wireLiveSearch({
     host: host,
     inputSel: '#search-input',
     rowsSel: '#list-rows',
     restore: function () { return pageEntries.map(poemRow).join(''); },
     match: async function (q) {
-      try {
-        var hits = await searchPoems(q, 120);
-        return hits.length ? hits.map(searchRow).join('') : emptyState('换个关键词试试');
-      } catch (e) {
-        return errorSection('搜索索引加载失败');
-      }
+      var hits = await searchPoems(q, limit);
+      var hasTotal = Number.isFinite(hits.total);
+      return {
+        html: hits.length
+          ? hits.map(function (hit) { return searchRow(hit, q); }).join('')
+          : emptyState('请缩短关键词，或检查是否有错字。', '没有找到相近的诗词'),
+        count: hits.length,
+        total: hasTotal ? hits.total : undefined,
+        mayBeTruncated: !hasTotal && hits.length === limit,
+      };
     },
+    errorTitle: '诗词搜索暂不可用',
+    errorMessage: '搜索索引加载失败，请稍后重试',
   });
 }
 
@@ -258,7 +311,13 @@ export async function renderAuthors(param, ctx) {
     '<section class="section section--top">'
     + '<div class="section-head"><span class="section-head__title">诗人</span>'
     + '<span class="section-head__tag latin">' + idx.length + '</span></div>'
-    + searchBoxHTML({ id: 'author-search', placeholder: '搜索诗人…', aria: '搜索诗人', tag: 'poets' })
+    + searchBoxHTML({
+      id: 'author-search',
+      placeholder: '搜索诗人姓名或近似关键词…',
+      aria: '搜索诗人',
+      tag: 'poets',
+      controls: 'authors-rows',
+    })
     + '<div class="rule"></div>'
     + '<div id="authors-rows">' + slice.map(authorRow).join('') + '</div>'
     + pagerHTML('authors', page, totalPages)
@@ -270,12 +329,18 @@ export async function renderAuthors(param, ctx) {
     rowsSel: '#authors-rows',
     restore: function () { return slice.map(authorRow).join(''); },
     match: async function (q) {
-      var hits = [];
-      for (var k = 0; k < idx.length && hits.length < 120; k++) {
-        if (idx[k].name.indexOf(q) >= 0) hits.push(idx[k]);
-      }
-      return hits.length ? hits.map(authorRow).join('') : emptyState('换个名字试试');
+      var result = searchAuthorIndex(idx, q, 120);
+      var hits = result.hits || [];
+      var matches = result.matches || [];
+      return {
+        html: hits.length
+          ? hits.map(function (author, k) { return authorRow(author, q, matches[k]); }).join('')
+          : emptyState('请缩短关键词，或检查是否有错字。', '没有找到相近的诗人'),
+        count: hits.length,
+        total: Number.isFinite(result.total) ? result.total : hits.length,
+      };
     },
+    errorTitle: '诗人搜索暂不可用',
   });
   wirePager(host, ctx.go);
 }

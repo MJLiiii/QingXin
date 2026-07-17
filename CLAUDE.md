@@ -76,12 +76,14 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   index files; 诗人 lists all poets from `authors-index.json`. Both pagers come from `pagerHTML()` —
   prev/next buttons plus a page-number input + 跳转 button, wired by `wirePager()` (Enter or click,
   clamped to range). **Two separate searches** (both via `wireLiveSearch()`: debounced, capped at 120
-  hits, pager hidden while active): global title/author search on 诗集 and name-only search on 诗人.
+  hits, stale responses ignored, pager hidden while active): global title/author search on 诗集 and
+  name-only search on 诗人. Both show loading/result status and highlight only real exact substrings.
 - `data.js` — `fetchJSON()` (memoized via a `Map`), `parseId()`/`loadPoem()`/`loadAnnotation()`,
   `loadAuthor()` (slug→bucket hash).
-- `search.js` + `search-worker.js` — the 诗集 search scans `data/search.json` inside a Web Worker
-  (keeps the multi-MB index off the main thread); transparently falls back to a main-thread scan if
-  Workers are unavailable or the worker errors.
+- `search-core.js` + `search.js` + `search-worker.js` — shared ranked exact/fuzzy matching for
+  poems and authors, with punctuation and Traditional→Simplified query normalization via the local
+  OpenCC browser module. The 诗集 scan runs inside a module Web Worker (keeping the multi-MB index off
+  the main thread) and transparently uses the same core on the main thread if Workers fail.
 - `templates.js` — shared HTML builders (`poemRow`/`authorRow`/`searchRow`, `entryShell`, `proseEntry`,
   `pagerHTML`, `searchBoxHTML`); `utils.js` — `esc()`, `debounce()`, `groupStanzas()`, `idle()`.
 
