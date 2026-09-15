@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>情心 · 慢读古典</title>
   <meta name="description" content="情心 — 水墨留白的古诗文赏读。原文、注释、译文、赏析、创作背景，逐层深入。">
+  <script>
+    // 首帧前应用阅读偏好（主题 / 字号 / 竖排），避免闪烁；键名与 assets/js/reader.js 一致。
+    (function () {
+      try {
+        var prefs = JSON.parse(localStorage.getItem('qingxin:prefs')) || {};
+        var root = document.documentElement;
+        if (prefs.theme === 'dark' || prefs.theme === 'light') root.setAttribute('data-theme', prefs.theme);
+        var scale = Number(prefs.scale);
+        if (scale >= 0.8 && scale <= 1.5) root.style.setProperty('--reading-scale', String(scale));
+        if (prefs.vertical === true) root.setAttribute('data-vertical', '1');
+      } catch (e) {}
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet">
@@ -15,14 +28,15 @@
   <!-- ============ 页眉 ============ -->
   <header class="site-header">
     <div class="site-header__inner">
-      <button class="brand" data-nav="home" aria-label="返回首页">
+      <a class="brand" href="#/home" data-nav="home" aria-label="返回首页">
         <span class="brand__mark"></span>
         <span class="brand__name">情心</span>
-      </button>
+      </a>
       <nav class="site-nav">
-        <button class="site-nav__link" data-nav="list">诗集</button>
-        <button class="site-nav__link" data-nav="authors">诗人</button>
-        <button class="site-nav__link" data-nav="about">关于</button>
+        <a class="site-nav__link" href="#/list" data-nav="list">诗集</a>
+        <a class="site-nav__link" href="#/authors" data-nav="authors">诗人</a>
+        <a class="site-nav__link" href="#/about" data-nav="about">关于</a>
+        <button class="site-nav__theme" type="button" data-action="theme" aria-pressed="false" aria-label="夜间模式">夜读</button>
       </nav>
     </div>
   </header>

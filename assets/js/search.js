@@ -5,7 +5,7 @@ var worker = null;
 var workerFailed = false;
 var seq = 0;
 var pending = new Map();
-var searchIndexPromise = null;
+var searchDataPromise = null;
 
 function ensureWorker() {
   if (workerFailed) return null;
@@ -52,16 +52,31 @@ function withMatchMetadata(result) {
       distance: match.distance || 0,
       start: Number.isInteger(match.start) ? match.start : -1,
       length: Number.isInteger(match.length) ? match.length : 0,
+      line: typeof match.line === 'string' ? match.line : '',
     }];
   });
   rows.total = Number.isFinite(result.total) ? result.total : rows.length;
   return rows;
 }
 
+// Same loading contract as search-worker.js: both files in parallel, a missing
+// lines.json degrades to title/author search, a failed search.json is retried.
+function loadSearchData() {
+  if (!searchDataPromise) {
+    var lines = fetchJSON('data/lines.json').catch(function () { return null; });
+    searchDataPromise = Promise.all([fetchJSON('data/search.json'), lines]).then(function (loaded) {
+      return { index: loaded[0], lines: loaded[1] };
+    }, function (error) {
+      searchDataPromise = null;
+      throw error;
+    });
+  }
+  return searchDataPromise;
+}
+
 async function searchOnMainThread(q, limit) {
-  if (!searchIndexPromise) searchIndexPromise = fetchJSON('data/search.json');
-  var idx = await searchIndexPromise;
-  return withMatchMetadata(searchPoemIndex(idx, q, limit));
+  var data = await loadSearchData();
+  return withMatchMetadata(searchPoemIndex(data.index, q, limit, { lines: data.lines }));
 }
 
 export async function searchPoems(q, limit) {
@@ -84,10 +99,7 @@ export function warmSearchIndex() {
   var w = ensureWorker();
   if (w) {
     try { w.postMessage({ id: ++seq, warm: true }); } catch (e) { workerFailed = true; }
-  } else if (!searchIndexPromise) {
-    searchIndexPromise = fetchJSON('data/search.json').catch(function () {
-      searchIndexPromise = null;
-      return null;
-    });
+  } else {
+    loadSearchData().catch(function () { return null; });
   }
 }

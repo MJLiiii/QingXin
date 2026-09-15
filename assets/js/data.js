@@ -5,7 +5,11 @@ var cache = new Map();
 export async function fetchJSON(path) {
   if (cache.has(path)) return cache.get(path);
   var res = await fetch(path);
-  if (!res.ok) throw new Error(path + ' -> ' + res.status);
+  if (!res.ok) {
+    var err = new Error(path + ' -> ' + res.status);
+    err.status = res.status;
+    throw err;
+  }
   var data = await res.json();
   cache.set(path, data);
   return data;
@@ -29,11 +33,13 @@ export async function loadPoem(id) {
   return slice[loc.i % 100] || null;
 }
 
+// 仅 404（确无该文件）返回 null；网络等其它失败照常抛出，由调用方决定如何降级。
 export async function loadAnnotation(id) {
   try {
     return await fetchJSON('data/annotations/' + encodeURIComponent(id) + '.json');
   } catch (e) {
-    return null;
+    if (e && e.status === 404) return null;
+    throw e;
   }
 }
 
@@ -44,11 +50,13 @@ export function authorBucket(slug) {
 }
 
 export async function loadAuthor(slug) {
+  if (!slug) return null;
   try {
     var bundle = await fetchJSON('data/authors/bucket-' + pad3(authorBucket(slug)) + '.json');
     return bundle[slug] || null;
   } catch (e) {
-    return null;
+    if (e && e.status === 404) return null;
+    throw e;
   }
 }
 

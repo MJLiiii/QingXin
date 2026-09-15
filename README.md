@@ -9,17 +9,19 @@
 ## 功能特性
 
 - 收录约 78,660 首作品，包括全唐诗 57,607 首和宋词 21,053 首。
-- 首页随机推荐，每次进入或点击“换一首”都会重新抽取作品。
-- 诗集浏览支持分页，以及标题/作者的繁简、标点归一和轻微错字搜索。
+- 首页「今日一诗」按本地日期每天固定一首，点击“换一首”随机抽取。
+- 诗集浏览支持分页，以及标题 / 作者 / 名句搜索：繁简、标点归一和轻微错字容错；名句检索覆盖有注释的名篇，并容忍一字异文（如全唐诗《静夜思》作“床前看月光”）。
+- 搜索词写入地址栏：从结果进入诗词再返回，搜索词、结果和滚动位置都会保留；链接可在新标签页打开。
 - 诗人页支持按作品数浏览全部作者、近似姓名搜索，并可进入作者详情页。
-- 诗词详情页固定展示原文、注释、译文、赏析、创作背景五个板块。
+- 诗词详情页固定展示原文、注释、译文、赏析、创作背景五个板块；原文与词序中的注释词可点按查看释义，无内容的栏目在标题处标明“未收录”，读者展开过的栏目会被记住。
+- 阅读工具：复制全文、分享链接、原文竖排、字号调节，以及跟随系统或手动切换的夜读模式。
 - 注释、译文、赏析、创作背景使用独立叠加层维护，不需要修改大体量原文数据。
 - 可直接部署到 GitHub Pages、Netlify、Vercel 或任意静态文件服务。
 
 ## 技术栈
 
 - 原生 HTML/CSS/JavaScript
-- Hash Router：`#/home`、`#/list/:page`、`#/poem/:id`、`#/author/:slug`、`#/authors/:page`、`#/about`
+- Hash Router：`#/home`、`#/list/:page`、`#/poem/:id`、`#/author/:slug`、`#/authors/:page`、`#/about`（诗集、诗人页可带 `?q=` 搜索词）
 - 前端资源：`assets/css/`、`assets/js/`
 - 静态数据：`data/**/*.json`
 - 数据准备脚本：Node.js ESM
@@ -55,6 +57,12 @@ node tools/server/serve.mjs
 cd tools
 npm install
 
+# 语法检查 + 单元测试 + 数据一致性校验
+npm run check
+
+# 注释覆盖变化后，重建首页精选池与名句检索语料
+node data/build-featured.mjs
+
 # 重建 data/** 数据
 node data/prep.mjs --src ../../chinese-poetry-src
 
@@ -70,6 +78,7 @@ node annotations/annotate-import.mjs
 ```bash
 cd tools
 npm run serve
+npm test
 npm run prep -- --src ../../chinese-poetry-src
 npm run annotate:import -- --dry-run
 ```
@@ -81,28 +90,40 @@ npm run annotate:import -- --dry-run
 ```text
 QingXin/
 ├── index.html                # 页面骨架：页眉、页脚和空容器
+├── sw.js                     # Service Worker：离线与跨刷新缓存
 ├── assets/                   # 浏览器直接加载的前端资源
 │   ├── css/
-│   │   └── styles.css        # 视觉样式和设计变量
+│   │   └── styles.css        # 视觉样式和设计变量（含夜读主题）
 │   └── js/
-│       └── app.js            # 客户端路由、数据加载和页面渲染
+│       ├── app.js            # 入口：启动路由
+│       ├── router.js         # hash 路由、渲染缓存与滚动恢复
+│       ├── pages.js          # 各页面渲染
+│       ├── reader.js         # 阅读偏好、原文工具栏与注释浮层
+│       ├── templates.js      # HTML 片段构建
+│       ├── search*.js        # 标题 / 作者 / 名句检索（含 Web Worker）
+│       └── data.js、utils.js # 数据加载与工具函数
 ├── data/
 │   ├── manifest.json         # 数据总量、分页、分块信息
 │   ├── search.json           # 全局搜索索引：[id, title, author]
+│   ├── lines.json            # 名句检索语料：有注释诗词的正文
+│   ├── featured.json         # 首页精选池
 │   ├── authors-index.json    # 作者索引，按作品数排序
 │   ├── about.json            # 关于页文案
 │   ├── index/page-*.json     # 诗集浏览索引，500 条/文件
-│   ├── poems/*.json          # 诗词原文详情，1000 首/文件
+│   ├── poems/*.json          # 诗词原文详情，100 首/文件
 │   ├── authors/*.json        # 作者简介和代表作
 │   └── annotations/          # 注释、译文、赏析、创作背景叠加层
 └── tools/
     ├── server/
     │   └── serve.mjs         # 本地静态服务器
     ├── data/
-    │   └── prep.mjs          # 从 chinese-poetry 生成 data/**
+    │   ├── prep.mjs          # 从 chinese-poetry 生成 data/**
+    │   ├── build-featured.mjs # 生成首页精选池与名句检索语料
+    │   └── validate.mjs      # 只读数据一致性校验
     ├── annotations/
     │   ├── annotate-import.mjs
     │   └── annotate-lib.mjs
+    ├── tests/                # node:test 单元测试
     └── package.json          # 工具脚本入口与依赖
 ```
 
@@ -124,10 +145,10 @@ t<chunk>-<index>  # 唐诗
 c<chunk>-<index>  # 宋词
 ```
 
-例如 `c59-66` 表示宋词数据第 `0059.json` 个分块中的第 `66` 首。`assets/js/app.js` 会根据 ID 直接定位到：
+例如 `c59-66` 表示第 `59` 个 ID 分块中的第 `66` 首。每个 1000 首的分块再拆成 10 个 100 首的子文件，`assets/js/data.js` 会根据 ID 直接定位到：
 
 ```text
-data/poems/0059.json[66]
+data/poems/0059-0.json[66]
 ```
 
 核心数据分为三层：
@@ -169,7 +190,9 @@ data/poems/0059.json[66]
 }
 ```
 
-保存后刷新页面即可生效，不需要重跑数据脚本。字段可留空，前端会显示“尚未收录，敬请期待。”占位。更详细的格式说明见 `data/annotations/README.md`。
+保存后刷新页面即可生效，不需要重跑数据脚本。字段可留空，前端会显示“尚未收录，敬请期待。”占位。注释词条 `term` 若与原文或词序逐字一致（可带“（拼音）”括注），原文中会自动出现可点按的释义链接。更详细的格式说明见 `data/annotations/README.md`。
+
+新增注释后，如希望这首诗进入首页精选池和名句检索，在 `tools/` 下运行 `node data/build-featured.mjs`。
 
 如果某个注释文件来自批量导入，文件中可能带有 `"source": "gushiwen"`。手工改好后建议删除这个字段，避免以后使用 `--force` 重新导入时覆盖。
 
@@ -198,7 +221,7 @@ node data/prep.mjs --src ../../chinese-poetry-src
 - `data/poems/`
 - `data/authors/`
 
-脚本会保留 `data/annotations/` 目录，因此手工补充的注释不会被清空。内置种子文件 `c59-66.json` 可能会被重写。
+脚本会保留 `data/annotations/` 目录，因此手工补充的注释不会被清空。内置种子文件 `c59-66.json` 可能会被重写。重建后再运行 `node data/build-featured.mjs` 更新精选池与名句检索语料。
 
 ## 批量导入注释
 

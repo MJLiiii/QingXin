@@ -1,11 +1,15 @@
-import { esc } from './utils.js';
+import { esc, hashPath } from './utils.js';
+
+var GLOSS_PAREN = /（[^（）]*）|\([^()]*\)/g;
+
+export function navHref(path) {
+  return esc('#/' + hashPath(path));
+}
 
 export function listRow(nav, title, by, excerpt) {
   var rendered = arguments[4] || {};
-  var path = String(nav).split('/').map(function (part) { return encodeURIComponent(part); }).join('/');
-  var safeNav = esc(nav);
-  return '<a class="poem-list__item poem-list__item--link" href="' + esc('#/' + path)
-    + '" data-nav="' + safeNav + '">'
+  return '<a class="poem-list__item poem-list__item--link" href="' + navHref(nav)
+    + '" data-nav="' + esc(nav) + '">'
     + '<div><div class="poem-list__title">' + (rendered.title || esc(title)) + '</div>'
     + (excerpt ? '<div class="poem-list__excerpt">' + (rendered.excerpt || esc(excerpt)) + '</div>' : '')
     + '</div>'
@@ -55,9 +59,18 @@ function highlighted(text, query, match, field) {
 export function searchRow(a, query) {
   var id = String(a[0] || '');
   var match = a[3] || {};
+  var by = highlighted(a[2], query, match, 'author') + ' · ' + (id.charAt(0) === 't' ? '唐' : '宋');
+  if (match.field === 'line' && match.line) {
+    // 诗句命中：标题照常显示，命中句作为摘句并高亮。
+    return listRow('poem/' + id, a[1], '', match.line, {
+      title: esc(a[1]),
+      by: by,
+      excerpt: highlighted(match.line, query, match, 'line'),
+    });
+  }
   return listRow('poem/' + id, a[1], '', '', {
     title: highlighted(a[1], query, match, 'title'),
-    by: highlighted(a[2], query, match, 'author') + ' · ' + (id.charAt(0) === 't' ? '唐' : '宋'),
+    by: by,
   });
 }
 
@@ -78,19 +91,25 @@ export function emptyState(hint, title) {
     + '<div class="poem-list__excerpt">' + esc(hint) + '</div></div></div>';
 }
 
-export function entryShell(title, roman, inner, ruleClass, collapsible) {
+// opts: section（data-section，记住展开用）、open、empty（标题行「未收录」）、headExtra（非折叠栏标题行右侧内容）。
+export function entryShell(title, roman, inner, ruleClass, collapsible, opts) {
+  opts = opts || {};
   var rule = '<div class="entry-head__rule' + (ruleClass ? ' ' + ruleClass : '') + '"></div>';
+  var section = opts.section ? ' data-section="' + esc(opts.section) + '"' : '';
   if (!collapsible) {
-    return '<section class="section entry">'
+    return '<section class="section entry"' + section + '>'
       + '<div class="entry-head"><span class="entry-head__title">' + esc(title) + '</span>'
-      + '<span class="entry-head__num latin">' + roman + '</span></div>'
+      + '<span class="entry-head__num latin">' + roman + '</span>'
+      + (opts.headExtra || '') + '</div>'
       + rule + inner
       + '</section>';
   }
-  return '<section class="section entry entry--collapsible entry--collapsed">'
-    + '<button class="entry-head entry-head--toggle" data-toggle aria-expanded="false">'
+  var open = !!opts.open;
+  return '<section class="section entry entry--collapsible' + (open ? '' : ' entry--collapsed') + '"' + section + '>'
+    + '<button class="entry-head entry-head--toggle" data-toggle aria-expanded="' + open + '">'
     + '<span class="entry-head__title">' + esc(title) + '</span>'
     + '<span class="entry-head__num latin">' + roman + '</span>'
+    + (opts.empty ? '<span class="entry-head__empty">未收录</span>' : '')
     + '<span class="entry-head__chev" aria-hidden="true"></span>'
     + '</button>'
     + rule
@@ -98,9 +117,11 @@ export function entryShell(title, roman, inner, ruleClass, collapsible) {
     + '</section>';
 }
 
-export function proseEntry(title, roman, paras, faintFirst) {
+export function proseEntry(title, roman, paras, faintFirst, opts) {
+  opts = opts || {};
+  var has = !!(paras && paras.length);
   var body;
-  if (paras && paras.length) {
+  if (has) {
     body = paras.map(function (p, i) {
       var faint = faintFirst && i === 0;
       return '<p' + (faint ? ' class="prose--faint"' : '') + '>' + esc(p) + '</p>';
@@ -108,7 +129,60 @@ export function proseEntry(title, roman, paras, faintFirst) {
   } else {
     body = '<p class="prose--faint">尚未收录，敬请期待。</p>';
   }
-  return entryShell(title, roman, '<div class="prose">' + body + '</div>', '', true);
+  return entryShell(title, roman, '<div class="prose">' + body + '</div>', '', true, {
+    section: opts.section,
+    open: has && opts.open,
+    empty: !has,
+  });
+}
+
+export function glossTerm(term) {
+  return String(term == null ? '' : term).replace(GLOSS_PAREN, '').trim();
+}
+
+// 把注释词条定位到原文各行：按注释顺序用游标向后找（找不到再从头找），不跨行；
+// 与已定位的词重叠时保留较长者。返回每行转义后的 HTML，第 k 条注释对应 data-gloss="k"。
+export function glossLines(lines, notes) {
+  var text = (lines || []).map(function (line) { return String(line == null ? '' : line); });
+  var claims = text.map(function () { return []; });
+  var cursor = { line: 0, pos: 0 };
+
+  (notes || []).forEach(function (note, k) {
+    var term = glossTerm(note && note.term);
+    if (!term) return;
+    var hits = [];
+    text.forEach(function (line, li) {
+      for (var at = line.indexOf(term); at >= 0; at = line.indexOf(term, at + 1)) {
+        hits.push({ line: li, start: at, end: at + term.length });
+      }
+    });
+    var ahead = hits.filter(function (h) {
+      return h.line > cursor.line || (h.line === cursor.line && h.start >= cursor.pos);
+    });
+    var ordered = ahead.concat(hits.filter(function (h) { return ahead.indexOf(h) < 0; }));
+    for (var i = 0; i < ordered.length; i++) {
+      var hit = ordered[i];
+      var overlaps = claims[hit.line].filter(function (c) { return c.start < hit.end && hit.start < c.end; });
+      if (overlaps.some(function (c) { return c.end - c.start >= term.length; })) continue;
+      claims[hit.line] = claims[hit.line]
+        .filter(function (c) { return overlaps.indexOf(c) < 0; })
+        .concat({ start: hit.start, end: hit.end, k: k });
+      cursor = { line: hit.line, pos: hit.end };
+      return;
+    }
+  });
+
+  return text.map(function (line, li) {
+    var html = '';
+    var pos = 0;
+    claims[li].sort(function (a, b) { return a.start - b.start; }).forEach(function (c) {
+      html += esc(line.slice(pos, c.start))
+        + '<span class="gloss" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false"'
+        + ' data-gloss="' + c.k + '">' + esc(line.slice(c.start, c.end)) + '</span>';
+      pos = c.end;
+    });
+    return html + esc(line.slice(pos));
+  });
 }
 
 export function errorSection(msg) {
@@ -118,8 +192,9 @@ export function errorSection(msg) {
 
 export function pagerHTML(route, page, pages) {
   function btn(target, label, on) {
+    var path = route + '/' + target;
     return on
-      ? '<button class="pager__btn" data-nav="' + route + '/' + target + '">' + label + '</button>'
+      ? '<a class="pager__btn" href="' + navHref(path) + '" data-nav="' + esc(path) + '">' + label + '</a>'
       : '<span class="pager__btn pager__btn--off">' + label + '</span>';
   }
   return '<div class="pager" id="pager">'
@@ -145,7 +220,7 @@ export function searchBoxHTML(o) {
   return '<div class="search" role="search" aria-label="' + esc(aria) + '">'
     + '<input class="search__input" id="' + esc(id) + '" type="search" autocomplete="off"'
     + ' autocapitalize="off" spellcheck="false" enterkeyhint="search"'
-    + ' placeholder="' + esc(o.placeholder || '搜索诗词标题、作者或近似关键词…') + '"'
+    + ' placeholder="' + esc(o.placeholder || '搜索标题、作者或名句…') + '"'
     + ' aria-label="' + esc(aria) + '" aria-controls="' + esc(controls) + '"'
     + ' aria-describedby="' + esc(statusId) + '">'
     + '<span class="search__tag latin" aria-hidden="true">' + esc(o.tag || 'search') + '</span>'

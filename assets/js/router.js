@@ -1,33 +1,98 @@
 import { preloadJSON, preloadListPage } from './data.js';
+import { closeGloss, handleAction, initReader, openGloss, rememberSection } from './reader.js';
 import { warmSearchIndex } from './search.js';
-import { idle } from './utils.js';
 import { errorSection } from './templates.js';
-import { RENDERERS, renderHome } from './pages.js';
+import { hrefFor, idle, localDateKey } from './utils.js';
+import { RENDERERS } from './pages.js';
 
 var PAGES = ['home', 'list', 'poem', 'author', 'authors', 'about'];
+var NAV_OF = { list: 'list', authors: 'authors', author: 'authors', about: 'about' };
+var DEFAULT_TITLE = '情心 · 慢读古典';
+
+var rendered = {};          // 页面 → 当前 DOM 对应的规范化路由键；命中时返回不重建 DOM
+var titles = {};            // 页面 → document.title
+var seq = 0;                // 导航序号：过期的异步渲染不得写 DOM、不得切换页面
+var entrySeq = 0;
+var currentEntry = null;    // 当前历史项 id（history.state.qx）
+var scrollById = new Map(); // 历史项 id → 离开时的滚动位置
+
+function parseHash() {
+  var raw = window.location.hash.replace(/^#\/?/, '');
+  var at = raw.indexOf('?');
+  var parts = (at >= 0 ? raw.slice(0, at) : raw).split('/').map(function (s) {
+    try { return decodeURIComponent(s); } catch (e) { return s; }
+  });
+  var query = {};
+  new URLSearchParams(at >= 0 ? raw.slice(at + 1) : '').forEach(function (value, key) {
+    if (value !== '') query[key] = value;
+  });
+  var name = PAGES.indexOf(parts[0]) >= 0 ? parts[0] : 'home';
+  var param = parts[1];
+  var keyParam = name === 'list' || name === 'authors' ? String(parseInt(param || '0', 10) || 0)
+    : name === 'poem' || name === 'author' ? (param || '') : '';
+  var key = name + '/' + keyParam + (query.q ? '?q=' + query.q : '')
+    + (name === 'home' ? '@' + localDateKey() : '');
+  return { name: name, param: param, rest: parts.slice(2), query: query, key: key };
+}
+
+// 给每个历史项打 id：没有 id 的是新导航（滚到顶），有 id 的是前进/后退（恢复位置）。
+function historyEntry() {
+  var state = window.history.state;
+  if (state && state.qx) return { id: state.qx, fresh: false };
+  var id = Date.now().toString(36) + '.' + (++entrySeq);
+  try {
+    window.history.replaceState(Object.assign({}, state, { qx: id }), '', window.location.href);
+  } catch (e) { /* 无法标记时按新导航处理 */ }
+  return { id: id, fresh: true };
+}
+
+// 路由复位/恢复滚动必须瞬时完成：styles.css 的 smooth 若残留动画，会把恢复的位置又拉走。
+function scrollToY(y) {
+  var root = document.documentElement;
+  var behavior = root.style.scrollBehavior;
+  root.style.scrollBehavior = 'auto';
+  void window.getComputedStyle(root).scrollBehavior; // 先刷新样式：Chrome 的 scrollTo(0, 0) 不会自行刷新
+  try {
+    window.scrollTo({ top: y, left: 0, behavior: 'instant' });
+  } catch (e) {
+    window.scrollTo(0, y);
+  }
+  root.style.scrollBehavior = behavior;
+}
 
 function show(name) {
   var boot = document.getElementById('boot');
   if (boot) boot.remove();
   PAGES.forEach(function (p) {
     var el = document.getElementById('page-' + p);
-    if (el) el.classList.toggle('is-active', p === name);
+    if (!el) return;
+    el.classList.toggle('is-active', p === name);
+    el.hidden = p !== name;
+  });
+  document.title = titles[name] || DEFAULT_TITLE;
+  var current = NAV_OF[name] || '';
+  document.querySelectorAll('.site-nav__link[data-nav]').forEach(function (link) {
+    if (link.getAttribute('data-nav') === current) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
   });
 }
 
-function parseHash() {
-  var raw = window.location.hash.replace(/^#\/?/, '');
-  var parts = raw.split('/').map(function (s) {
-    try { return decodeURIComponent(s); } catch (e) { return s; }
-  });
-  var name = parts[0] || 'home';
-  if (PAGES.indexOf(name) === -1) name = 'home';
-  return { name: name, param: parts[1] };
+// 只改地址栏（不产生历史项、不触发 hashchange），并让渲染缓存认得新地址。
+function replace(path, query) {
+  var target = hrefFor(path, query);
+  if (window.location.hash === target) return;
+  try {
+    window.history.replaceState(window.history.state, '', target);
+  } catch (e) {
+    return; // Safari 等对 replaceState 有频率限制：失败只是不更新地址栏
+  }
+  var r = parseHash();
+  if (rendered[r.name] != null) rendered[r.name] = r.key;
 }
 
-export function go(path) {
-  var target = '#/' + path.split('/').map(encodeURIComponent).join('/');
-  if (window.location.hash === target) render();
+export function go(path, query) {
+  var target = hrefFor(path, query);
+  if (window.location.hash === target) render({ force: true });
   else window.location.hash = target;
 }
 
@@ -45,36 +110,103 @@ function schedulePreload(route) {
   });
 }
 
-export async function render() {
-  var r = parseHash();
-  try {
-    await (RENDERERS[r.name] || renderHome)(r.param, { go: go });
-  } catch (e) {
-    if (window.console) console.error(e);
-    var el = document.getElementById('page-' + r.name);
-    if (el) el.innerHTML = errorSection('内容加载失败，请稍后重试。');
+export async function render(opts) {
+  opts = opts || {};
+  var token = ++seq;
+  var route = parseHash();
+  var here = historyEntry();
+  closeGloss();
+  if (opts.force || rendered[route.name] !== route.key) {
+    delete rendered[route.name];
+    titles[route.name] = DEFAULT_TITLE;
+    var cacheable = true;
+    var ctx = {
+      go: go,
+      replace: replace,
+      query: route.query,
+      rest: route.rest,
+      shuffle: !!opts.shuffle,
+      isCurrent: function () { return token === seq; },
+      noCache: function () { cacheable = false; },
+      setTitle: function () {
+        var parts = Array.prototype.slice.call(arguments).filter(Boolean);
+        titles[route.name] = parts.length ? parts.concat('情心').join(' · ') : DEFAULT_TITLE;
+      },
+    };
+    try {
+      await RENDERERS[route.name](route.param, ctx);
+      if (token === seq && cacheable) rendered[route.name] = route.key;
+    } catch (e) {
+      if (window.console) console.error(e);
+      var el = document.getElementById('page-' + route.name);
+      if (el && token === seq) el.innerHTML = errorSection('内容加载失败，请稍后重试。');
+    }
   }
-  show(r.name);
-  schedulePreload(r);
-  try { window.scrollTo({ top: 0, behavior: 'auto' }); }
-  catch (e) { window.scrollTo(0, 0); }
+  if (token !== seq) return;
+  show(route.name);
+  scrollToY(here.fresh || opts.force ? 0 : (scrollById.get(here.id) || 0));
+  currentEntry = here.id;
+  schedulePreload(route);
+}
+
+function onHashChange() {
+  if (currentEntry) scrollById.set(currentEntry, window.scrollY);
+  render();
+}
+
+function onClick(e) {
+  var target = e.target;
+  if (!(target instanceof Element)) return;
+  var gloss = target.closest('[data-gloss]');
+  if (!gloss && !target.closest('.gloss-pop')) closeGloss();
+  if (gloss) {
+    openGloss(gloss);
+    return;
+  }
+
+  var toggle = target.closest('[data-toggle]');
+  if (toggle) {
+    var entry = toggle.closest('.entry');
+    var collapsed = entry.classList.toggle('entry--collapsed');
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+    rememberSection(entry.getAttribute('data-section'), !collapsed);
+    return;
+  }
+
+  var action = target.closest('[data-action]');
+  if (action) {
+    var name = action.getAttribute('data-action');
+    if (name === 'shuffle') render({ force: true, shuffle: true });
+    else handleAction(name);
+    return;
+  }
+
+  var trigger = target.closest('[data-nav]');
+  if (!trigger) return;
+  // 修饰键 / 非主键点击交给浏览器（新标签页、新窗口）。
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  go(trigger.getAttribute('data-nav'));
+}
+
+function onKeydown(e) {
+  if (e.key === 'Escape') {
+    closeGloss(true);
+    return;
+  }
+  if ((e.key === 'Enter' || e.key === ' ') && e.target instanceof Element && e.target.matches('[data-gloss]')) {
+    e.preventDefault();
+    openGloss(e.target);
+  }
 }
 
 export function startRouter() {
-  document.addEventListener('click', function (e) {
-    var toggle = e.target.closest('[data-toggle]');
-    if (toggle) {
-      var entry = toggle.closest('.entry');
-      var collapsed = entry.classList.toggle('entry--collapsed');
-      toggle.setAttribute('aria-expanded', String(!collapsed));
-      return;
-    }
-    var trigger = e.target.closest('[data-nav]');
-    if (!trigger) return;
-    e.preventDefault();
-    go(trigger.getAttribute('data-nav'));
+  if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
+  document.addEventListener('click', onClick);
+  document.addEventListener('keydown', onKeydown);
+  window.addEventListener('hashchange', onHashChange);
+  document.addEventListener('DOMContentLoaded', function () {
+    initReader();
+    render();
   });
-
-  window.addEventListener('hashchange', render);
-  document.addEventListener('DOMContentLoaded', render);
 }

@@ -15,15 +15,16 @@ is only header/footer + empty page containers; everything else is `fetch`ed from
 There is no build or bundling step. Things you actually run:
 
 - **Preview locally** (required — `fetch()` blocks `file://`):
-  `node tools/server/serve.mjs` → http://localhost:8080  (cwd-independent static server).
-  In Claude Code, use the `.claude/launch.json` config named **`qingxin`**.
+  `node tools/server/serve.mjs` → http://localhost:8080  (cwd-independent static server; `PORT=…` to change).
   Do NOT use `python -m http.server` — it crashes under the preview launcher (`os.getcwd`).
 
 - **Check** (the closest thing to lint+tests — run after touching `assets/js/**`, `sw.js`, or `data/**`):
-  `cd tools && npm run check` — `node --check` syntax-checks every frontend/tool script, then runs
-  `node data/validate.mjs`, a read-only data-consistency audit (manifest counts vs search/index rows,
-  id→shard round-trip for every poem, author slug→bucket hits, annotation shape + `source` rules;
-  exits 1 on any error).
+  `cd tools && npm run check` — `node --check` syntax-checks every frontend/tool script, runs the unit
+  tests (`node --test tests/*.test.mjs`: search ranking + line search in `search-core.test.mjs`, HTML
+  builders + utils in `templates.test.mjs`), then runs `node data/validate.mjs`, a read-only
+  data-consistency audit (manifest counts vs search/index rows, id→shard round-trip for every poem,
+  author slug→bucket hits, annotation shape + `source` rules, `lines.json` rows vs annotations and
+  poem text; exits 1 on any error, only warns about annotated poems not yet in `lines.json`).
 
 - **Regenerate the data** (only when refreshing/rebuilding `data/**`):
   ```bash
@@ -56,8 +57,10 @@ There is no build or bundling step. Things you actually run:
    bundled into 256 hash-shards — `loadAuthor` resolves `slug`→bucket; see `tools/data/bundle-authors.mjs`),
    `data/authors-index.json`
    (all poets sorted by output, for the 诗人 browse page), `data/about.json` (关于 page copy),
-   and `data/featured.json` (home-page pool: index rows of the ~3,200 poems whose annotation has
-   赏析 + 注释/译文 — regenerate with `node tools/data/build-featured.mjs` after coverage changes).
+   `data/featured.json` (home-page pool: index rows of the ~3,200 poems whose annotation has
+   赏析 + 注释/译文) and `data/lines.json` (`[[id, text]]` body text of every non-AI annotated poem,
+   identical (author, text) siblings collapsed — the corpus for 名句 line search). Both derived files
+   come from `node tools/data/build-featured.mjs`; rerun it after coverage changes.
 
 **Poem IDs encode storage location:** `t<chunk>-<i>` (唐) / `c<chunk>-<i>` (宋词), where `i` is the
 0–999 position within the id-block, resolves to `data/poems/<chunk>-<⌊i/100⌋>.json[i%100]` — no
@@ -66,40 +69,77 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
 
 **Front end** (`assets/js/`, native ES modules — `app.js` is a 3-line entry calling `startRouter()`):
 - `router.js` — hash router: `#/home | #/list/:page | #/poem/:id | #/author/:slug | #/authors/:page
-  | #/about` → `RENDERERS` map (unknown routes fall back to home). One delegated click handler drives
-  all navigation via `data-nav="poem/<id>"`-style attributes plus `data-toggle` (collapsible entry
-  sections); after each render it idle-preloads the JSON the next click will likely need.
-- `pages.js` — the six renderers (`renderHome/renderList/renderPoem/renderAuthor/renderAuthors/renderAbout`)
-  plus pager/search wiring. Each builds HTML strings **reusing the existing CSS classes** and injects
-  into `#page-<name>`. Home shuffles `data/featured.json` into an annotated hero poem + 5-row 精选
-  list (换一首 re-renders via `data-nav="home"`); 诗集 paginates 25/page (`DISPLAY`) over the 500-row
-  index files; 诗人 lists all poets from `authors-index.json`. Both pagers come from `pagerHTML()` —
-  prev/next buttons plus a page-number input + 跳转 button, wired by `wirePager()` (Enter or click,
-  clamped to range). **Two separate searches** (both via `wireLiveSearch()`: debounced, capped at 120
-  hits, stale responses ignored, pager hidden while active): global title/author search on 诗集 and
-  name-only search on 诗人. Both show loading/result status and highlight only real exact substrings.
-- `data.js` — `fetchJSON()` (memoized via a `Map`), `parseId()`/`loadPoem()`/`loadAnnotation()`,
-  `loadAuthor()` (slug→bucket hash).
+  | #/about`, plus an optional `?q=` live-search query → `RENDERERS` map (unknown routes fall back to
+  home). Navigation uses real `<a href="#/…" data-nav="…">` links (hrefs from `hashPath()`/`hrefFor()`
+  in `utils.js`); one delegated click handler intercepts plain left clicks and lets modifier/middle
+  clicks through (new tab). The same handler dispatches `data-toggle` (collapsible sections),
+  `data-action` (`shuffle` re-renders home at random; `copy/share/vertical/scale-up/scale-down/theme/
+  gloss-all` go to `reader.js`) and `data-gloss` (note popover; Enter/Space/Escape via delegated keydown).
+  **Render cache:** the six `#page-<name>` containers stay in the DOM and `rendered[name]` holds the
+  canonical route key each one shows, so Back to the same key only re-shows it (search box, results
+  and DOM survive). A render is cached only on success; renderers call `ctx.noCache()` when they had
+  to degrade (e.g. an annotation fetch failed with a non-404). **Stale renders:** every navigation
+  bumps a sequence number — renderers must check `ctx.isCurrent()` right before writing `innerHTML`.
+  **Scroll:** `history.scrollRestoration='manual'`; each history entry gets an id in `history.state.qx`
+  — new entries scroll to top, Back/Forward restore the saved offset instantly (explicitly overriding
+  the CSS `scroll-behavior: smooth`, which would otherwise drag the restored position). Renderers set
+  titles with `ctx.setTitle(...)`; `show()` applies `document.title`, `hidden` and `aria-current`, so
+  cached re-shows are correct too. After each render it idle-preloads the JSON the next click will
+  likely need.
+- `pages.js` — the six renderers, all `(param, ctx)` (`renderHome/renderList/renderPoem/renderAuthor/
+  renderAuthors/renderAbout`), plus pager/search wiring. Each builds HTML strings **reusing the
+  existing CSS classes** and injects into `#page-<name>`. Home is 今日一诗: `data/featured.json`
+  shuffled with `seededRandom('qingxin:' + localDateKey())` (local date, so hero + 5-row 精选 list are
+  stable for the day); 换一首 shuffles with `Math.random`. 诗集 paginates 25/page (`DISPLAY`) over the
+  500-row index files; 诗人 lists all poets from `authors-index.json`. Both pagers come from
+  `pagerHTML()` — prev/next links plus a page-number input + 跳转 button, wired by `wirePager()`
+  (Enter or click, clamped to range). **Two separate searches** (both via `wireLiveSearch()`:
+  debounced, capped at 120 hits, stale responses ignored, pager hidden while active, query written to
+  `?q=` from the debounce — never per keystroke or during IME composition — and restored via
+  `start(q)`): global title/author/line search on 诗集 and name-only search on 诗人. Both show
+  loading/result status and highlight only real exact substrings. The poem page's 原文 heading
+  carries the reading toolbar (复制/分享/竖排/A−/A+; 竖排 is omitted above 60 lines) and note terms are
+  linked inside 词序 + 原文 via `glossLines()`.
+- `reader.js` — browser-only reading layer: preferences in localStorage `qingxin:prefs`
+  (`theme`, `scale`, `vertical`, `open` section ids), toolbar actions, and the single note popover
+  (`openGloss`/`closeGloss`; the k-th `.gloss` term maps to the k-th `.notes__row`). The inline
+  `<head>` script in `index.html` applies theme/scale/vertical before first paint — keep its key and
+  fields in sync with `reader.js`.
+- `data.js` — `fetchJSON()` (memoized via a `Map`; errors carry `status`), `parseId()`/`loadPoem()`,
+  `loadAnnotation()`/`loadAuthor()` (slug→bucket hash) — both return `null` only on 404 and rethrow
+  other failures.
 - `search-core.js` + `search.js` + `search-worker.js` — shared ranked exact/fuzzy matching for
   poems and authors, with punctuation and Traditional→Simplified query normalization via the local
-  OpenCC browser module. The 诗集 scan runs inside a module Web Worker (keeping the multi-MB index off
-  the main thread) and transparently uses the same core on the main thread if Workers fail.
+  OpenCC browser module. Poem search also scans `data/lines.json`: exact substring for queries of 2+
+  characters, one substituted character for 5+ (全唐诗 texts differ from popular versions, e.g.
+  静夜思 reads 床前看月光); body hits rank below every title/author direct match, and their excerpt
+  offsets are mapped per line (OpenCC phrase conversion makes whole-body offsets unreliable). If
+  `lines.json` fails to load, search degrades to title/author. The 诗集 scan runs inside a module Web
+  Worker (keeping the multi-MB index off the main thread) and transparently uses the same core on the
+  main thread if Workers fail.
 - `templates.js` — shared HTML builders (`poemRow`/`authorRow`/`searchRow`, `entryShell`, `proseEntry`,
-  `pagerHTML`, `searchBoxHTML`); `utils.js` — `esc()`, `debounce()`, `groupStanzas()`, `idle()`.
+  `glossLines`, `pagerHTML`, `searchBoxHTML`, `navHref`); `utils.js` — `esc()`, `hashPath()`/`hrefFor()`,
+  `groupStanzas()`, `idle()`, `localDateKey()`, `seededRandom()`. Both are imported by the Node unit
+  tests, so they must not touch `window`/`document`/`localStorage` at import time.
 
 **`sw.js` service worker** (registered from `index.html` with a relative path, so it works under the
 `/QingXin/` Pages subpath): stale-while-revalidate on every same-origin GET — cached copy returns
 instantly, the network refresh lands by the next reload, so content updates lag at most one refresh
 (remember this when previewing changes locally). It pre-caches the app shell (`index.html`, CSS,
-every `assets/js/*.js`). **Adding/renaming a frontend module means updating its `SHELL` list;
-changing any cached format means bumping `CACHE_NAME`** (old caches are purged on activate).
+every `assets/js/*.js`) with `cache: 'reload'`, bypassing the HTTP cache so a new worker never mixes
+old and new modules. **Adding/renaming a frontend module means updating its `SHELL` list;
+changing any cached format means bumping `CACHE_NAME`** (currently `qingxin-v4`; old caches are
+purged on activate).
 
 **Detail-page invariant:** all five section headings (原文/注释/译文/赏析/创作背景) always
 render. Only 原文 + author bio come from source data; the other four come from the annotation
 overlay (`loadAnnotation()` merges it over the read-only poem) and show a
-"尚未收录，敬请期待。" faint placeholder when absent. 原文 is always open; the four overlay
-sections are collapsible entries, collapsed by default (`entryShell(…, collapsible)` + `data-toggle`).
-Annotations with `source:"ai"` additionally get a faint AI disclaimer line (`aiNotice()` in `pages.js`).
+"尚未收录，敬请期待。" faint placeholder when absent, with a faint 「未收录」 marker in the heading.
+原文 is always open; the four overlay sections are collapsible entries, collapsed by default unless the
+reader has expanded that section type before (`entryShell(…, collapsible, { section, open, empty })` +
+`data-toggle`; empty sections never auto-open, and the popover's 查看全部注释 does not count as a
+preference). Annotations with `source:"ai"` additionally get a faint AI disclaimer line (`aiNotice()`
+in `pages.js`).
 
 ## Conventions & gotchas
 
@@ -109,8 +149,15 @@ Annotations with `source:"ai"` additionally get a faint AI disclaimer line (`aiN
   hold local preview, data generation, and annotation-import tooling respectively.
 - **Design system** lives in `assets/css/styles.css` `:root` (`--paper` #F5F1E8 米纸, `--ink` #221F1A,
   `--accent` #9A3B2E 朱砂, `--serif` Noto Serif SC, `--latin` Cormorant Garamond; plus muted-ink
-  tiers `--body`/`--muted`/`--muted-2`/`--muted-3` and hairlines `--line`/`--line-strong`).
-  Preserve it exactly; build any new UI from these tokens (that's how search/pagination were added).
+  tiers `--body`/`--muted`/`--muted-2`/`--muted-3`, hairlines `--line`/`--line-strong`, RGB channels
+  `--ink-rgb`/`--paper-rgb`/`--accent-rgb`, `--seal-bg`/`--seal-fg`, `--shadow`, `--selection-alpha`,
+  and `--reading-scale`). Preserve it exactly; build any new UI from these tokens (that's how
+  search/pagination were added). **夜读 (dark theme)** only redefines tokens, in two identical blocks —
+  `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {…} }` and
+  `:root[data-theme="dark"] {…}` — so never hard-code a color: add a token to `:root` and to both dark
+  blocks. Reading text sizes are `calc(<px> * var(--reading-scale))` (including the mobile media
+  query). Vertical 原文 is `:root[data-vertical="1"] .original__body` — the scroll container itself is
+  `vertical-rl`, so it opens on the first column.
 - **`tools/data/prep.mjs`**: converts 全唐诗 繁→简 via `opencc-js` (宋词 is already simplified); strips
   lone UTF-16 surrogates; synthesizes ci titles/ids. On re-run it **preserves
   `data/annotations/`** (your hand-written overlays), only regenerating index/poems/authors +
@@ -118,8 +165,11 @@ Annotations with `source:"ai"` additionally get a faint AI disclaimer line (`aiN
 - **To annotate a poem:** create `data/annotations/<id>.json` (id is in the URL `#/poem/<id>`);
   fill `notes:[{term,def}]`, `translation:[…]`, `appreciation:[…]`, `background:[…]`,
   optional `preface`/`prefaceTranslation`. Save + reload; no rebuild. See
-  `data/annotations/README.md`. (Detail pages need no rebuild; only the home-page featured pool
-  does — run `node tools/data/build-featured.mjs` when coverage changes so new poems join it.)
+  `data/annotations/README.md`. (Detail pages need no rebuild; only the home-page featured pool and
+  the line-search corpus do — run `node tools/data/build-featured.mjs` when coverage changes so the
+  poem joins `featured.json` and `lines.json`; until then `validate.mjs` just warns.) Note terms are
+  linked in 原文 when they occur verbatim in 词序/正文 after stripping （pinyin） parentheticals, so keep
+  `term` as the original wording.
 - **Bulk-imported annotations:** ~1,045 famous 唐诗/宋词 have 译文/注释/赏析 imported from the
   chinese-gushiwen dataset via `node tools/annotations/annotate-import.mjs` (fuzzy-matches by author +
   body-text Dice similarity; caches downloads in gitignored `tools/.cache/`). Imported files
@@ -163,9 +213,9 @@ Annotations with `source:"ai"` additionally get a faint AI disclaimer line (`aiN
   `validate.mjs`): hand-written (no `source` field) > `gushiwen-web` > `gushiwen` > `ai`. Nothing may
   overwrite a hand-written file. The `"ai"` tier (LLM-generated annotations) is plumbed end-to-end
   but so far unused — no generator tool or `ai` files exist yet: `renderPoem` shows an AI disclaimer,
-  `build-featured.mjs` excludes them from the home pool (keeping it human-sourced), `validate.mjs`
-  requires their `background` to stay `[]`, and both import/scrape scripts treat existing `ai` files
-  as freely overwritable (human sources always win).
+  `build-featured.mjs` excludes them from the home pool and from `lines.json` (keeping both
+  human-sourced), `validate.mjs` requires their `background` to stay `[]`, and both import/scrape
+  scripts treat existing `ai` files as freely overwritable (human sources always win).
 - `data/**` (~67MB) is committed and is what the site serves; `tools/node_modules` and the
   external `../chinese-poetry-src` clone are gitignored.
 - **Deploy** is GitHub Pages "Deploy from a branch" (`main` / root — no workflow; `.github/`

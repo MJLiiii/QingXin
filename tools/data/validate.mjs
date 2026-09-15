@@ -160,9 +160,14 @@ for (const a of authorIndex) {
 }
 
 const annFiles = (await readdir(join(DATA, 'annotations'))).filter((f) => ANN_FILE_RE.test(f));
+const annSources = new Map(); // id -> source(无法解析的文件记为 undefined)
 for (const f of annFiles) {
+  const id = f.slice(0, -5);
+  annSources.set(id, undefined);
   try {
-    validateAnnotationShape(f.slice(0, -5), await readJson(join(DATA, 'annotations', f)));
+    const a = await readJson(join(DATA, 'annotations', f));
+    if (a && typeof a === 'object') annSources.set(id, a.source);
+    validateAnnotationShape(id, a);
   } catch (e) {
     addError(`无法解析 data/annotations/${f}: ${e.message}`);
   }
@@ -173,7 +178,73 @@ if (poemCache.size !== expectedPoemFiles) {
   addWarning(`本次按 search 触达 ${poemCache.size} 个 poem 分片，按总量估算 ${expectedPoemFiles} 个`);
 }
 
-console.log(`validate: poems=${searchIds.size}, indexRows=${indexRows}, authors=${authorIndex.length}, annotations=${annFiles.length}`);
+/* data/lines.json(名句检索正文,build-featured.mjs 生成):行 [id, text],
+   text = 原文非空 paragraphs 以 '\n' 连接;只收非 AI 注释诗,同 (作者, 正文) 只留一个 id。
+   手工新增注释后未重跑生成脚本只报 warning,不让校验失败。 */
+const bodyText = (poem) => poem.paragraphs.filter((p) => typeof p === 'string' && p !== '').join('\n');
+const bodyKey = (poem) => `${poem.author}\u0000${bodyText(poem)}`;
+
+function corpusPoem(id) {
+  const loc = parseId(id);
+  if (!loc || !searchIds.has(id)) return null;
+  const shard = poemCache.get(`${pad4(loc.chunk)}-${Math.floor(loc.i / manifest.subChunkSize)}.json`);
+  const poem = shard && shard[loc.i % manifest.subChunkSize];
+  return poem && poem.id === id && isArray(poem.paragraphs) ? poem : null;
+}
+
+let lines = null;
+try {
+  lines = await readJson(join(DATA, 'lines.json'));
+} catch (e) {
+  if (e.code === 'ENOENT') {
+    addWarning('缺少 data/lines.json(诗集搜索只能匹配标题/作者),请运行 node tools/data/build-featured.mjs');
+  } else {
+    addError(`无法解析 data/lines.json: ${e.message}`);
+  }
+}
+if (lines !== null && !isArray(lines)) {
+  addError('data/lines.json 必须是数组');
+  lines = null;
+}
+if (lines) {
+  const lineIds = new Set();
+  const lineBodies = new Set();
+  for (const row of lines) {
+    if (!isArray(row) || row.length !== 2 || typeof row[0] !== 'string' || typeof row[1] !== 'string') {
+      addError('lines.json 存在非 [id,text] 行');
+      continue;
+    }
+    const [id, text] = row;
+    if (!parseId(id)) {
+      addError(`lines.json 非法诗词 id: ${id}`);
+      continue;
+    }
+    if (lineIds.has(id)) addError(`lines.json 重复 id: ${id}`);
+    lineIds.add(id);
+    if (!annSources.has(id)) addError(`lines.json ${id} 没有注释文件`);
+    else if (annSources.get(id) === 'ai') addError(`lines.json ${id} 是 AI 注释诗,不应收录`);
+    const poem = corpusPoem(id);
+    if (!poem) {
+      addError(`lines.json ${id} 不在语料中`);
+      continue;
+    }
+    if (text !== bodyText(poem)) addError(`lines.json ${id} 正文与原文非空 paragraphs 不一致`);
+    lineBodies.add(bodyKey(poem));
+  }
+  const missing = [];
+  for (const [id, source] of annSources) {
+    if (source === 'ai' || lineIds.has(id)) continue;
+    const poem = corpusPoem(id);
+    if (poem && lineBodies.has(bodyKey(poem))) continue; // 同作者同正文,已由另一 id 收录
+    missing.push(id);
+  }
+  if (missing.length) {
+    addWarning(`lines.json 缺少 ${missing.length} 首非 AI 注释诗(如 ${missing.slice(0, 5).join(', ')}),` +
+      '请重跑 node tools/data/build-featured.mjs');
+  }
+}
+
+console.log(`validate: poems=${searchIds.size}, indexRows=${indexRows}, authors=${authorIndex.length}, annotations=${annFiles.length}, lines=${lines ? lines.length : 0}`);
 for (const w of warnings) console.warn(`warning: ${w}`);
 if (errors.length) {
   for (const e of errors.slice(0, 50)) console.error(`error: ${e}`);

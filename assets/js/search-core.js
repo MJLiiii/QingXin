@@ -3,8 +3,18 @@ import { Converter } from './vendor/opencc-t2cn.js';
 var toSimplified = Converter({ from: 't', to: 'cn' });
 var poemCache = new WeakMap();
 var authorCache = new WeakMap();
+var linesCache = new WeakMap();
 var punctuation = /[\p{P}\p{Z}\s]+/gu;
 var surrogate = /[\uD800-\uDFFF]/;
+var LINE_SUBSTRING_SCORE = 190;
+var LINE_FUZZY_SCORE = 105;
+var LINE_FUZZY_MIN_LENGTH = 5;
+var TWO_CHARACTER_LINE_CAP = 40;
+var EXCERPT_LIMIT = 40;
+// A full-width space normalizes to '', so joined excerpt lines keep the
+// normalized offsets of their source lines.
+var EXCERPT_JOINER = '\u3000';
+var ELLIPSIS = '\u2026';
 
 function compactText(value) {
   return String(value == null ? '' : value)
@@ -141,6 +151,49 @@ function fuzzyDistance(text, query) {
     }
   }
   return 2;
+}
+
+// Leftmost same-length window of `text` that differs from `query` by exactly
+// one substituted character. Callers rule out exact containment first.
+function substitutionWindow(text, query) {
+  var useCodePoints = surrogate.test(text) || surrogate.test(query);
+  var textUnits = useCodePoints ? Array.from(text) : text;
+  var queryUnits = useCodePoints ? Array.from(query) : query;
+  var size = queryUnits.length;
+  for (var start = 0; start + size <= textUnits.length; start++) {
+    var candidate = textUnits.slice(start, start + size);
+    if (editDistanceAtMostOne(candidate, queryUnits) !== 1) continue;
+    if (!useCodePoints) return { at: start, span: size };
+    // Report UTF-16 offsets into the normalized body, like indexOf().
+    return { at: textUnits.slice(0, start).join('').length, span: candidate.join('').length };
+  }
+  return null;
+}
+
+function lineMatch(type, at, span) {
+  var fuzzy = type === 'fuzzy';
+  return {
+    field: 'line',
+    type: type,
+    score: fuzzy ? LINE_FUZZY_SCORE : LINE_SUBSTRING_SCORE,
+    distance: fuzzy ? 1 : 0,
+    start: -1,
+    length: 0,
+    _lengthDelta: 0,
+    _at: at,
+    _span: span,
+  };
+}
+
+// Body matches only matter when they outrank the title/author match, so the
+// scans are skipped when they cannot win.
+function bestLineMatch(body, query, queryLength, currentScore) {
+  if (currentScore >= LINE_SUBSTRING_SCORE) return null;
+  var at = body.norm.indexOf(query);
+  if (at >= 0) return lineMatch('substring', at, query.length);
+  if (queryLength < LINE_FUZZY_MIN_LENGTH || currentScore >= LINE_FUZZY_SCORE) return null;
+  var found = substitutionWindow(body.norm, query);
+  return found ? lineMatch('fuzzy', found.at, found.span) : null;
 }
 
 function directCandidate(display, normalized, query, alias) {
@@ -283,21 +336,91 @@ function insertTop(top, entry, limit) {
   if (top.length > limit) top.pop();
 }
 
-function publicMatch(match) {
+// Index of the line holding normalized offset `position`: the last line that
+// starts at or before it (a line normalizing to '' shares the next line's
+// offset and holds no positions).
+function lineIndexAt(offsets, position) {
+  var low = 0;
+  var high = offsets.length - 1;
+  while (low < high) {
+    var mid = (low + high + 1) >> 1;
+    if (offsets[mid] <= position) low = mid;
+    else high = mid - 1;
+  }
+  return low;
+}
+
+function isHighSurrogate(code) {
+  return code >= 0xD800 && code <= 0xDBFF;
+}
+
+function isLowSurrogate(code) {
+  return code >= 0xDC00 && code <= 0xDFFF;
+}
+
+// Clip a long excerpt to EXCERPT_LIMIT units around [focusStart, focusEnd),
+// marking each cut side with an ellipsis. The focus itself is never cut.
+function clipExcerpt(text, focusStart, focusEnd, range) {
+  var focusLength = Math.max(0, focusEnd - focusStart);
+  var room = Math.max(focusLength, EXCERPT_LIMIT - 2);
+  var from = Math.max(0, focusStart - Math.floor((room - focusLength) / 2));
+  var to = Math.min(text.length, from + room);
+  from = Math.max(0, to - room);
+  // A side that keeps the text's own edge needs no ellipsis: reuse its unit.
+  if (from === 0) to = Math.min(text.length, to + 1);
+  else if (to === text.length) from -= 1;
+  if (from > 0 && isLowSurrogate(text.charCodeAt(from))) from += 1;
+  if (to < text.length && isHighSurrogate(text.charCodeAt(to - 1))) to -= 1;
+  var prefix = from > 0 ? ELLIPSIS : '';
+  var suffix = to < text.length ? ELLIPSIS : '';
   return {
+    line: prefix + text.slice(from, to) + suffix,
+    start: range.start >= 0 ? range.start - from + prefix.length : -1,
+    length: range.start >= 0 ? range.length : 0,
+  };
+}
+
+// Display excerpt for a body match: the source lines covering the match,
+// with an excerpt-relative highlight range for substring hits.
+function lineExcerpt(body, match) {
+  var first = lineIndexAt(body.offsets, match._at);
+  var last = lineIndexAt(body.offsets, match._at + match._span - 1);
+  var text = body.lines.slice(first, last + 1).join(EXCERPT_JOINER);
+  var normalized = body.normLines.slice(first, last + 1).join('');
+  var at = match._at - body.offsets[first];
+  var range = match.type === 'fuzzy' ? { start: -1, length: 0 }
+    : displayRange(text, normalized, at, match._span);
+  if (text.length <= EXCERPT_LIMIT) return { line: text, start: range.start, length: range.length };
+  var focus = range;
+  if (focus.start < 0 && match.type === 'fuzzy') focus = displayRange(text, normalized, at, match._span);
+  if (focus.start < 0) {
+    // OpenCC phrase conversions defeat the per-character map: estimate.
+    var ratio = normalized.length ? text.length / normalized.length : 1;
+    focus = { start: Math.floor(at * ratio), length: Math.ceil(match._span * ratio) };
+  }
+  return clipExcerpt(text, focus.start, Math.min(text.length, focus.start + focus.length), range);
+}
+
+function publicMatch(match, excerpt) {
+  var result = {
     field: match.field,
     type: match.type,
     score: match.score,
     distance: match.distance,
-    start: match.start,
-    length: match.length,
+    start: excerpt ? excerpt.start : match.start,
+    length: excerpt ? excerpt.length : match.length,
   };
+  if (excerpt) result.line = excerpt.line;
+  return result;
 }
 
+// Excerpts are built only for the entries actually returned.
 function resultFromTop(top, total) {
   return {
     hits: top.map(function (entry) { return entry.value; }),
-    matches: top.map(function (entry) { return publicMatch(entry.match); }),
+    matches: top.map(function (entry) {
+      return publicMatch(entry.match, entry.body ? lineExcerpt(entry.body, entry.match) : null);
+    }),
     total: total,
   };
 }
@@ -305,8 +428,10 @@ function resultFromTop(top, total) {
 function createCollector(limit) {
   return {
     direct: [],
+    line: [],
     fuzzy: [],
     directTotal: 0,
+    lineTotal: 0,
     fuzzyTotal: 0,
     hasExact: false,
     limit: limit,
@@ -317,6 +442,9 @@ function collectMatch(collector, entry) {
   if (entry.match.type === 'fuzzy') {
     collector.fuzzyTotal += 1;
     insertTop(collector.fuzzy, entry, collector.limit);
+  } else if (entry.match.field === 'line') {
+    collector.lineTotal += 1;
+    insertTop(collector.line, entry, collector.limit);
   } else {
     collector.directTotal += 1;
     collector.hasExact = collector.hasExact || entry.match.type === 'exact';
@@ -326,12 +454,50 @@ function collectMatch(collector, entry) {
 
 function collectedResult(collector, queryLength) {
   var room = Math.max(0, collector.limit - collector.direct.length);
+  // Body (名句) substring hits follow direct title/author hits. A two-character
+  // query hits hundreds of bodies, so it keeps a capped, ranked sample.
+  var lineCap = queryLength === 2 ? TWO_CHARACTER_LINE_CAP : room;
+  var acceptedLines = Math.min(room, lineCap, collector.lineTotal);
+  room -= acceptedLines;
   // A one-edit match on two characters is only 50% similar. Keep a small,
   // ranked suggestion set, and suppress fuzzy noise when an exact hit exists.
   var fuzzyLimit = collector.hasExact ? 0 : (queryLength === 2 ? 12 : room);
   var acceptedFuzzy = Math.min(room, fuzzyLimit, collector.fuzzyTotal);
-  var top = collector.direct.concat(collector.fuzzy.slice(0, acceptedFuzzy));
-  return resultFromTop(top, collector.directTotal + acceptedFuzzy);
+  var top = collector.direct.concat(
+    collector.line.slice(0, acceptedLines),
+    collector.fuzzy.slice(0, acceptedFuzzy)
+  );
+  var lineCount = queryLength === 2
+    ? Math.min(collector.lineTotal, TWO_CHARACTER_LINE_CAP)
+    : collector.lineTotal;
+  return resultFromTop(top, collector.directTotal + lineCount + acceptedFuzzy);
+}
+
+// rows: [[id, text]] from data/lines.json, lines joined by '\n'. Each line is
+// normalized separately: OpenCC converts whole phrases, so per-line pieces
+// (not the whole body) are what displayRange() can map back for excerpts.
+export function prepareLines(rows) {
+  if (!Array.isArray(rows)) return new Map();
+  var cached = linesCache.get(rows);
+  if (cached) return cached;
+  cached = new Map();
+  for (var row of rows) {
+    if (!Array.isArray(row) || typeof row[0] !== 'string' || typeof row[1] !== 'string') continue;
+    if (cached.has(row[0])) continue;
+    var lines = row[1].split('\n');
+    var normLines = [];
+    var offsets = [];
+    var norm = '';
+    for (var line of lines) {
+      var normalized = normalizeSearchText(line);
+      offsets.push(norm.length);
+      normLines.push(normalized);
+      norm += normalized;
+    }
+    cached.set(row[0], { lines: lines, normLines: normLines, norm: norm, offsets: offsets });
+  }
+  linesCache.set(rows, cached);
+  return cached;
 }
 
 export function preparePoemIndex(index) {
@@ -341,20 +507,35 @@ export function preparePoemIndex(index) {
   }
 }
 
-export function searchPoemIndex(index, query, limit) {
+// options.lines: optional data/lines.json rows ([[id, text]]) adding body-text
+// (名句) matches for multi-character queries.
+export function searchPoemIndex(index, query, limit, options) {
   if (!Array.isArray(index)) throw new TypeError('search index must be an array');
   var normalizedQuery = normalizeSearchText(query);
   var cap = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 120;
   if (!normalizedQuery) return { hits: [], matches: [], total: 0 };
+  var queryLength = characterLength(normalizedQuery);
+  var bodies = options && Array.isArray(options.lines) && queryLength >= 2
+    ? prepareLines(options.lines) : null;
   var collector = createCollector(cap);
   for (var i = 0; i < index.length; i++) {
     var row = index[i];
     if (!Array.isArray(row) || typeof row[1] !== 'string' || typeof row[2] !== 'string') continue;
     var match = bestPoemMatch(row, normalizedQuery);
+    var body = bodies ? bodies.get(row[0]) : undefined;
+    if (body) {
+      var line = bestLineMatch(body, normalizedQuery, queryLength, match ? match.score : 0);
+      if (line && (!match || line.score > match.score)) match = line;
+    }
     if (!match) continue;
-    collectMatch(collector, { value: row, match: match, index: i });
+    collectMatch(collector, {
+      value: row,
+      match: match,
+      index: i,
+      body: match.field === 'line' ? body : null,
+    });
   }
-  return collectedResult(collector, characterLength(normalizedQuery));
+  return collectedResult(collector, queryLength);
 }
 
 export function searchAuthorIndex(index, query, limit) {

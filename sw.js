@@ -1,10 +1,11 @@
 /* 情心 Service Worker —— 跨刷新/离线缓存。纯原生、零依赖。
    策略：对同源 GET 一律 stale-while-revalidate——命中缓存立即返回、后台再拉新写回，
    故二次访问秒开，而代码/注释更新至多滞后一次刷新（不会卡在旧版本）。
-   预缓存仅应用外壳与前端模块；大文件（search.json 等）按访问懒缓存。
+   预缓存仅应用外壳与前端模块；大文件（search.json、lines.json 等）按访问懒缓存。
+   预缓存绕过 HTTP 缓存（cache: 'reload'），避免新旧模块混装。
    改动缓存格式时 bump CACHE_NAME，旧缓存在 activate 清除。
    作用域随注册路径（GitHub Pages 子路径 /QingXin/ 亦可）。 */
-const CACHE_NAME = 'qingxin-v3';
+const CACHE_NAME = 'qingxin-v4';
 const SHELL = [
   './',
   './index.html',
@@ -12,6 +13,7 @@ const SHELL = [
   './assets/js/app.js',
   './assets/js/data.js',
   './assets/js/pages.js',
+  './assets/js/reader.js',
   './assets/js/router.js',
   './assets/js/search.js',
   './assets/js/search-core.js',
@@ -24,7 +26,7 @@ const SHELL = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(SHELL))
+      .then((cache) => cache.addAll(SHELL.map((url) => new Request(url, { cache: 'reload' }))))
       .then(() => self.skipWaiting()),
   );
 });
