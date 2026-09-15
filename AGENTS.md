@@ -161,7 +161,8 @@ in `pages.js`).
 - **`tools/data/prep.mjs`**: converts 全唐诗 繁→简 via `opencc-js` (宋词 is already simplified); strips
   lone UTF-16 surrogates; synthesizes ci titles/ids. On re-run it **preserves
   `data/annotations/`** (your hand-written overlays), only regenerating index/poems/authors +
-  top-level JSON + the seed `c59-66.json`.
+  top-level JSON + the seed `c59-66.json`. `data/annotations/README.md` is hand-maintained docs —
+  prep writes its built-in starter copy only when the file is missing, so edit the README itself.
 - **To annotate a poem:** create `data/annotations/<id>.json` (id is in the URL `#/poem/<id>`);
   fill `notes:[{term,def}]`, `translation:[…]`, `appreciation:[…]`, `background:[…]`,
   optional `preface`/`prefaceTranslation`. Save + reload; no rebuild. See

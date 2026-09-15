@@ -354,8 +354,12 @@ if (sd) {
   console.log(`  种子注释 → annotations/${sd.id}.json（《水调歌头》id = ${sd.id}）`);
 }
 
-// ---------- 注释目录说明（幂等重写；不影响用户已建的 <id>.json） ----------
-writeFileSync(join(OUT, 'annotations', 'README.md'), `# 注释叠加层（手工补内容）
+// ---------- 注释目录说明（仅在缺失时生成；已存在则原样保留，重跑不覆盖） ----------
+// README 是手工维护的文档而非可再生产物，下方模板只是全新 data/ 的起始稿；
+// 改说明请直接编辑 data/annotations/README.md，无需同步此模板。
+const readmePath = join(OUT, 'annotations', 'README.md');
+if (!existsSync(readmePath)) {
+  writeFileSync(readmePath, `# 注释叠加层（手工补内容）
 
 想给某首诗补 **注释 / 译文 / 赏析 / 创作背景**，只需在本目录新建一个
 \`<诗的id>.json\`。id 见该诗详情页地址栏 \`#/poem/<id>\`（如 \`c59-66\`）。
@@ -382,6 +386,7 @@ writeFileSync(join(OUT, 'annotations', 'README.md'), `# 注释叠加层（手工
 > 说明：重跑 \`prep.mjs\` 会保留本目录（你的注释不会丢），但会**重写**
 > 随仓库自带的种子文件 \`${sd ? sd.id : 'c59-66'}.json\`（《水调歌头》）。
 `);
+}
 
 console.log(`\n✓ 完成：${total} 首 · ${chunkNum} 原文块 · ${pages} 索引页 · ${authors.size} 作者`);
 console.log(`  输出目录：${OUT}`);
