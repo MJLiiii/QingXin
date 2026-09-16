@@ -15,7 +15,10 @@ entry `assets/js/glass-app.js` → renderers in `glass-pages.js` + behaviour in 
 served two designs side by side (Kyne at `kyne/`, liquid glass at `liquidglass/`, a chooser at the root);
 Kyne was removed and liquid glass moved to the root. `kyne/index.html` and `liquidglass/index.html` are now
 identical `noindex` redirect stubs that `location.replace('../' + location.hash)`, so old shared links
-(including `#/…` routes and `?q=`) land on the same page at the root — keep them.
+(including `#/…` routes and `?q=`) land on the same page at the root — keep them. When a stub was reached
+from the site root itself (same-origin referrer `…/` or `…/index.html`), the root is an old worker's cached
+chooser forwarding `#/…` back, so the stub goes to `'../?'` instead (a URL no old cache holds); the root's
+`<head>` script strips that empty `?` again. Keep both halves, or the two pages can bounce.
 
 ## Commands
 
@@ -99,11 +102,11 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   `.site-nav__link[data-nav]`, via `NAV_OF`: home/list/authors/about, poem → list, author → authors), so
   cached re-shows are correct too. After each render it idle-preloads the JSON the next click will likely need.
 - `pages.js` — data and wiring helpers the renderers share (no page layout): `wirePager()` (page-number
-  input + 跳转 button: Enter or click, clamped to range); `wireLiveSearch()` — debounced, capped at 120 hits,
+  input + 跳转 button: Enter or click, clamped to range); `wireLiveSearch()` — debounced,
   stale responses ignored, pager hidden while active, query written to `?q=` from the debounce (never per
   keystroke or during IME composition) and restored via `start(q)`, with loading/result status — and
   `wireSearch(host, entries, onQuery, { entry, hit })`, the 诗集 title/author/line search on top of it (诗人
-  runs a name-only search through `wireLiveSearch` directly); `pickFeatured()` — 今日一诗 is
+  runs a name-only search through `wireLiveSearch` directly; both cap results at 120); `pickFeatured()` — 今日一诗 is
   `data/featured.json` shuffled with `seededRandom('qingxin:' + localDateKey())` (stable for the local day;
   换一首 shuffles with `Math.random`); `loadPoemData()`; `poemParts()` (the reading toolbar 复制/分享/竖排/
   A−/A+ — 竖排 omitted above 60 lines — and the 原文 with note terms linked inside 词序 + 原文 via
@@ -178,15 +181,19 @@ means bumping `CACHE_NAME`** (currently `qingxin-v10`; old caches are purged on 
 module drops an export another module used to import, so the new set is precached in one step.
 `index.html` reloads the page once when an old worker hands over (it checks for `qingxin-v1…v9` caches,
 whose modules don't match this shell — e.g. a v9 `router.js` still imports the removed Kyne renderers from
-`pages.js`); drop that block once those workers have aged out. A v7–v9 worker may also serve the old chooser
-or old glass page once more; the next load is current.
+`pages.js`). An old worker may also serve the old chooser, glass or Kyne page once more; the next load is
+current. `startRouter()` called without a renderer map (only the removed Kyne `app.js` does that — in
+`kyne/` and in pre-v7 root pages) redirects to the site root, resolved from `import.meta.url`. Drop the
+reload block, that router fallback and the stubs' `'../?'` branch (with the root's `?` strip) once those
+workers have aged out.
 
-**Detail-page invariant:** all five section headings (原文/注释/译文/赏析/创作背景) always
+**Detail-page invariant:** all five sections (原文/注释/译文/赏析/创作背景) always
 render. Only 原文 + author bio come from source data; the other four come from the annotation
 overlay (`loadAnnotation()` merges it over the read-only poem) and show a
-"尚未收录，敬请期待。" faint placeholder when absent, with a faint 「未收录」 marker in the heading.
-原文 is always shown. The four overlay sections are segmented tabs (one panel visible, see `glass-pages.js`);
-empty tabs get a dashed outline plus a screen-reader-only （未收录）. Annotations with `source:"ai"` additionally get a
+"尚未收录，敬请期待。" faint placeholder when absent.
+原文 is a card with its own heading; the four overlay sections are always-present segmented tabs (one panel
+visible, see `glass-pages.js`); an empty tab gets a faded label, a dashed outline and a screen-reader-only
+（未收录）. Annotations with `source:"ai"` additionally get a
 faint AI disclaimer line (`aiNotice()` in `pages.js`).
 
 ## Conventions & gotchas
