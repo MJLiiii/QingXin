@@ -9,9 +9,9 @@ import {
 } from './templates.js';
 
 // 竖排按列横向滚动；行数过多的长篇（如歌行）不提供竖排。
-var VERTICAL_MAX_LINES = 60;
+export var VERTICAL_MAX_LINES = 60;
 
-function wirePager(host, go) {
+export function wirePager(host, go) {
   var input = host.querySelector('#pager-input');
   if (!input) return;
   var route = input.getAttribute('data-route');
@@ -35,7 +35,7 @@ function wirePager(host, go) {
   if (goBtn) goBtn.addEventListener('click', jump);
 }
 
-function wireLiveSearch(o) {
+export function wireLiveSearch(o) {
   var input = o.host.querySelector(o.inputSel);
   if (!input) return null;
   var rows = o.host.querySelector(o.rowsSel);
@@ -117,20 +117,23 @@ function wireLiveSearch(o) {
   };
 }
 
-function wireSearch(host, pageEntries, onQuery) {
+// rows：整页条目 / 搜索命中的行模板，默认是本界面的列表行（liquidglass/ 传入卡片模板）。
+export function wireSearch(host, pageEntries, onQuery, rows) {
   var limit = 120;
+  var entryRow = (rows && rows.entry) || poemRow;
+  var hitRow = (rows && rows.hit) || searchRow;
   return wireLiveSearch({
     host: host,
     inputSel: '#search-input',
     rowsSel: '#list-rows',
     onQuery: onQuery,
-    restore: function () { return pageEntries.map(poemRow).join(''); },
+    restore: function () { return pageEntries.map(entryRow).join(''); },
     match: async function (q) {
       var hits = await searchPoems(q, limit);
       var hasTotal = Number.isFinite(hits.total);
       return {
         html: hits.length
-          ? hits.map(function (hit) { return searchRow(hit, q); }).join('')
+          ? hits.map(function (hit) { return hitRow(hit, q); }).join('')
           : emptyState('请缩短关键词，或检查是否有错字。', '没有找到相近的诗词'),
         count: hits.length,
         total: hasTotal ? hits.total : undefined,
@@ -142,7 +145,7 @@ function wireSearch(host, pageEntries, onQuery) {
   });
 }
 
-function aiNotice(ann) {
+export function aiNotice(ann) {
   if (ann.source !== 'ai') return '';
   return '<p class="prose--faint">本篇注释、译文、赏析由 AI 生成，仅供参考。</p>';
 }
@@ -156,7 +159,7 @@ function pageHead(title, count) {
 }
 
 // 元信息行：每格一个 dt/dd；值为已转义或已构造的 HTML，空值不出格。
-function metaRow(items) {
+export function metaRow(items) {
   var cells = items.filter(function (item) { return item && item.value; }).map(function (item) {
     return '<div class="meta__item"><dt>' + esc(item.label) + '</dt>'
       + '<dd>' + item.value + '</dd></div>';
@@ -164,10 +167,9 @@ function metaRow(items) {
   return cells.length ? '<dl class="meta">' + cells.join('') + '</dl>' : '';
 }
 
-export async function renderHome(param, ctx) {
-  var entries = await fetchJSON('data/featured.json');
-  var daily = !ctx.shuffle;
-  // 「今日一诗」：以本地日期为种子，当天刷新不变；「换一首」才真正随机。
+// 「今日一诗」：以本地日期为种子，当天刷新不变；「换一首」才真正随机。
+// 返回洗牌后的精选条目与首页主推（第一首有摘句的）。
+export function pickFeatured(entries, daily) {
   var random = daily ? seededRandom('qingxin:' + localDateKey()) : Math.random;
   var pick = entries.slice();
   for (var k = pick.length - 1; k > 0; k--) {
@@ -183,7 +185,15 @@ export async function renderHome(param, ctx) {
       break;
     }
   }
-  if (!hero) hero = pick[0];
+  return { pick: pick, hero: hero || pick[0] };
+}
+
+export async function renderHome(param, ctx) {
+  var entries = await fetchJSON('data/featured.json');
+  var daily = !ctx.shuffle;
+  var picked = pickFeatured(entries, daily);
+  var pick = picked.pick;
+  var hero = picked.hero;
   var heroPoem = await loadPoem(hero.id);
   if (!ctx.isCurrent()) return;
   var lines = heroLines((heroPoem && heroPoem.paragraphs) || []);
@@ -250,47 +260,34 @@ export async function renderList(param, ctx) {
   if (search && ctx.query.q) search.start(ctx.query.q);
 }
 
-export async function renderPoem(id, ctx) {
+// 诗文页数据：诗（找不到为 null）、注解（无则 {}）、作者。
+// 注释 / 作者加载失败（非 404）时降级展示（degraded），调用方应 ctx.noCache()，返回时会重试。
+export async function loadPoemData(id) {
   var degraded = false;
   function soft(promise) {
-    // 注释 / 作者加载失败（非 404）时降级展示，但不缓存这次渲染，返回时会重试。
     return promise.catch(function () {
       degraded = true;
       return null;
     });
   }
-
   var loaded = await Promise.all([loadPoem(id), soft(loadAnnotation(id))]);
   var poem = loaded[0];
-  var host = document.getElementById('page-poem');
-  if (!poem) {
-    if (!ctx.isCurrent()) return;
-    ctx.setTitle('未找到这首诗');
-    host.innerHTML = errorSection('未找到这首诗。');
-    return;
-  }
-  var ann = loaded[1] || {};
+  if (!poem) return { poem: null, ann: {}, author: null, degraded: degraded };
   var author = await soft(loadAuthor(poem.authorSlug));
-  if (!ctx.isCurrent()) return;
-  if (degraded) ctx.noCache();
+  return { poem: poem, ann: loaded[1] || {}, author: author, degraded: degraded };
+}
 
-  var isCi = poem.kind === 'ci';
-  var titleText = isCi ? (poem.rhythmic || poem.title) : poem.title;
-  var sub = isCi ? esc((poem.title.split('·')[1] || '')) : '';
-  var authorHref = navHref('author/' + poem.authorSlug);
-  var authorNav = 'author/' + esc(poem.authorSlug);
+export function notesHTML(ann, notes, withAi) {
+  return '<div class="notes">' + (withAi ? aiNotice(ann) : '') + (notes.length
+    ? notes.map(function (n) {
+      return '<div class="notes__row"><div class="notes__term">' + esc(n.term)
+        + '</div><div class="notes__def">' + esc(n.def) + '</div></div>';
+    }).join('')
+    : '<p class="prose--faint">尚未收录，敬请期待。</p>') + '</div>';
+}
 
-  var html = '<section class="poem-hero">'
-    + '<h1 class="poem-hero__title display" data-size="' + displaySize(titleText) + '">' + esc(titleText) + '</h1>'
-    + (sub ? '<p class="poem-hero__sub">' + sub + '</p>' : '')
-    + metaRow([
-      { label: '作者', value: '<a class="author-link" href="' + authorHref + '" data-nav="' + authorNav + '">' + esc(poem.author) + '</a>' },
-      { label: '朝代', value: esc(poem.dynasty) },
-      { label: '体裁', value: isCi ? ('词 · ' + esc(poem.rhythmic || '')) : '诗' },
-      { label: '编号', value: '<span class="latin">' + esc(poem.id) + '</span>' },
-    ])
-    + '</section>';
-
+// 原文区的共用部件：阅读工具栏、带注释词的原文、注释条目（与 .notes__row 顺序一一对应）。
+export function poemParts(poem, ann) {
   var paragraphs = poem.paragraphs || [];
   var hasNotes = !!(ann.notes && ann.notes.length && ann.notes.some(function (n) { return n.term || n.def; }));
   var notes = hasNotes ? ann.notes : [];
@@ -317,18 +314,58 @@ export async function renderPoem(id, ctx) {
       return '<p class="original__stanza">' + lines.join('<br>') + '</p>';
     }).join('')
     + '</div></div>';
-  html += entryShell('原文', 'i', original, 'entry-head__rule--wide', false, { section: 'original', headExtra: tools });
+
+  return {
+    paragraphs: paragraphs,
+    hasNotes: hasNotes,
+    notes: notes,
+    longPoem: longPoem,
+    tools: tools,
+    original: original,
+  };
+}
+
+export async function renderPoem(id, ctx) {
+  var data = await loadPoemData(id);
+  var poem = data.poem;
+  var host = document.getElementById('page-poem');
+  if (!poem) {
+    if (!ctx.isCurrent()) return;
+    ctx.setTitle('未找到这首诗');
+    host.innerHTML = errorSection('未找到这首诗。');
+    return;
+  }
+  var ann = data.ann;
+  var author = data.author;
+  if (!ctx.isCurrent()) return;
+  if (data.degraded) ctx.noCache();
+
+  var isCi = poem.kind === 'ci';
+  var titleText = isCi ? (poem.rhythmic || poem.title) : poem.title;
+  var sub = isCi ? esc((poem.title.split('·')[1] || '')) : '';
+  var authorHref = navHref('author/' + poem.authorSlug);
+  var authorNav = 'author/' + esc(poem.authorSlug);
+
+  var html = '<section class="poem-hero">'
+    + '<h1 class="poem-hero__title display" data-size="' + displaySize(titleText) + '">' + esc(titleText) + '</h1>'
+    + (sub ? '<p class="poem-hero__sub">' + sub + '</p>' : '')
+    + metaRow([
+      { label: '作者', value: '<a class="author-link" href="' + authorHref + '" data-nav="' + authorNav + '">' + esc(poem.author) + '</a>' },
+      { label: '朝代', value: esc(poem.dynasty) },
+      { label: '体裁', value: isCi ? ('词 · ' + esc(poem.rhythmic || '')) : '诗' },
+      { label: '编号', value: '<span class="latin">' + esc(poem.id) + '</span>' },
+    ])
+    + '</section>';
+
+  var parts = poemParts(poem, ann);
+  var paragraphs = parts.paragraphs;
+  var hasNotes = parts.hasNotes;
+  html += entryShell('原文', 'i', parts.original, 'entry-head__rule--wide', false, { section: 'original', headExtra: parts.tools });
 
   var remembered = openSections();
   function isOpen(section) { return remembered.indexOf(section) >= 0; }
 
-  var notesInner = '<div class="notes">' + aiNotice(ann) + (hasNotes
-    ? notes.map(function (n) {
-      return '<div class="notes__row"><div class="notes__term">' + esc(n.term)
-        + '</div><div class="notes__def">' + esc(n.def) + '</div></div>';
-    }).join('')
-    : '<p class="prose--faint">尚未收录，敬请期待。</p>') + '</div>';
-  html += entryShell('注释', 'ii', notesInner, 'entry-head__rule--tight', true, {
+  html += entryShell('注释', 'ii', notesHTML(ann, parts.notes, true), 'entry-head__rule--tight', true, {
     section: 'notes',
     open: hasNotes && isOpen('notes'),
     empty: !hasNotes,

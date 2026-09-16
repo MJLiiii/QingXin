@@ -9,7 +9,7 @@ var popTrigger = null;
 var popScroller = null;
 var statusTimer = null;
 
-function readPrefs() {
+export function readPrefs() {
   try {
     var prefs = JSON.parse(window.localStorage.getItem(PREFS_KEY));
     return prefs && typeof prefs === 'object' ? prefs : {};
@@ -18,7 +18,7 @@ function readPrefs() {
   }
 }
 
-function writePrefs(patch) {
+export function writePrefs(patch) {
   var prefs = Object.assign(readPrefs(), patch);
   try {
     window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
@@ -187,6 +187,11 @@ function positionGloss() {
   pop.style.top = Math.round(top + window.scrollY) + 'px';
 }
 
+// 浮层所在的原文栏被钉住（sticky）时，页面滚动后按触发词的新位置重新摆放。
+export function repositionGloss() {
+  if (pop && popTrigger && popTrigger.isConnected) positionGloss();
+}
+
 // 第 k 个可点词对应注释栏第 k 行（.notes__row），浮层直接取其文字，不重复存数据。
 export function openGloss(el) {
   if (popTrigger === el) {
@@ -251,6 +256,8 @@ function expandNotes() {
   entry.classList.remove('entry--collapsed');
   var toggle = entry.querySelector('[data-toggle]');
   if (toggle) toggle.setAttribute('aria-expanded', 'true');
+  // 注释栏若是标签页（liquidglass/），先由监听方同步切到该栏，再滚动过去。
+  entry.dispatchEvent(new CustomEvent('qx:expand-notes', { bubbles: true }));
   entry.scrollIntoView({ block: 'start' });
 }
 

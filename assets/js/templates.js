@@ -65,7 +65,7 @@ function isMatchField(match, field) {
   return field === 'name' && actual === 'author';
 }
 
-function highlighted(text, query, match, field) {
+export function highlighted(text, query, match, field) {
   var value = String(text == null ? '' : text);
   if (isFuzzyMatch(match) || !isMatchField(match, field)) return esc(value);
 
