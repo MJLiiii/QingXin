@@ -6,6 +6,38 @@ export function navHref(path) {
   return esc('#/' + hashPath(path));
 }
 
+// 超大标题按字数（码点，生僻扩展字算一个）分档，对应 styles.css 的 [data-size]。
+export function displaySize(text) {
+  var n = Array.from(String(text == null ? '' : text)).length;
+  if (n <= 4) return 's';
+  if (n <= 8) return 'm';
+  if (n <= 16) return 'l';
+  if (n <= 40) return 'xl';
+  return 'xxl';
+}
+
+var HERO_SPLIT = /^(.+?)[，,；;？?！!](.+)$/;
+var HERO_TAIL = /[，,。．.；;：:？?！!、…—\s]+$/;
+var HERO_MAX = 12;
+
+function heroClean(line) {
+  return String(line == null ? '' : line).trim().replace(HERO_TAIL, '');
+}
+
+// 首页超大标题：首句在第一个逗号 / 分号 / 问叹号处拆成两行并去掉句末标点；
+// 拆不开或某行超过 HERO_MAX 字时，退回原文前两行。
+export function heroLines(paragraphs) {
+  var lines = (paragraphs || []).map(heroClean).filter(Boolean);
+  if (!lines.length) return [];
+  var m = HERO_SPLIT.exec(lines[0]);
+  if (m) {
+    var pair = [heroClean(m[1]), heroClean(m[2])];
+    var fits = pair.every(function (line) { return line && Array.from(line).length <= HERO_MAX; });
+    if (fits) return pair;
+  }
+  return lines.slice(0, 2);
+}
+
 export function listRow(nav, title, by, excerpt) {
   var rendered = arguments[4] || {};
   return '<a class="poem-list__item poem-list__item--link" href="' + navHref(nav)

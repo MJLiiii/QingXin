@@ -128,7 +128,7 @@ instantly, the network refresh lands by the next reload, so content updates lag 
 (remember this when previewing changes locally). It pre-caches the app shell (`index.html`, CSS,
 every `assets/js/*.js`) with `cache: 'reload'`, bypassing the HTTP cache so a new worker never mixes
 old and new modules. **Adding/renaming a frontend module means updating its `SHELL` list;
-changing any cached format means bumping `CACHE_NAME`** (currently `qingxin-v4`; old caches are
+changing any cached format means bumping `CACHE_NAME`** (currently `qingxin-v5`; old caches are
 purged on activate).
 
 **Detail-page invariant:** all five section headings (原文/注释/译文/赏析/创作背景) always
@@ -147,17 +147,33 @@ in `pages.js`).
   `.nojekyll`); `assets/css/` and `assets/js/` hold browser-loaded front-end assets; `data/`
   holds committed static content; `tools/server/`, `tools/data/`, and `tools/annotations/`
   hold local preview, data generation, and annotation-import tooling respectively.
-- **Design system** lives in `assets/css/styles.css` `:root` (`--paper` #F5F1E8 米纸, `--ink` #221F1A,
-  `--accent` #9A3B2E 朱砂, `--serif` Noto Serif SC, `--latin` Cormorant Garamond; plus muted-ink
-  tiers `--body`/`--muted`/`--muted-2`/`--muted-3`, hairlines `--line`/`--line-strong`, RGB channels
-  `--ink-rgb`/`--paper-rgb`/`--accent-rgb`, `--seal-bg`/`--seal-fg`, `--shadow`, `--selection-alpha`,
-  and `--reading-scale`). Preserve it exactly; build any new UI from these tokens (that's how
-  search/pagination were added). **夜读 (dark theme)** only redefines tokens, in two identical blocks —
+- **Design system** lives in `assets/css/styles.css` `:root` — editorial monochrome (after the Kyne
+  redesign): `--paper` #F6F6F6, `--surface` #FCFCFC, `--ink` #2B2B2B, muted-ink tiers
+  `--body`/`--muted`/`--muted-2`/`--muted-3` (`--muted` #6B6B6B is the lightest grey allowed for text,
+  ~4.9:1 on paper), 1px hairlines `--line`/`--line-strong`, inverted footer `--invert-bg`/`--invert-fg`
+  (+`--invert-fg-rgb`), `--mark-bg` (search hits, gloss hover), RGB channels `--ink-rgb`/`--paper-rgb`,
+  `--shadow`, `--selection-alpha`, `--reading-scale`, and layout `--max`/`--gutter`/`--measure`/`--header-h`.
+  Three font roles: `--serif` Noto Serif SC for anything containing Chinese (display sizes included),
+  `--latin` Fraunces for Latin letters and digits only (its Google subset covers `·` and `—…“”`, so a
+  Chinese-first stack must come first, or that punctuation switches to Western glyphs), `--sans`
+  Noto Sans SC for labels, nav and buttons. **There is no accent hue** — never signal state by colour
+  alone: the current page and pressed toggles get an underline, search hits get `--mark-bg` + underline.
+  Build any new UI from these tokens (that's how search/pagination were added).
+  **夜读 (dark theme)** only redefines tokens, in two identical blocks —
   `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {…} }` and
   `:root[data-theme="dark"] {…}` — so never hard-code a color: add a token to `:root` and to both dark
   blocks. Reading text sizes are `calc(<px> * var(--reading-scale))` (including the mobile media
   query). Vertical 原文 is `:root[data-vertical="1"] .original__body` — the scroll container itself is
-  `vertical-rl`, so it opens on the first column.
+  `vertical-rl`, so it opens on the first column (left-aligned, `margin: 0`).
+- **Display headings** use `.display[data-size]`, the tier coming from `displaySize()` in
+  `templates.js`; the home hero sizes itself from `--hero-chars` + `cqi` (its lines come from
+  `heroLines()`). CJK needs `line-height ≥ 1.05` and tracking no tighter than `-0.03em`, so Kyne's
+  0.9/-0.06em are not copied verbatim. Breakpoints are `(max-width: 1199px)` and `(max-width: 809px)`;
+  at ≥1200 entry bodies and the author bio indent by 33% for the case-study look.
+- **`templates.js` markup is frozen by `tools/tests/templates.test.mjs`** — restyle it from CSS instead.
+  Row numbers, brackets `[…]`, parens `(…)`, arrows and +/− are pseudo-elements written as
+  `content: "x" / ""` so screen readers skip them. Structural changes belong in `pages.js`/`index.html`,
+  which have no markup tests.
 - **`tools/data/prep.mjs`**: converts 全唐诗 繁→简 via `opencc-js` (宋词 is already simplified); strips
   lone UTF-16 surrogates; synthesizes ci titles/ids. On re-run it **preserves
   `data/annotations/`** (your hand-written overlays), only regenerating index/poems/authors +

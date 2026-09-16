@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>情心 · 慢读古典</title>
-  <meta name="description" content="情心 — 水墨留白的古诗文赏读。原文、注释、译文、赏析、创作背景，逐层深入。">
+  <meta name="description" content="情心 — 黑白极简的古诗文赏读。原文、注释、译文、赏析、创作背景，逐层深入。">
   <script>
     // 首帧前应用阅读偏好（主题 / 字号 / 竖排），避免闪烁；键名与 assets/js/reader.js 一致。
     (function () {
@@ -20,7 +20,7 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Noto+Sans+SC:wght@400;500&family=Noto+Serif+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body>
@@ -28,15 +28,14 @@
   <!-- ============ 页眉 ============ -->
   <header class="site-header">
     <div class="site-header__inner">
-      <a class="brand" href="#/home" data-nav="home" aria-label="返回首页">
-        <span class="brand__mark"></span>
+      <a class="brand" href="#/home" data-nav="home" aria-label="情心 · 返回首页">
         <span class="brand__name">情心</span>
       </a>
-      <nav class="site-nav">
+      <nav class="site-nav" aria-label="主导航">
         <a class="site-nav__link" href="#/list" data-nav="list">诗集</a>
         <a class="site-nav__link" href="#/authors" data-nav="authors">诗人</a>
         <a class="site-nav__link" href="#/about" data-nav="about">关于</a>
-        <button class="site-nav__theme" type="button" data-action="theme" aria-pressed="false" aria-label="夜间模式">夜读</button>
+        <button class="site-nav__theme" type="button" data-action="theme" aria-pressed="false">夜读</button>
       </nav>
     </div>
   </header>
@@ -52,10 +51,23 @@
   <!-- 首屏加载态：数据就绪后被替换 -->
   <div id="boot" class="boot"><span class="boot__mark">情心</span></div>
 
-  <!-- ============ 页脚 ============ -->
+  <!-- ============ 页脚（反色通栏；链接用 site-footer__link，router 不会给它设 aria-current） ============ -->
   <footer class="site-footer">
-    <div class="site-footer__mark">情心</div>
-    <div class="site-footer__tagline">慢 读 古 典 · 一 日 一 诗</div>
+    <div class="site-footer__inner">
+      <p class="site-footer__slogan"><span>慢读古典</span><span>一日一诗</span></p>
+      <div class="site-footer__base">
+        <nav class="site-footer__nav" aria-label="页脚导航">
+          <a class="site-footer__link" href="#/home" data-nav="home">首页</a>
+          <a class="site-footer__link" href="#/list" data-nav="list">诗集</a>
+          <a class="site-footer__link" href="#/authors" data-nav="authors">诗人</a>
+          <a class="site-footer__link" href="#/about" data-nav="about">关于</a>
+        </nav>
+        <div class="site-footer__meta">
+          <span class="site-footer__mark">情心 <span class="latin">(QingXin)</span></span>
+          <span>诗文数据 · chinese-poetry</span>
+        </div>
+      </div>
+    </div>
   </footer>
 
   <script type="module" src="assets/js/app.js"></script>

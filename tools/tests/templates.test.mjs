@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  displaySize,
   entryShell,
   glossLines,
   glossTerm,
+  heroLines,
   pagerHTML,
   proseEntry,
   searchRow,
@@ -15,6 +17,30 @@ import {
   localDateKey,
   seededRandom,
 } from '../../assets/js/utils.js';
+
+test('display sizes count code points, not UTF-16 units', () => {
+  assert.equal(displaySize('静夜思'), 's');
+  assert.equal(displaySize('𬸦𬸦𬸦𬸦'), 's');
+  assert.equal(displaySize('一二三四五六七八'), 'm');
+  assert.equal(displaySize('一二三四五六七八九'), 'l');
+  assert.equal(displaySize('一'.repeat(16)), 'l');
+  assert.equal(displaySize('一'.repeat(17)), 'xl');
+  assert.equal(displaySize('一'.repeat(40)), 'xl');
+  assert.equal(displaySize('一'.repeat(41)), 'xxl');
+  assert.equal(displaySize(null), 's');
+});
+
+test('hero lines split the first sentence and fall back to the first two lines', () => {
+  assert.deepEqual(heroLines(['床前明月光，疑是地上霜。', '举头望明月，低头思故乡。']), ['床前明月光', '疑是地上霜']);
+  assert.deepEqual(heroLines(['明月几时有？把酒问青天。']), ['明月几时有', '把酒问青天']);
+  assert.deepEqual(heroLines(['', '转朱阁，低绮户，照无眠。']), ['转朱阁', '低绮户，照无眠']);
+  assert.deepEqual(
+    heroLines(['一二三四五六七八九十一二三，甲乙。', '第二行。']),
+    ['一二三四五六七八九十一二三，甲乙', '第二行']
+  );
+  assert.deepEqual(heroLines(['无标点的一行', '次行']), ['无标点的一行', '次行']);
+  assert.deepEqual(heroLines([]), []);
+});
 
 test('gloss terms drop pinyin annotations', () => {
   assert.equal(glossTerm('阑（lán）'), '阑');
