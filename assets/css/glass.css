@@ -1,7 +1,7 @@
 /* ===========================================================
-   情心 · 古诗文网站 —— Liquid Glass 界面（/liquidglass/）
+   情心 · 古诗文网站 —— Liquid Glass 界面
    应用式悬浮布局：玻璃胶囊控件浮在内容之上（页眉三胶囊、手机底部标签栏、
-   分段标签、工具 / 分页胶囊），彩色流光背景，便当卡片墙与卡片网格。
+   分段标签、工具 / 分页胶囊），彩色流光背景，今日一诗 + 搜索的首页与卡片网格。
    标记由 glass-pages.js / glass-templates.js 生成；浅色默认 + 夜读同构；#996AFF 紫色点缀
    =========================================================== */
 
@@ -2206,7 +2206,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px 24px;
-  padding: 14px 16px 14px 26px;
+  padding: 14px 26px;
   border-radius: var(--r-xl);
   font-family: var(--sans);
   font-size: 13px;
@@ -2232,52 +2232,6 @@ body {
   font-size: 13px;
   font-weight: 500;
 }
-
-.site-footer__end {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 20px;
-}
-
-/* 界面切换：小号分段胶囊，当前界面 = 填充 + 下划线 */
-.site-footer__designs {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  background: var(--tile-bg);
-  border: 1px solid var(--chip-border);
-  border-radius: var(--r-pill);
-}
-
-.site-footer__design {
-  display: inline-block;
-  padding: 0 12px;
-  border-radius: var(--r-pill);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 30px;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  color: var(--ink);
-  text-decoration: none;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.35em;
-  transition:
-    background-color var(--dur) var(--ease),
-    color var(--dur) var(--ease);
-}
-
-.site-footer__design:hover { background-color: var(--nav-hover-bg); }
-
-.site-footer__design[aria-current="page"] {
-  background-color: var(--btn-bg);
-  color: var(--btn-fg);
-  text-decoration-line: underline;
-}
-
-.site-footer__design:focus-visible { outline-offset: 2px; }
 
 /* ---------- 兜底：不支持 backdrop-filter / 降低透明度 / 强制配色 ---------- */
 
@@ -2540,7 +2494,6 @@ body {
     align-items: flex-start;
     padding: 20px 22px;
   }
-  .site-footer__end { width: 100%; justify-content: space-between; }
 }
 
 /* ---------- 平板 600–809：两列网格（须排在手机块之后，才能压过其中的单列） ---------- */

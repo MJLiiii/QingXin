@@ -2,143 +2,47 @@
 <html lang="zh-Hans">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
   <title>情心 · 慢读古典</title>
-  <meta name="description" content="情心 — 液态玻璃质感的古诗文赏读。今日一诗、诗集与诗人卡片，原文与注释、译文、赏析分栏对读。">
+  <link rel="canonical" href="../">
   <script>
-    // 首帧前应用阅读偏好（主题 / 字号 / 竖排），避免闪烁；键名与 assets/js/reader.js 一致。
+    // 旧地址（两套界面并存时的 kyne/、liquidglass/）：带着 #/… 路由跳到站点根目录，不留历史项。
     (function () {
       try {
         var prefs = JSON.parse(localStorage.getItem('qingxin:prefs')) || {};
-        var root = document.documentElement;
-        if (prefs.theme === 'dark' || prefs.theme === 'light') root.setAttribute('data-theme', prefs.theme);
-        var scale = Number(prefs.scale);
-        if (scale >= 0.8 && scale <= 1.5) root.style.setProperty('--reading-scale', String(scale));
-        if (prefs.vertical === true) root.setAttribute('data-vertical', '1');
+        if (prefs.theme === 'dark' || prefs.theme === 'light') document.documentElement.setAttribute('data-theme', prefs.theme);
       } catch (e) {}
+      // 旧版 Worker（qingxin-v1…v9）缓存里的根目录可能还是界面选择页，它会把 #/… 转回这里：
+      // 从根目录转来时改去 ../?（缓存里没有的地址，只能取网络上的新页面），免得来回跳。
+      var fromRoot = false;
+      try {
+        var root = new URL('../', window.location.href).pathname;
+        var from = new URL(document.referrer).pathname;
+        fromRoot = from === root || from === root + 'index.html';
+      } catch (e) {}
+      window.location.replace((fromRoot ? '../?' : '../') + window.location.hash);
     })();
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..600&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/css/glass.css">
+  <style>
+    /* 跳转前的一瞬间与根目录同底色，不闪白；配色取自 assets/css/glass.css */
+    :root { color-scheme: light; --paper: #F4F4F6; --ink: #1C1C1E; --link: #6A3FD6; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { color-scheme: dark; --paper: #0A0A0A; --ink: #F2F2F2; --link: #AB87FF; }
+    }
+    :root[data-theme="dark"] { color-scheme: dark; --paper: #0A0A0A; --ink: #F2F2F2; --link: #AB87FF; }
+    body {
+      margin: 0;
+      padding: 48px 16px;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Noto Serif SC", "Songti SC", serif;
+      text-align: center;
+    }
+    a { color: var(--link); }
+  </style>
 </head>
 <body>
-
-  <!-- 玻璃折射滤镜：0×0 绝对定位（Firefox 不应用 display:none SVG 里的滤镜），仅 .glass__effect 引用 -->
-  <svg class="glass-defs" width="0" height="0" aria-hidden="true" focusable="false">
-    <filter id="qx-glass" x="0%" y="0%" width="100%" height="100%" filterUnits="objectBoundingBox">
-      <feTurbulence type="fractalNoise" baseFrequency="0.015 0.015" numOctaves="1" seed="5" result="turbulence"/>
-      <feGaussianBlur in="turbulence" stdDeviation="3" result="softMap"/>
-      <feDisplacementMap in="SourceGraphic" in2="softMap" scale="60" xChannelSelector="R" yChannelSelector="G"/>
-    </filter>
-  </svg>
-
-  <!-- 流光背景：三团柔光固定在视口，垫在所有内容下 -->
-  <div class="ambient" aria-hidden="true">
-    <span class="ambient__blob ambient__blob--violet"></span>
-    <span class="ambient__blob ambient__blob--cyan"></span>
-    <span class="ambient__blob ambient__blob--peach"></span>
-  </div>
-
-  <!-- ============ 页眉：三颗悬浮玻璃胶囊（品牌 / 导航 / 夜读）；玻璃层用 span 以便放进 a、button ============ -->
-  <header class="site-header">
-    <a class="capsule brand" href="#/home" data-nav="home" aria-label="情心 · 返回首页">
-      <span class="glass" aria-hidden="true"><span class="glass__effect"></span><span class="glass__tint"></span><span class="glass__shine"></span></span>
-      <span class="brand__name">情心</span>
-    </a>
-    <nav class="capsule site-nav" aria-label="主导航">
-      <span class="glass" aria-hidden="true"><span class="glass__effect"></span><span class="glass__tint"></span><span class="glass__shine"></span></span>
-      <a class="site-nav__link" href="#/home" data-nav="home">首页</a>
-      <a class="site-nav__link" href="#/list" data-nav="list">诗集</a>
-      <a class="site-nav__link" href="#/authors" data-nav="authors">诗人</a>
-      <a class="site-nav__link" href="#/about" data-nav="about">关于</a>
-    </nav>
-    <button class="capsule theme-btn" type="button" data-action="theme" aria-pressed="false">
-      <span class="glass" aria-hidden="true"><span class="glass__effect"></span><span class="glass__tint"></span><span class="glass__shine"></span></span>
-      <svg class="icon theme-btn__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8"/><path class="fill" d="M12 4a8 8 0 0 1 0 16z"/></svg>
-      <span class="theme-btn__label">夜读</span>
-    </button>
-  </header>
-
-  <!-- ============ 页面容器（内容由 assets/js/*.js 按数据渲染，不写死诗文） ============ -->
-  <main class="page" id="page-home"></main>
-  <main class="page" id="page-list"></main>
-  <main class="page" id="page-poem"></main>
-  <main class="page" id="page-author"></main>
-  <main class="page" id="page-authors"></main>
-  <main class="page" id="page-about"></main>
-
-  <!-- 首屏加载态：数据就绪后被替换 -->
-  <div id="boot" class="boot"><span class="boot__mark">情心</span></div>
-
-  <!-- ============ 页脚：一条紧凑卡片（导航在页眉 / 底部标签栏里，这里不重复） ============ -->
-  <footer class="site-footer">
-    <div class="site-footer__inner">
-      <p class="site-footer__brand">
-        <span class="site-footer__mark">情心 <span class="latin">(QingXin)</span></span>
-        <span>慢读古典 · 一日一诗</span>
-      </p>
-      <div class="site-footer__end">
-        <nav class="site-footer__designs" aria-label="切换界面">
-          <a class="site-footer__design latin" href="../kyne/" data-design="../kyne/">Kyne</a>
-          <a class="site-footer__design latin" href="../liquidglass/" data-design="../liquidglass/" aria-current="page">Liquid Glass</a>
-        </nav>
-        <span>诗文数据 · chinese-poetry</span>
-      </div>
-    </div>
-  </footer>
-
-  <!-- ============ 手机底部标签栏（<810 显示，同时隐藏页眉导航）；router 给 .site-nav__link 设 aria-current ============ -->
-  <nav class="tabbar" aria-label="底部导航">
-    <span class="glass" aria-hidden="true"><span class="glass__effect"></span><span class="glass__tint"></span><span class="glass__shine"></span></span>
-    <a class="site-nav__link tabbar__item" href="#/home" data-nav="home">
-      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 10.4 12 4l8 6.4V19a1 1 0 0 1-1 1h-4.2v-5.6H9.2V20H5a1 1 0 0 1-1-1z"/></svg>
-      <span class="tabbar__label">首页</span>
-    </a>
-    <a class="site-nav__link tabbar__item" href="#/list" data-nav="list">
-      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 6.5C10 5 7.2 4.6 4 5v13.5c3.2-.4 6 0 8 1.5 2-1.5 4.8-1.9 8-1.5V5c-3.2-.4-6 0-8 1.5zM12 6.5V20"/></svg>
-      <span class="tabbar__label">诗集</span>
-    </a>
-    <a class="site-nav__link tabbar__item" href="#/authors" data-nav="authors">
-      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.8 20c.7-3.9 3.6-6.2 7.2-6.2s6.5 2.3 7.2 6.2z"/></svg>
-      <span class="tabbar__label">诗人</span>
-    </a>
-    <a class="site-nav__link tabbar__item" href="#/about" data-nav="about">
-      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.2M12 7.8v.1"/></svg>
-      <span class="tabbar__label">关于</span>
-    </a>
-  </nav>
-
-  <script type="module" src="../assets/js/glass-app.js"></script>
-  <script>
-    // 离线/跨刷新缓存；Worker 在站点根目录，作用域覆盖两套界面（GitHub Pages 子路径 /QingXin/ 亦可）。特性检测 + 静默失败。
-    if ('serviceWorker' in navigator) {
-      // 旧版 Worker 会给本页送上缓存的旧模块：v1…v6 的 data.js 按页面目录取 data/…（子目录里 404），
-      // v7 缓存里没有本页依赖的 glass-*.js 与新导出，v8 缓存里的 glass-pages.js 还引用已删掉的首页卡片模板。
-      // 本页若由旧 Worker 控制，新 Worker 接管后刷新一次。
-      if (navigator.serviceWorker.controller && window.caches) {
-        var legacySW = caches.keys().then(function (keys) {
-          return keys.some(function (k) { return /^qingxin-v[1-8]$/.test(k); });
-        }, function () { return false; });
-        navigator.serviceWorker.addEventListener('controllerchange', function () {
-          legacySW.then(function (legacy) { if (legacy) window.location.reload(); });
-        });
-      }
-      window.addEventListener('load', function () {
-        navigator.serviceWorker.register('../sw.js').catch(function () {});
-      });
-    }
-    // 页脚「界面」切换：跳到另一套设计的同一页——在点击 / 中键 / 右键 / 聚焦前把当前 #/… 路由补到链接上。
-    (function () {
-      function sync(e) {
-        var a = e.target instanceof Element && e.target.closest('a[data-design]');
-        if (a) a.href = a.getAttribute('data-design') + window.location.hash;
-      }
-      ['pointerdown', 'focusin', 'click', 'auxclick'].forEach(function (type) {
-        document.addEventListener(type, sync, true);
-      });
-    })();
-  </script>
+  <noscript><p>情心已搬到新地址：<a href="../">前往情心</a></p></noscript>
 </body>
 </html>

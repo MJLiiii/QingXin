@@ -1,5 +1,5 @@
-/* 阅读体验：主题 / 字号 / 竖排偏好、记住展开的栏目、原文工具栏（复制、分享）与注释浮层。
-   仅在浏览器中使用；偏好键 qingxin:prefs 与入口页及 kyne/、liquidglass/ 两个 index.html 的首帧脚本共用。 */
+/* 阅读体验：主题 / 字号 / 竖排偏好、原文工具栏（复制、分享）与注释浮层。
+   仅在浏览器中使用；偏好键 qingxin:prefs 与 index.html 的首帧脚本共用（诗文页标签另存 tab 键，见 glass-ui.js）。 */
 var PREFS_KEY = 'qingxin:prefs';
 var SCALES = [0.9, 1, 1.12, 1.25];
 
@@ -24,18 +24,6 @@ export function writePrefs(patch) {
     window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
   } catch (e) { /* 隐私模式等：仅本次会话生效 */ }
   return prefs;
-}
-
-export function openSections() {
-  var open = readPrefs().open;
-  return Array.isArray(open) ? open : [];
-}
-
-export function rememberSection(section, open) {
-  if (!section) return;
-  var list = openSections().filter(function (s) { return s !== section; });
-  if (open) list.push(section);
-  writePrefs({ open: list });
 }
 
 function isDark() {
@@ -162,7 +150,7 @@ function closeOnViewportChange() {
   closeGloss();
 }
 
-// 视口上下被悬浮控件占去的高度（liquidglass/ 的页眉、底部标签栏）：由 CSS 注册的长度属性给出，Kyne 没有即为 0。
+// 视口上下被悬浮控件占去的高度（页眉、底部标签栏）：由 glass.css 注册的长度属性给出，取不到时为 0。
 function viewportInsets() {
   var cs = window.getComputedStyle(document.documentElement);
   return {
@@ -188,8 +176,8 @@ function positionGloss() {
     left = r.left - gap - width;
     if (left < margin) left = r.right + gap;
     top = r.top;
-    // 左右都放不下时改放到词的上下方，免得盖住词本身（仅在有悬浮控件的界面启用）
-    if ((insets.top || insets.bottom) && left + width > window.innerWidth - margin) {
+    // 左右都放不下时改放到词的上下方，免得盖住词本身
+    if (left + width > window.innerWidth - margin) {
       left = r.left + r.width / 2 - width / 2;
       top = r.bottom + gap;
       if (top + height > maxBottom) top = r.top - gap - height;
@@ -201,14 +189,14 @@ function positionGloss() {
   }
   left = Math.max(margin, Math.min(window.innerWidth - width - margin, left));
   top = Math.max(minTop, Math.min(maxBottom - height, top));
-  // 触发词在钉住的栏里（[data-pinned]，liquidglass/）时浮层按视口定位，页面滚动时不与之脱开。
+  // 触发词在钉住的栏里（[data-pinned]）时浮层按视口定位，页面滚动时不与之脱开。
   var fixed = !!popTrigger.closest('[data-pinned]');
   pop.style.position = fixed ? 'fixed' : '';
   pop.style.left = Math.round(left + (fixed ? 0 : window.scrollX)) + 'px';
   pop.style.top = Math.round(top + (fixed ? 0 : window.scrollY)) + 'px';
 }
 
-// 页面滚动后按触发词的新位置重新摆放（触发词所在的栏被钉住时由 liquidglass/ 调用）。
+// 页面滚动后按触发词的新位置重新摆放（触发词所在的栏被钉住时由 glass-ui.js 调用）。
 export function repositionGloss() {
   if (pop && popTrigger && popTrigger.isConnected) positionGloss();
 }
@@ -273,11 +261,7 @@ function expandNotes() {
   closeGloss();
   var entry = document.querySelector('#page-poem .entry[data-section="notes"]');
   if (!entry) return;
-  // 一次性跳转，不写入「记住展开」偏好。
-  entry.classList.remove('entry--collapsed');
-  var toggle = entry.querySelector('[data-toggle]');
-  if (toggle) toggle.setAttribute('aria-expanded', 'true');
-  // 注释栏若是标签页（liquidglass/），先由监听方同步切到该栏，再滚动过去。
+  // 注释栏是分段标签页：先由 glass-ui.js 同步切到该栏，再滚动过去。
   entry.dispatchEvent(new CustomEvent('qx:expand-notes', { bubbles: true }));
   entry.scrollIntoView({ block: 'start' });
 }

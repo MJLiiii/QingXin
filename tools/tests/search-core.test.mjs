@@ -6,11 +6,8 @@ import {
   searchAuthorIndex,
   searchPoemIndex,
 } from '../../assets/js/search-core.js';
-import {
-  authorRow,
-  searchBoxHTML,
-  searchRow,
-} from '../../assets/js/templates.js';
+import { hitCard, poetTile } from '../../assets/js/glass-templates.js';
+import { searchBoxHTML } from '../../assets/js/templates.js';
 
 test('normalizes traditional characters, whitespace, and punctuation', () => {
   assert.equal(normalizeSearchText(' 《 靜夜思 》 '), '静夜思');
@@ -355,7 +352,7 @@ test('module worker and main-thread fallback return equivalent ranked matches', 
 });
 
 test('templates highlight only real direct ranges and expose search status semantics', () => {
-  const exact = searchRow(
+  const exact = hitCard(
     ['p1', '静夜思', '李白', {
       field: 'title', type: 'exact', distance: 0, start: 0, length: 3,
     }],
@@ -363,14 +360,14 @@ test('templates highlight only real direct ranges and expose search status seman
   );
   assert.match(exact, /<mark class="search-match">静夜思<\/mark>/);
 
-  const fuzzy = searchRow(
+  const fuzzy = hitCard(
     ['p1', '静夜思', '李白', {
       field: 'title', type: 'fuzzy', distance: 1, start: -1, length: 0,
     }],
     '静夜诗',
   );
   assert.doesNotMatch(fuzzy, /<mark/);
-  assert.doesNotMatch(authorRow({ slug: 'libai', name: '李白', dynasty: '唐', count: 1 }), /<mark/);
+  assert.doesNotMatch(poetTile({ slug: 'libai', name: '李白', dynasty: '唐', count: 1 }), /<mark/);
 
   const box = searchBoxHTML({ id: 'poem-search', controls: 'results' });
   assert.match(box, /aria-controls="results"/);

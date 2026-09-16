@@ -24,7 +24,7 @@ http.createServer(async (req, res) => {
     let fp = normalize(join(ROOT, p));
     if (fp !== ROOT && !fp.startsWith(ROOT + sep)) { res.writeHead(403); res.end('forbidden'); return; }
     let s = await stat(fp).catch(() => null);
-    // 目录：与 GitHub Pages 一致——缺尾斜杠先 301 补上，再返回其中的 index.html（/kyne/、/liquidglass/）
+    // 目录：与 GitHub Pages 一致——缺尾斜杠先 301 补上，再返回其中的 index.html（如旧地址 /kyne/、/liquidglass/ 的跳转页）
     if (s && s.isDirectory()) {
       if (!p.endsWith('/')) {
         const url = req.url || '/';
