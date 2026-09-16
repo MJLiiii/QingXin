@@ -3,7 +3,7 @@
    用法：node tools/server/serve.mjs  （默认端口 8080，可 PORT=xxxx 覆盖）*/
 import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
-import { join, extname, normalize, dirname, resolve } from 'node:path';
+import { join, extname, normalize, dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -20,10 +20,25 @@ const TYPES = {
 http.createServer(async (req, res) => {
   try {
     let p = decodeURIComponent((req.url || '/').split('?')[0]);
-    if (p === '/' || p === '') p = '/index.html';
-    const fp = normalize(join(ROOT, p));
-    if (!fp.startsWith(ROOT)) { res.writeHead(403); res.end('forbidden'); return; }
-    const s = await stat(fp).catch(() => null);
+    if (p === '') p = '/';
+    let fp = normalize(join(ROOT, p));
+    if (fp !== ROOT && !fp.startsWith(ROOT + sep)) { res.writeHead(403); res.end('forbidden'); return; }
+    let s = await stat(fp).catch(() => null);
+    // 目录：与 GitHub Pages 一致——缺尾斜杠先 301 补上，再返回其中的 index.html（/kyne/、/liquidglass/）
+    if (s && s.isDirectory()) {
+      if (!p.endsWith('/')) {
+        const url = req.url || '/';
+        const at = url.indexOf('?');
+        const raw = at >= 0 ? url.slice(0, at) : url; // 仍是百分号编码的原始路径
+        const q = at >= 0 ? url.slice(at) : '';
+        // 去掉开头多余的 / 与 \，避免 //host 被浏览器当成协议相对地址跳去别的主机
+        res.writeHead(301, { Location: '/' + raw.replace(/^[\\/]+/, '') + '/' + q });
+        res.end();
+        return;
+      }
+      fp = join(fp, 'index.html');
+      s = await stat(fp).catch(() => null);
+    }
     if (!s || !s.isFile()) { res.writeHead(404); res.end('not found'); return; }
     const buf = await readFile(fp);
     res.writeHead(200, {
