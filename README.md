@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | 入口 | 并排预览两种界面 | <https://mjliiii.github.io/QingXin/> |
 | Kyne | 黑白极简、编辑排版 | <https://mjliiii.github.io/QingXin/kyne/> |
-| Liquid Glass | 应用式液态玻璃：悬浮胶囊导航（手机为底部标签栏）、彩色流光背景、便当卡片首页、原文与注解分栏 | <https://mjliiii.github.io/QingXin/liquidglass/> |
+| Liquid Glass | 应用式液态玻璃：悬浮胶囊导航（手机为底部标签栏）、彩色流光背景、今日一诗加搜索的简洁首页、原文与注解分栏 | <https://mjliiii.github.io/QingXin/liquidglass/> |
 
 以前分享的 `…/QingXin/#/poem/…` 链接会自动转到 Liquid Glass 界面的同一页。
 
