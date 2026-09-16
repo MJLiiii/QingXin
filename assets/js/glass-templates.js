@@ -127,8 +127,22 @@ export function metaChips(items) {
   return cells.length ? '<dl class="facts">' + cells.join('') + '</dl>' : '';
 }
 
+// 大标题：--chars（码点数）供需要按字数缩放的位置使用（如资料卡姓名）。
 export function pageTitle(text, cls) {
-  return '<h1 class="' + cls + ' display" data-size="' + displaySize(text) + '">' + esc(text) + '</h1>';
+  return '<h1 class="' + cls + ' display" data-size="' + displaySize(text) + '"'
+    + ' style="--chars:' + Array.from(String(text == null ? '' : text)).length + '">' + esc(text) + '</h1>';
+}
+
+// 未找到 / 出错：标题 + 去处。actions: [{ nav, label, primary }]
+export function errorCard(message, actions) {
+  return '<section class="section section--top"><div class="prose error-card">'
+    + '<h1 class="error-card__title">' + esc(message) + '</h1>'
+    + ((actions && actions.length)
+      ? '<p class="error-card__actions">' + actions.map(function (a) {
+        return link(a.nav, 'btn ' + (a.primary ? 'btn--primary' : 'btn--chip'), esc(a.label));
+      }).join('') + '</p>'
+      : '')
+    + '</div></section>';
 }
 
 // 悬浮分页胶囊：保留 reader 之外 pages.js wirePager 依赖的 #pager / #pager-input[data-route][max] / #pager-go。

@@ -55,6 +55,7 @@
   --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px -12px rgba(60, 40, 120, 0.16);
   --card-glow: rgba(153, 106, 255, 0.16);
   --card-glow-2: rgba(56, 189, 248, 0.12);
+  --card-glow-3: rgba(255, 150, 100, 0.14);
   --row-hover-bg: rgba(var(--ink-rgb), 0.04);
   --chip-bg: rgba(255, 255, 255, 0.72);
   --chip-border: rgba(var(--ink-rgb), 0.12);
@@ -106,7 +107,22 @@
   --tabbar-space: 0px; /* 标签栏占去的底部空间（桌面为 0） */
   --bento-gap: 16px;
   --content-w: min(100% - 2 * max(var(--gutter), env(safe-area-inset-left), env(safe-area-inset-right)), var(--max));
+  /* 注释浮层避开悬浮页眉与底部标签栏（reader.js positionGloss 读取，须注册为长度才能取到 px） */
+  --pop-inset-top: var(--header-space);
+  --pop-inset-bottom: calc(var(--tabbar-space) + 8px);
   color-scheme: light;
+}
+
+@property --pop-inset-top {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
+@property --pop-inset-bottom {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
 }
 
 /* 夜读：只重定义 token。默认跟随系统；页眉「夜读」写入 data-theme 后以其为准。 */
@@ -150,6 +166,7 @@
     --card-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
     --card-glow: rgba(124, 77, 255, 0.2);
     --card-glow-2: rgba(34, 160, 210, 0.12);
+    --card-glow-3: rgba(255, 130, 90, 0.1);
     --row-hover-bg: rgba(255, 255, 255, 0.06);
     --chip-bg: rgba(18, 18, 22, 0.55);
     --chip-border: rgba(255, 255, 255, 0.16);
@@ -211,6 +228,7 @@
   --card-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
   --card-glow: rgba(124, 77, 255, 0.2);
   --card-glow-2: rgba(34, 160, 210, 0.12);
+  --card-glow-3: rgba(255, 130, 90, 0.1);
   --row-hover-bg: rgba(255, 255, 255, 0.06);
   --chip-bg: rgba(18, 18, 22, 0.55);
   --chip-border: rgba(255, 255, 255, 0.16);
@@ -779,6 +797,9 @@ body {
 
 .gpage-head__fact { white-space: nowrap; }
 
+/* 搜索时分页已隐藏：页码也不再显示，只留总数 */
+.gpage--browse:has(> .pager[hidden]) .gpage-head__facts > :not(:first-child) { display: none; }
+
 .gpage-head__facts .latin {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -914,6 +935,11 @@ a.gcard:focus-visible,
 .era-tile { grid-area: era; }
 .masters-tile { grid-area: masters; }
 .about-tile { grid-area: about; }
+
+/* 统计数据没加载到时，剩下的卡片占满空出来的格子（区域名在各断点通用） */
+.bento--no-authors .stat-tile--poems { grid-column: poems-start / poets-end; }
+.bento--no-authors .about-tile { grid-column: masters-start / about-end; }
+.bento--no-manifest .stat-tile--poets { grid-column: poems-start / era-end; }
 
 /* 今日一诗：大字铺满卡片，右下角淡色印章水印 */
 .hero-card {
@@ -1288,7 +1314,7 @@ a.gcard:hover .stat-tile__go {
   gap: 6px;
   background-image:
     radial-gradient(circle at 100% 0%, var(--card-glow-2), transparent 60%),
-    radial-gradient(circle at 0% 100%, rgba(255, 150, 100, 0.14), transparent 60%);
+    radial-gradient(circle at 0% 100%, var(--card-glow-3), transparent 60%);
 }
 
 .about-tile__title {
@@ -1327,9 +1353,31 @@ a.gcard:hover .stat-tile__go {
   padding: 18px 20px 16px;
 }
 
-.pcard--work { min-height: 0; }
+/* 作品卡只有题目和体裁：同一行排开 */
+.pcard--work {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+  padding-block: 16px;
+}
+
+.pcard--work .pcard__title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pcard--work .pcard__foot {
+  flex: none;
+  margin: 0;
+  padding: 0;
+}
 
 .pcard__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3; /* 极长的题目（含编者注）不把整行卡片撑高 */
+  overflow: hidden;
   font-size: 19px;
   font-weight: 500;
   line-height: 1.45;
@@ -1345,6 +1393,7 @@ a.gcard:hover .stat-tile__go {
 }
 
 .pcard__excerpt {
+  word-break: keep-all; /* 在标点处折行，不拆开词语和命中片段 */
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -1489,6 +1538,7 @@ a.gcard:hover .stat-tile__go {
 }
 
 .qcard__line {
+  word-break: keep-all;
   font-size: clamp(21px, 1.9vw, 26px);
   font-weight: 500;
   line-height: 1.55;
@@ -1799,6 +1849,7 @@ a.gcard:hover .stat-tile__go {
 .fact__value {
   margin: 0;
   min-width: 0;
+  word-break: keep-all;
   font-size: 15px;
   line-height: 1.5;
   letter-spacing: 0.02em;
@@ -1884,12 +1935,15 @@ a.gcard:hover .stat-tile__go {
   animation: qx-pop 0.2s var(--ease);
 }
 
-/* 原文卡 */
+/* 原文卡：原文字号按最长一句（--line-chars，glass-pages.js 写入）铺满卡片，限于 --stanza-min…max */
 .original-card {
+  --stanza-min: 19px;
+  --stanza-max: 26px;
   padding: 24px 28px 30px;
   background:
-    radial-gradient(circle at 100% 0%, var(--card-glow), transparent 45%),
+    radial-gradient(circle 400px at 100% 0%, var(--card-glow), transparent),
     var(--card-strong);
+  container-type: inline-size;
 }
 
 .original { text-align: start; }
@@ -1906,12 +1960,22 @@ a.gcard:hover .stat-tile__go {
 
 .original__stanza {
   margin: 0;
-  font-size: calc(26px * var(--reading-scale));
+  /* 每字 1.04em（含字距），另留 1.2em 给悬挂缩进 */
+  font-size: calc(clamp(var(--stanza-min), 100cqi / (var(--line-chars, 12) * 1.04 + 1.2), var(--stanza-max)) * var(--reading-scale));
   font-weight: 400;
   line-height: 2.05;
   letter-spacing: 0.04em;
-  text-wrap: pretty; /* 折行时不把「年。」这类单字留在末行 */
+  word-break: keep-all;      /* 放不下时在标点后折行，不拆词、不拆注释词 */
+  overflow-wrap: anywhere;   /* 无标点的长句仍可断开 */
+  text-wrap: pretty;
   color: var(--ink);
+}
+
+/* 一句一块：折到下一行的部分悬挂缩进 1 字，看得出仍是同一句 */
+.original__line {
+  display: block;
+  padding-inline-start: 1em;
+  text-indent: -1em;
 }
 
 .original__stanza + .original__stanza { margin-block-start: 20px; }
@@ -1940,6 +2004,11 @@ a.gcard:hover .stat-tile__go {
 :root[data-vertical="1"] .original__body:not(.original__body--long) .original__stanza {
   line-height: 2;
   letter-spacing: 0.04em;
+}
+
+:root[data-vertical="1"] .original__body:not(.original__body--long) .original__line {
+  padding-inline-start: 0;
+  text-indent: 0;
 }
 
 /* 注释联动：原文中可点的注释词 */
@@ -2093,6 +2162,14 @@ a.gcard:hover .stat-tile__go {
   pointer-events: none;
 }
 
+/* 标签与面板同组：面板滚完，吸顶的标签随之离开，不压在「关于作者」上 */
+.tab-group {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .tab-panel {
   padding: 26px 30px 30px;
   scroll-margin-top: 0; /* html 的 scroll-padding-top 已让出页眉与标签栏 */
@@ -2114,13 +2191,14 @@ a.gcard:hover .stat-tile__go {
 .notes__row:last-child { border-bottom: 0; padding-bottom: 0; }
 
 .notes__term {
-  flex: 0 0 7em;
+  flex: 0 0 8.5em;
   font-weight: 500;
   font-size: calc(16px * var(--reading-scale));
   line-height: 1.8;
 }
 
 .notes__def {
+  text-wrap: pretty;
   flex: 1;
   font-size: calc(15px * var(--reading-scale));
   line-height: 1.9;
@@ -2131,6 +2209,7 @@ a.gcard:hover .stat-tile__go {
 .prose { max-width: var(--measure); }
 
 .prose p {
+  text-wrap: pretty;
   margin: 0 0 22px;
   font-size: calc(17px * var(--reading-scale));
   line-height: 2;
@@ -2191,6 +2270,8 @@ a.gcard:hover .stat-tile__go {
 }
 
 .author-card__style {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   font-family: var(--sans);
   font-size: 13px;
   line-height: 1.6;
@@ -2250,9 +2331,12 @@ a.gcard:hover .stat-tile__go {
   container-type: inline-size;
 }
 
-.profile-card__name.display[data-size] { font-size: clamp(40px, 22cqi, 72px); }
+/* 姓名一行放下：按字数（--chars）缩放，最大 72px */
+.profile-card__name.display[data-size] { font-size: clamp(26px, min(22cqi, 96cqi / var(--chars, 4)), 72px); }
 
 .profile-card__style {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   margin: 10px 0 0;
   font-family: var(--sans);
   font-size: 14px;
@@ -2310,6 +2394,7 @@ a.gcard:hover .stat-tile__go {
 }
 
 .about-hero__sub {
+  text-wrap: pretty;
   margin: 12px 0 0;
   font-size: 18px;
   color: var(--muted);
@@ -2322,27 +2407,33 @@ a.gcard:hover .stat-tile__go {
 .figures {
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
+/* 一行一项：名称在左，数字与单位在右 */
 .figure {
-  padding: 14px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 14px 18px;
   background: var(--tile-bg);
   border-radius: var(--r-md);
 }
 
 .figure dt {
   font-family: var(--sans);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.08em;
   color: var(--muted);
 }
 
 .figure dd {
-  margin: 6px 0 0;
+  margin: 0;
   font-size: 14px;
+  white-space: nowrap;
   color: var(--muted);
 }
 
@@ -2366,6 +2457,22 @@ a.gcard:hover .stat-tile__go {
   max-width: none;
   padding: 48px 36px;
   text-align: center;
+}
+
+.error-card__title {
+  margin: 0;
+  font-size: clamp(22px, 3vw, 32px);
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+
+.prose .error-card__actions {
+  margin: 24px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
 }
 
 .section--top > .prose .prose--faint {
@@ -2487,6 +2594,7 @@ a.gcard:hover .stat-tile__go {
   .site-header[data-scrolled] .glass__tint,
   .search { background: var(--glass-tint-solid); }
   .gloss-pop { background: var(--surface); }
+  .theme-btn[aria-pressed="true"] .glass__tint { background: var(--btn-bg); }
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -2539,6 +2647,12 @@ a.gcard:hover .stat-tile__go {
   .pager__input:focus { outline: 2px solid CanvasText; }
   .era-tile__bar > span,
   .era-tile__bar::after { border: 1px solid CanvasText; }
+  .search::before,
+  .era-tile__item dt::before,
+  .chip--accent::before {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
 }
 
 /* ---------- 宽屏 ≥1200：便当 12 列、两栏详情页、五列网格 ---------- */
@@ -2580,7 +2694,8 @@ a.gcard:hover .stat-tile__go {
     max-width: 900px;
   }
 
-  .poem-layout:not(.poem-layout--long) .original__stanza { font-size: calc(24px * var(--reading-scale)); line-height: 2; }
+  .poem-layout:not(.poem-layout--long) .original-card { --stanza-max: 24px; }
+  .poem-layout:not(.poem-layout--long) .original__stanza { line-height: 2; }
   .poem-layout:not(.poem-layout--long) .original__stanza + .original__stanza { margin-block-start: 16px; }
 
   /* 资料卡竖排：印章在上 */
@@ -2588,14 +2703,6 @@ a.gcard:hover .stat-tile__go {
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
   }
-}
-
-/* ---------- 平板 600–809：两列网格 ---------- */
-
-@media (min-width: 600px) and (max-width: 809px) {
-  .card-grid--poems,
-  .card-grid--poets,
-  .card-grid--works { --cols: 2; }
 }
 
 /* ---------- 手机 <810：底部标签栏、单列 ---------- */
@@ -2730,7 +2837,11 @@ a.gcard:hover .stat-tile__go {
   .reader-tools__btn { padding: 0 13px; }
 
   .original-card { padding: 20px 20px 24px; }
-  .original__stanza { font-size: calc(21px * var(--reading-scale)); line-height: 2; }
+  .original-card {
+    --stanza-min: 17px;
+    --stanza-max: 21px;
+  }
+  .original__stanza { line-height: 2; }
   .original__stanza + .original__stanza { margin-block-start: 16px; }
 
   .tabs__tab { font-size: 14px; letter-spacing: 0.02em; }
@@ -2770,6 +2881,14 @@ a.gcard:hover .stat-tile__go {
   .site-footer__end { width: 100%; justify-content: space-between; }
 }
 
+/* ---------- 平板 600–809：两列网格（须排在手机块之后，才能压过其中的单列） ---------- */
+
+@media (min-width: 600px) and (max-width: 809px) {
+  .card-grid--poems,
+  .card-grid--poets,
+  .card-grid--works { --cols: 2; }
+}
+
 /* 小屏手机：名家与分页再收紧，「创作背景」只显示「背景」（完整名称仍给读屏） */
 @media (max-width: 389px) {
   .masters .seal--md {
@@ -2778,9 +2897,17 @@ a.gcard:hover .stat-tile__go {
     border-radius: 14px;
     font-size: 22px;
   }
+  .master { padding-inline: 2px; }
   .master__name { font-size: 14px; }
 
   .pager__btn--edge { display: none; }
+
+  /* 注释词与释义上下排，词不再挤在窄栏里 */
+  .notes__row {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .notes__term { flex-basis: auto; }
 
   .tabs__trim {
     position: absolute;
@@ -2792,13 +2919,24 @@ a.gcard:hover .stat-tile__go {
   }
 }
 
-/* 极窄屏：五言一联 12 字在 250px 栏里放得下 */
+/* 极窄屏：统计卡、名家、工具与标签再收一点 */
 @media (max-width: 359px) {
-  .original__stanza {
-    font-size: calc(19px * var(--reading-scale));
-    letter-spacing: 0.02em;
+  .stat-tile { padding-inline: 14px; }
+  .stat-tile__value {
+    flex-wrap: nowrap;
+    gap: 4px;
   }
-  .stat-tile__value .latin { font-size: 26px; }
+  .stat-tile__value .latin { font-size: 24px; }
+  .master { padding-inline: 0; }
+  .master__count {
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .masters .seal--md {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
   .find__go { padding: 0 14px; }
   .reader-tools__btn { padding: 0 10px; }
   .tabs__tab { font-size: 13px; letter-spacing: 0; }

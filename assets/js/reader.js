@@ -162,6 +162,15 @@ function closeOnViewportChange() {
   closeGloss();
 }
 
+// 视口上下被悬浮控件占去的高度（liquidglass/ 的页眉、底部标签栏）：由 CSS 注册的长度属性给出，Kyne 没有即为 0。
+function viewportInsets() {
+  var cs = window.getComputedStyle(document.documentElement);
+  return {
+    top: parseFloat(cs.getPropertyValue('--pop-inset-top')) || 0,
+    bottom: parseFloat(cs.getPropertyValue('--pop-inset-bottom')) || 0,
+  };
+}
+
 function positionGloss() {
   var rects = popTrigger.getClientRects();
   var r = rects.length ? rects[0] : popTrigger.getBoundingClientRect();
@@ -169,6 +178,9 @@ function positionGloss() {
   var margin = 12;
   var width = pop.offsetWidth;
   var height = pop.offsetHeight;
+  var insets = viewportInsets();
+  var minTop = margin + insets.top;
+  var maxBottom = window.innerHeight - margin - insets.bottom;
   var vertical = !!popScroller && window.getComputedStyle(popScroller).writingMode.indexOf('vertical') === 0;
   var left;
   var top;
@@ -176,13 +188,19 @@ function positionGloss() {
     left = r.left - gap - width;
     if (left < margin) left = r.right + gap;
     top = r.top;
+    // 左右都放不下时改放到词的上下方，免得盖住词本身（仅在有悬浮控件的界面启用）
+    if ((insets.top || insets.bottom) && left + width > window.innerWidth - margin) {
+      left = r.left + r.width / 2 - width / 2;
+      top = r.bottom + gap;
+      if (top + height > maxBottom) top = r.top - gap - height;
+    }
   } else {
     left = r.left + r.width / 2 - width / 2;
     top = r.bottom + gap;
-    if (top + height > window.innerHeight - margin && r.top - gap - height >= margin) top = r.top - gap - height;
+    if (top + height > maxBottom && r.top - gap - height >= minTop) top = r.top - gap - height;
   }
   left = Math.max(margin, Math.min(window.innerWidth - width - margin, left));
-  top = Math.max(margin, Math.min(window.innerHeight - height - margin, top));
+  top = Math.max(minTop, Math.min(maxBottom - height, top));
   // 触发词在钉住的栏里（[data-pinned]，liquidglass/）时浮层按视口定位，页面滚动时不与之脱开。
   var fixed = !!popTrigger.closest('[data-pinned]');
   pop.style.position = fixed ? 'fixed' : '';

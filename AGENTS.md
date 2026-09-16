@@ -83,7 +83,8 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
 `glass-app.js` (liquid glass) calls `startRouter(RENDERERS)` with `glass-pages.js`'s map, then `initGlassUI()`):
 - `router.js` — hash router: `#/home | #/list/:page | #/poem/:id | #/author/:slug | #/authors/:page
   | #/about`, plus an optional `?q=` live-search query → a renderer map (default `pages.js` `RENDERERS`;
-  `startRouter(renderers)` swaps it; unknown routes fall back to home). Navigation uses real
+  `startRouter(renderers, { navOf })` swaps it and can extend the page → nav-item map; unknown routes fall
+  back to home). Navigation uses real
   `<a href="#/…" data-nav="…">` links (hrefs from `hashPath()`/`hrefFor()` in `utils.js`); one delegated
   click handler intercepts plain left clicks and lets modifier/middle clicks through (new tab). The same
   handler dispatches `data-toggle` (collapsible sections),
@@ -98,7 +99,8 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   — new entries scroll to top, Back/Forward restore the saved offset instantly (explicitly overriding
   the CSS `scroll-behavior: smooth`, which would otherwise drag the restored position). Renderers set
   titles with `ctx.setTitle(...)`; `show()` applies `document.title`, `hidden` and `aria-current` (on every
-  `.site-nav__link[data-nav]`, via `NAV_OF`: home/list/authors/about, author → authors), so cached re-shows
+  `.site-nav__link[data-nav]`, via `NAV_OF`: home/list/authors/about, author → authors; glass adds
+  poem → list), so cached re-shows
   are correct too. After each render it idle-preloads the JSON the next click will likely need.
 - `pages.js` — the six renderers, all `(param, ctx)` (`renderHome/renderList/renderPoem/renderAuthor/
   renderAuthors/renderAbout`), plus pager/search wiring. Each builds HTML strings **reusing the
@@ -115,21 +117,26 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   carries the reading toolbar (复制/分享/竖排/A−/A+; 竖排 is omitted above 60 lines) and note terms are
   linked inside 词序 + 原文 via `glossLines()`. The data/wiring pieces a second renderer set needs are
   exported: `wireLiveSearch`/`wireSearch` (optional `{ entry, hit }` row templates)/`wirePager`,
-  `pickFeatured`, `loadPoemData`, `poemParts` (toolbar, 原文, notes), `notesHTML`, `aiNotice`, `metaRow`.
+  `pickFeatured`, `loadPoemData`, `poemParts` (toolbar, 原文, notes), `notesHTML`, `aiNotice`.
 - `glass-pages.js` — the liquid-glass renderers (same `(param, ctx)` contract, same data and hooks):
   home is a bento wall (今日一诗 hero card, 寻章摘句 search form → `#/list?q=`, stat tiles from
   `manifest.json`/`authors-index.json` (soft-loaded: failures hide the tile and `noCache()`), 唐/宋 split,
   top-5 名家 excluding 无名氏/不详, about tile, six quote cards); 诗集/诗人 are card grids with the same
   search/pager wiring; the poem page is a two-column layout (`.poem-aside[data-pin]` with title, fact chips,
   the toolbar in a glass `.tools-dock` and the 原文 card; `.poem-main` with the AI note, segmented tabs and the
-  author card; poems over 60 lines get `.poem-layout--long` and no `data-pin`); the author page is a pinned
+  author card; poems over 60 lines get `.poem-layout--long` and no `data-pin`; each 原文 line is wrapped in a
+  block `.original__line` (hanging indent when it wraps) and the card gets `--line-chars`, the longest line's
+  length, which sizes the stanza text to fit the card); the author page is a pinned
   profile card + bio + works grid; about is a card grid. `glass-templates.js` holds its pure HTML fragments
   (cards, `seal()` glyph avatars — first code point of the name, never the data's `seal` field, which is a
   lone surrogate for astral names — `pagerDock` (keeps `#pager`/`#pager-input[data-route]`/`#pager-go`),
   `poemTabs`/`pickTab`, `findForm`, `GLASS` layers, `ICONS`). **Tabs:** `role=tablist/tab/tabpanel`, roving
   tabindex, ←/→/Home/End; panels keep `class="tab-panel entry" data-section` (hidden panels stay in the DOM,
   so `openGloss` and `expandNotes` work unchanged). The initial tab is `prefs.tab` if that section has
-  content, else the first non-empty one, else 注释; fallbacks never overwrite the pref.
+  content, else the first non-empty one, else 注释; fallbacks never overwrite the pref. The chosen tab is also
+  stored on the history entry (`history.state.qxTab`, via `rememberTab`), and a Back/Forward re-render prefers it
+  so the restored scroll offset matches the panel. Not-found poem/author pages use `errorCard()` (an h1 plus
+  links to 诗集/诗人 and 首页).
 - `glass-ui.js` — liquid-glass behaviour, all delegated: tab clicks/keys (`selectTab` writes `prefs.tab`
   on user choice and, when the tab bar is stuck, scrolls the new panel under it), the `qx:expand-notes`
   event (switches to 注释 without persisting), the home search submit (ignores the IME-confirm Enter), and
@@ -141,7 +148,9 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   (`theme`, `scale`, `vertical`, `open` section ids (Kyne), `tab` (liquid glass); `readPrefs`/`writePrefs`
   merge), toolbar actions, and the single note popover (`openGloss`/`closeGloss`/`repositionGloss`; the k-th
   `.gloss` term maps to the k-th `.notes__row`; the popover is absolute in document coordinates, or `fixed`
-  when its term sits inside a `[data-pinned]` column). `expandNotes` (查看全部注释) dispatches a bubbling
+  when its term sits inside a `[data-pinned]` column; it keeps clear of `--pop-inset-top/-bottom`, lengths the
+  glass stylesheet registers with `@property` for its floating header and tab bar — 0 in Kyne, where the
+  placement is unchanged). `expandNotes` (查看全部注释) dispatches a bubbling
   `qx:expand-notes` event on the notes section before scrolling to it. The inline
   `<head>` script in both app shells applies theme/scale/vertical before first paint (the chooser applies
   only the theme) — keep its key and fields in sync with `reader.js`.
@@ -170,11 +179,11 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
 Stale-while-revalidate on every same-origin GET — cached copy returns instantly, the network refresh lands
 by the next reload, so content updates lag at most one refresh (remember this when previewing changes
 locally). The background refresh is `fetch(req, { cache: 'no-cache' })` (a conditional request), so a stale
-HTTP-cache copy of a module can never be written back next to newer ones. It pre-caches the app shells (root, `kyne/`, `liquidglass/`, both stylesheets, every
-`assets/js/*.js`) with `cache: 'reload'`, bypassing the HTTP cache so a new worker never mixes old and new
-modules; one missing entry fails the whole install. **Adding/renaming a frontend module or shell means
-updating its `SHELL` list; changing any cached format means bumping `CACHE_NAME`** (currently
-`qingxin-v8`; old caches are purged on activate).
+HTTP-cache copy of a module can never be written back next to newer ones. It pre-caches the app shells
+(root, `kyne/`, `liquidglass/`, both stylesheets, every `assets/js/*.js`) with `cache: 'reload'`, bypassing
+the HTTP cache so a new worker never mixes old and new modules; one missing entry fails the whole install.
+**Adding/renaming a frontend module or shell means updating its `SHELL` list; changing any cached format
+means bumping `CACHE_NAME`** (currently `qingxin-v8`; old caches are purged on activate).
 
 **Detail-page invariant:** all five section headings (原文/注释/译文/赏析/创作背景) always
 render. Only 原文 + author bio come from source data; the other four come from the annotation

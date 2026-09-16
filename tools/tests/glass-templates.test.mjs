@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  errorCard,
   fmt,
   findForm,
   hitCard,
   metaChips,
+  pageTitle,
   pagerDock,
   pickTab,
   poemCard,
@@ -153,4 +155,17 @@ test('home search form carries hint links to the list search', () => {
   assert.match(html, /href="#\/list\?q=%E6%98%8E%E6%9C%88">明月<\/a>/);
   assert.match(html, /href="#\/list\?q=%3Cx%3E">&lt;x&gt;<\/a>/);
   assert.doesNotMatch(findForm([]), /find__hints/);
+});
+
+test('page titles carry their size tier and code-point count', () => {
+  assert.equal(pageTitle('中宗皇帝', 'profile-card__name'),
+    '<h1 class="profile-card__name display" data-size="s" style="--chars:4">中宗皇帝</h1>');
+  assert.match(pageTitle('𬤇禅师<', 'x'), /style="--chars:4">𬤇禅师&lt;<\/h1>$/);
+});
+
+test('error cards have a heading and optional ways out', () => {
+  const html = errorCard('未找到<这首诗>。', [{ nav: 'list', label: '浏览诗集', primary: true }, { nav: 'home', label: '回到首页' }]);
+  assert.match(html, /^<section class="section section--top"><div class="prose error-card"><h1 class="error-card__title">未找到&lt;这首诗&gt;。<\/h1>/);
+  assert.match(html, /<a class="btn btn--primary" href="#\/list" data-nav="list">浏览诗集<\/a><a class="btn btn--chip" href="#\/home" data-nav="home">回到首页<\/a>/);
+  assert.doesNotMatch(errorCard('x'), /error-card__actions/);
 });

@@ -9,7 +9,7 @@ import {
 } from './templates.js';
 
 // 竖排按列横向滚动；行数过多的长篇（如歌行）不提供竖排。
-export var VERTICAL_MAX_LINES = 60;
+var VERTICAL_MAX_LINES = 60;
 
 export function wirePager(host, go) {
   var input = host.querySelector('#pager-input');
@@ -159,7 +159,7 @@ function pageHead(title, count) {
 }
 
 // 元信息行：每格一个 dt/dd；值为已转义或已构造的 HTML，空值不出格。
-export function metaRow(items) {
+function metaRow(items) {
   var cells = items.filter(function (item) { return item && item.value; }).map(function (item) {
     return '<div class="meta__item"><dt>' + esc(item.label) + '</dt>'
       + '<dd>' + item.value + '</dd></div>';

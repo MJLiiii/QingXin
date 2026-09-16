@@ -14,7 +14,7 @@ var ticking = false;
 
 // 切换标签：同一 tablist 内只有一个选中项（roving tabindex），对应面板显示、其余隐藏。
 // opts.remember 写入偏好；opts.reveal 在标签栏已吸顶时把新面板滚到它下面。
-export function selectTab(tab, opts) {
+function selectTab(tab, opts) {
   opts = opts || {};
   var list = tab.closest('[role="tablist"]');
   if (!list) return;
@@ -29,8 +29,18 @@ export function selectTab(tab, opts) {
     if (on) panel = p;
   });
   if (opts.focus) tab.focus();
-  if (opts.remember) writePrefs({ tab: tab.getAttribute('data-tab') });
+  if (opts.remember) {
+    writePrefs({ tab: tab.getAttribute('data-tab') });
+    rememberTab(tab.getAttribute('data-tab'));
+  }
   if (opts.reveal && panel && isStuck(list)) panel.scrollIntoView({ block: 'start' });
+}
+
+// 把当前选的栏记在本历史项上：前进 / 后退重建这首诗时仍打开同一栏（router 的 state.qx 等字段原样保留）。
+export function rememberTab(key) {
+  try {
+    window.history.replaceState(Object.assign({}, window.history.state, { qxTab: key }), '');
+  } catch (e) { /* 频率受限时只是不记 */ }
 }
 
 function isStuck(el) {
@@ -54,7 +64,7 @@ function onKeydown(e) {
     return;
   }
   var tab = target.closest('[role="tab"][data-tab]');
-  if (!tab) return;
+  if (!tab || e.altKey || e.ctrlKey || e.metaKey) return; // 带修饰键的是浏览器快捷键（前进 / 后退等）
   var tabs = Array.prototype.slice.call(tab.closest('[role="tablist"]').querySelectorAll('[role="tab"]'));
   var i = tabs.indexOf(tab);
   var next = null;
@@ -81,13 +91,25 @@ function onSubmit(e) {
   go('list', q ? { q: q } : null);
 }
 
-// 「查看全部注释」（reader.js）展开注释栏前先切到该标签，不写入偏好。
+// 「查看全部注释」（reader.js）展开注释栏前先切到该标签，不写入偏好；
+// 焦点随之移到注释面板（浮层连同按钮已移除，否则焦点会掉回 body）。
 function onExpandNotes(e) {
   var panel = e.target;
   if (!(panel instanceof Element) || !panel.id) return;
   var scope = panel.closest('.page') || document;
   var tab = scope.querySelector('[role="tab"][aria-controls="' + panel.id + '"]');
-  if (tab) selectTab(tab);
+  if (!tab) return;
+  selectTab(tab);
+  panel.focus({ preventScroll: true });
+}
+
+// 自动关闭浮层（滚出视口、栏钉住状态变化）时，焦点若在浮层里就还给触发词。
+function dismissGloss() {
+  var pop = document.querySelector('.gloss-pop');
+  var trigger = document.querySelector('.gloss[aria-expanded="true"]');
+  var hadFocus = !!pop && pop.contains(document.activeElement);
+  closeGloss();
+  if (hadFocus && trigger && trigger.isConnected) trigger.focus({ preventScroll: true });
 }
 
 function updatePin(el) {
@@ -97,7 +119,7 @@ function updatePin(el) {
     on = el.offsetHeight + top + PIN_SLACK <= window.innerHeight;
   }
   if (on !== el.hasAttribute('data-pinned')) {
-    closeGloss();
+    dismissGloss();
     el.toggleAttribute('data-pinned', on);
   }
 }
@@ -129,7 +151,7 @@ function onScroll() {
     var trigger = document.querySelector('.gloss[aria-expanded="true"]');
     if (!trigger || !trigger.closest('[data-pinned]')) return;
     var r = trigger.getBoundingClientRect();
-    if (r.bottom < 0 || r.top > window.innerHeight) closeGloss();
+    if (r.bottom < 0 || r.top > window.innerHeight) dismissGloss();
     else repositionGloss();
   });
 }

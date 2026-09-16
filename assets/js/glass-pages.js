@@ -1,17 +1,17 @@
 /* liquidglass/ 的页面渲染：数据与交互沿用 pages.js / reader.js，布局是玻璃界面自己的——
    首页便当卡片墙、诗集 / 诗人卡片网格、诗文页左栏钉住 + 右栏分段标签、作者页资料卡。 */
 import { fetchJSON, loadAuthor, loadPoem } from './data.js';
-import { initPin } from './glass-ui.js';
+import { initPin, rememberTab } from './glass-ui.js';
 import {
-  GLASS, ICONS, fmt, findForm, hitCard, metaChips, pageTitle, pagerDock, pickTab,
-  poemCard, poemTabs, poetTile, proseBody, quoteCard, seal, statTile, workCard,
+  GLASS, ICONS, errorCard, fmt, findForm, hitCard, metaChips, pageTitle, pagerDock, pickTab,
+  poemCard, poemTabs, poetTile, proseBody, quoteCard, seal, sealOf, statTile, workCard,
 } from './glass-templates.js';
 import {
   aiNotice, loadPoemData, notesHTML, pickFeatured, poemParts, wireLiveSearch, wirePager, wireSearch,
 } from './pages.js';
 import { readPrefs, setCurrentPoem, syncControls } from './reader.js';
 import { searchAuthorIndex } from './search-core.js';
-import { emptyState, errorSection, heroLines, navHref, searchBoxHTML } from './templates.js';
+import { emptyState, heroLines, navHref, searchBoxHTML } from './templates.js';
 import { esc, localDateKey, pad4 } from './utils.js';
 
 var DISPLAY = 25;
@@ -23,6 +23,21 @@ function soft(promise, ctx) {
   return promise.catch(function () {
     ctx.noCache();
     return null;
+  });
+}
+
+// 搜索框的防抖回调可能在读者离开本页之后才触发：只在仍停留在该路由时改写地址栏。
+function onRoute(name) {
+  var re = new RegExp('^#/?' + name + '(?:[/?]|$)');
+  return function () { return re.test(window.location.hash); };
+}
+
+// 原文逐句成块：一句折行时在标点后断开并悬挂缩进，看得出是同一句（竖排时由 CSS 取消缩进）。
+function lineBlocks(original) {
+  return original.replace(/(<p class="original__stanza">)([\s\S]*?)(<\/p>)/g, function (m, open, body, close) {
+    return open + body.split('<br>').map(function (line) {
+      return '<span class="original__line">' + line + '</span>';
+    }).join('') + close;
   });
 }
 
@@ -80,7 +95,7 @@ export async function renderHome(param, ctx) {
     + '<a class="btn btn--primary" href="' + navHref('poem/' + hero.id) + '" data-nav="poem/' + esc(hero.id) + '">品读全文</a>'
     + '<button class="btn btn--secondary" type="button" data-action="shuffle">换一首</button>'
     + '</div></div>'
-    + '<span class="hero-card__seal" aria-hidden="true">' + esc(Array.from(hero.author || '·')[0]) + '</span>'
+    + '<span class="hero-card__seal" aria-hidden="true">' + esc(sealOf(hero.author)) + '</span>'
     + '</article>';
 
   var find = '<section class="gcard find-tile" aria-labelledby="home-find-h">'
@@ -130,7 +145,7 @@ export async function renderHome(param, ctx) {
     + '<span class="stat-tile__go" aria-hidden="true">' + ICONS.arrow + '</span></a>';
 
   document.getElementById('page-home').innerHTML = '<div class="gpage home">'
-    + '<div class="bento">'
+    + '<div class="bento' + (manifest ? '' : ' bento--no-manifest') + (authors ? '' : ' bento--no-authors') + '">'
     + heroCard + find + stats + era + masters + about
     + '</div>'
     + '<section class="home-picks" aria-labelledby="home-picks-h">'
@@ -139,6 +154,11 @@ export async function renderHome(param, ctx) {
     + '<div class="card-grid card-grid--quotes">' + quotes.map(quoteCard).join('') + '</div>'
     + '</section>'
     + '</div>';
+  // 「换一首」重建了卡片：焦点落回新的「换一首」，键盘读者不必从头找起。
+  if (ctx.shuffle && document.activeElement === document.body) {
+    var again = document.querySelector('#page-home [data-action="shuffle"]');
+    if (again) again.focus({ preventScroll: true });
+  }
 }
 
 export async function renderList(param, ctx) {
@@ -163,8 +183,9 @@ export async function renderList(param, ctx) {
     + pagerDock('list', dp, totalPages)
     + '</div>';
 
+  var stillHere = onRoute('list');
   var search = wireSearch(host, slice, function (q) {
-    ctx.replace('list/' + dp, q ? { q: q } : null);
+    if (stillHere()) ctx.replace('list/' + dp, q ? { q: q } : null);
   }, { entry: poemCard, hit: hitCard });
   wirePager(host, ctx.go);
   if (search && ctx.query.q) search.start(ctx.query.q);
@@ -194,12 +215,13 @@ export async function renderAuthors(param, ctx) {
     + pagerDock('authors', page, totalPages)
     + '</div>';
 
+  var stillHere = onRoute('authors');
   var search = wireLiveSearch({
     host: host,
     inputSel: '#author-search',
     rowsSel: '#authors-rows',
     onQuery: function (q) {
-      ctx.replace('authors/' + page, q ? { q: q } : null);
+      if (stillHere()) ctx.replace('authors/' + page, q ? { q: q } : null);
     },
     restore: function () { return slice.map(poetTile).join(''); },
     match: async function (q) {
@@ -227,7 +249,10 @@ export async function renderPoem(id, ctx) {
   var host = document.getElementById('page-poem');
   if (!poem) {
     ctx.setTitle('未找到这首诗');
-    host.innerHTML = errorSection('未找到这首诗。');
+    host.innerHTML = errorCard('未找到这首诗。', [
+      { nav: 'list', label: '浏览诗集', primary: true },
+      { nav: 'home', label: '回到首页' },
+    ]);
     initPin(host);
     return;
   }
@@ -241,6 +266,10 @@ export async function renderPoem(id, ctx) {
   var sub = isCi ? (poem.title.split('·')[1] || '') : '';
   var authorHref = navHref('author/' + poem.authorSlug);
   var authorNav = 'author/' + esc(poem.authorSlug);
+  // 最长一句的字数：原文字号按它铺满原文卡（glass.css .original__stanza），放不下再在标点后折行。
+  var lineChars = Math.min(32, Math.max.apply(null, parts.paragraphs.map(function (line) {
+    return Array.from(String(line)).length;
+  }).concat(5)));
 
   // 左栏：标题 + 元信息 + 工具胶囊 + 原文；超长篇不钉住（改为单栏）。
   var aside = '<div class="poem-aside"' + (parts.longPoem ? '' : ' data-pin') + '>'
@@ -255,9 +284,9 @@ export async function renderPoem(id, ctx) {
     ])
     + '</header>'
     + '<div class="tools-dock">' + GLASS + parts.tools + '</div>'
-    + '<section class="gcard original-card" aria-labelledby="poem-orig-h">'
+    + '<section class="gcard original-card" aria-labelledby="poem-orig-h" style="--line-chars:' + lineChars + '">'
     + '<h2 class="card-label" id="poem-orig-h">原文</h2>'
-    + parts.original
+    + lineBlocks(parts.original)
     + '</section>'
     + '</div>';
 
@@ -271,7 +300,10 @@ export async function renderPoem(id, ctx) {
     { key: 'appreciation', label: '赏析', html: proseBody(appreciation), empty: !appreciation.length },
     { key: 'background', label: '<span class="tabs__trim">创作</span>背景', html: proseBody(background), empty: !background.length },
   ];
-  var tabs = poemTabs(sections, pickTab(sections, readPrefs().tab));
+  // 同一历史项（前进 / 后退重建）沿用当时选的栏，滚动位置才对得上；新打开的诗用记住的偏好。
+  var state = window.history.state || {};
+  var selected = pickTab(sections, state.qxTab || readPrefs().tab);
+  var tabs = poemTabs(sections, selected);
   var ai = aiNotice(ann);
 
   var others = ((author && author.works) || []).filter(function (w) { return w.id !== poem.id; }).slice(0, 4);
@@ -291,8 +323,7 @@ export async function renderPoem(id, ctx) {
     + aside
     + '<div class="poem-main">'
     + (ai ? '<div class="ai-note">' + ai + '</div>' : '')
-    + tabs.tablist
-    + tabs.panels
+    + '<div class="tab-group">' + tabs.tablist + tabs.panels + '</div>'
     + authorCard
     + '</div>'
     + '</div>';
@@ -305,19 +336,28 @@ export async function renderPoem(id, ctx) {
   });
   syncControls();
   initPin(host);
+  rememberTab(selected);
 }
 
 export async function renderAuthor(slug, ctx) {
-  var a = await loadAuthor(slug);
+  var loaded = await Promise.all([loadAuthor(slug), soft(fetchJSON('data/authors-index.json'), ctx)]);
   if (!ctx.isCurrent()) return;
+  var a = loaded[0];
   var host = document.getElementById('page-author');
   if (!a) {
     ctx.setTitle('未找到这位作者');
-    host.innerHTML = errorSection('未找到这位作者。');
+    host.innerHTML = errorCard('未找到这位作者。', [
+      { nav: 'authors', label: '浏览诗人', primary: true },
+      { nav: 'home', label: '回到首页' },
+    ]);
     initPin(host);
     return;
   }
   var works = a.works || [];
+  // 作者记录只带前 50 首代表作；总数取诗人索引（加载失败时退回代表作数，满 50 标「+」）。
+  var entry = (loaded[1] || []).find(function (e) { return e.slug === a.slug; });
+  var total = entry ? entry.count : works.length;
+  var totalText = total ? latinNum(total) + (entry || works.length < 50 ? '' : '+') + ' 首' : '';
 
   var profile = '<div class="author-aside" data-pin>'
     + '<section class="gcard profile-card">'
@@ -330,7 +370,7 @@ export async function renderAuthor(slug, ctx) {
       { label: '朝代', value: esc(a.dynasty) },
       { label: '籍贯', value: a.origin ? esc(a.origin) : '' },
       { label: '生卒', value: a.life ? '<span class="latin">' + esc(a.life) + '</span>' : '' },
-      { label: '作品', value: works.length ? latinNum(works.length) + ' 首' : '' },
+      { label: '作品', value: totalText },
     ])
     + '</section></div>';
 
@@ -372,7 +412,7 @@ export async function renderAbout(param, ctx) {
     + '</section>';
   (about.sections || []).forEach(function (s, i) {
     html += '<section class="gcard about-card" aria-labelledby="about-sec-' + i + '">'
-      + cardHead('about-sec-' + i, s.heading, s.roman ? '<span class="chip latin">' + esc(s.roman) + '</span>' : '')
+      + cardHead('about-sec-' + i, s.heading)
       + proseOf(s.paragraphs)
       + '</section>';
   });
