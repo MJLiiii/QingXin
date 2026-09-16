@@ -1,16 +1,15 @@
 import { preloadJSON, preloadListPage } from './data.js';
-import { closeGloss, handleAction, initReader, openGloss, rememberSection } from './reader.js';
+import { closeGloss, handleAction, initReader, openGloss } from './reader.js';
 import { warmSearchIndex } from './search.js';
 import { errorSection } from './templates.js';
 import { hrefFor, idle, localDateKey } from './utils.js';
-import { RENDERERS } from './pages.js';
 
 var PAGES = ['home', 'list', 'poem', 'author', 'authors', 'about'];
-var NAV_OF = { home: 'home', list: 'list', authors: 'authors', author: 'authors', about: 'about' };
+// 页面 → 高亮的导航项：诗文页归到「诗集」，页眉导航与底部标签栏始终有一项选中。
+var NAV_OF = { home: 'home', list: 'list', poem: 'list', authors: 'authors', author: 'authors', about: 'about' };
 var DEFAULT_TITLE = '情心 · 慢读古典';
 
-var renderers = RENDERERS;  // 页面 → 渲染函数；各界面可在 startRouter() 时替换（liquidglass/ 用 glass-pages.js）
-var navOf = NAV_OF;         // 页面 → 高亮的导航项；startRouter(pages, { navOf }) 可补充
+var renderers = {};         // 页面 → 渲染函数，由 startRouter(pages) 传入（glass-pages.js）
 var rendered = {};          // 页面 → 当前 DOM 对应的规范化路由键；命中时返回不重建 DOM
 var titles = {};            // 页面 → document.title
 var seq = 0;                // 导航序号：过期的异步渲染不得写 DOM、不得切换页面
@@ -48,7 +47,7 @@ function historyEntry() {
   return { id: id, fresh: true };
 }
 
-// 路由复位/恢复滚动必须瞬时完成：kyne.css / glass.css 的 smooth 若残留动画，会把恢复的位置又拉走。
+// 路由复位/恢复滚动必须瞬时完成：glass.css 的 smooth 若残留动画，会把恢复的位置又拉走。
 function scrollToY(y) {
   var root = document.documentElement;
   var behavior = root.style.scrollBehavior;
@@ -72,7 +71,7 @@ function show(name) {
     el.hidden = p !== name;
   });
   document.title = titles[name] || DEFAULT_TITLE;
-  var current = navOf[name] || '';
+  var current = NAV_OF[name] || '';
   document.querySelectorAll('.site-nav__link[data-nav]').forEach(function (link) {
     if (link.getAttribute('data-nav') === current) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
@@ -166,15 +165,6 @@ function onClick(e) {
     return;
   }
 
-  var toggle = target.closest('[data-toggle]');
-  if (toggle) {
-    var entry = toggle.closest('.entry');
-    var collapsed = entry.classList.toggle('entry--collapsed');
-    toggle.setAttribute('aria-expanded', String(!collapsed));
-    rememberSection(entry.getAttribute('data-section'), !collapsed);
-    return;
-  }
-
   var action = target.closest('[data-action]');
   if (action) {
     var name = action.getAttribute('data-action');
@@ -202,9 +192,15 @@ function onKeydown(e) {
   }
 }
 
-export function startRouter(pages, opts) {
-  if (pages) renderers = pages;
-  if (opts && opts.navOf) navOf = Object.assign({}, NAV_OF, opts.navOf);
+export function startRouter(pages) {
+  if (!pages) {
+    // 不传渲染器的只有已删除的 Kyne 入口 app.js（kyne/ 页面，及 v7 之前根目录的旧版页面）：
+    // 那是旧版 Worker 从缓存送来的旧页面，直接去站点根目录的新站。目标按本模块位置（assets/js/）求，
+    // 与旧页面在哪一层无关；带空查询（?）是为了不在旧缓存里命中旧页面。旧 Worker 淘汰后可删。
+    window.location.replace(new URL('../../?', import.meta.url).href + window.location.hash);
+    return;
+  }
+  renderers = pages;
   if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
   document.addEventListener('click', onClick);
   document.addEventListener('keydown', onKeydown);

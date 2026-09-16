@@ -283,7 +283,7 @@ for (const a of loadJSON(join(tangDir, 'authors.tang.json'))) {
 }
 
 // 作者按 256 桶打包为 authors/bucket-<000..255>.json（对象 {slug: 记录}），削减小文件数。
-// authorBucket 须与 app.js loadAuthor / bundle-authors.mjs 完全一致（改动三处需同步）。
+// authorBucket 须与 assets/js/data.js / bundle-authors.mjs 完全一致（改动三处需同步）。
 const AUTHOR_BUCKETS = 256;
 const authorBucket = (slug) => {
   let h = 0;

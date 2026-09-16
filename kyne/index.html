@@ -3,105 +3,47 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
   <title>情心 · 慢读古典</title>
-  <meta name="description" content="情心 — 黑白极简的古诗文赏读。原文、注释、译文、赏析、创作背景，逐层深入。">
+  <link rel="canonical" href="../">
   <script>
-    // 首帧前应用阅读偏好（主题 / 字号 / 竖排），避免闪烁；键名与 assets/js/reader.js 一致。
+    // 旧地址（两套界面并存时的 kyne/、liquidglass/）：带着 #/… 路由跳到站点根目录，不留历史项。
     (function () {
       try {
         var prefs = JSON.parse(localStorage.getItem('qingxin:prefs')) || {};
-        var root = document.documentElement;
-        if (prefs.theme === 'dark' || prefs.theme === 'light') root.setAttribute('data-theme', prefs.theme);
-        var scale = Number(prefs.scale);
-        if (scale >= 0.8 && scale <= 1.5) root.style.setProperty('--reading-scale', String(scale));
-        if (prefs.vertical === true) root.setAttribute('data-vertical', '1');
+        if (prefs.theme === 'dark' || prefs.theme === 'light') document.documentElement.setAttribute('data-theme', prefs.theme);
       } catch (e) {}
+      // 旧版 Worker（qingxin-v1…v9）缓存里的根目录可能还是界面选择页，它会把 #/… 转回这里：
+      // 从根目录转来时改去 ../?（缓存里没有的地址，只能取网络上的新页面），免得来回跳。
+      var fromRoot = false;
+      try {
+        var root = new URL('../', window.location.href).pathname;
+        var from = new URL(document.referrer);
+        fromRoot = from.origin === window.location.origin
+          && (from.pathname === root || from.pathname === root + 'index.html');
+      } catch (e) {}
+      window.location.replace((fromRoot ? '../?' : '../') + window.location.hash);
     })();
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Noto+Sans+SC:wght@400;500&family=Noto+Serif+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../assets/css/kyne.css">
+  <style>
+    /* 跳转前的一瞬间与根目录同底色，不闪白；配色取自 assets/css/glass.css */
+    :root { color-scheme: light; --paper: #F4F4F6; --ink: #1C1C1E; --link: #6A3FD6; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { color-scheme: dark; --paper: #0A0A0A; --ink: #F2F2F2; --link: #AB87FF; }
+    }
+    :root[data-theme="dark"] { color-scheme: dark; --paper: #0A0A0A; --ink: #F2F2F2; --link: #AB87FF; }
+    body {
+      margin: 0;
+      padding: 48px 16px;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Noto Serif SC", "Songti SC", serif;
+      text-align: center;
+    }
+    a { color: var(--link); }
+  </style>
 </head>
 <body>
-
-  <!-- ============ 页眉 ============ -->
-  <header class="site-header">
-    <div class="site-header__inner">
-      <a class="brand" href="#/home" data-nav="home" aria-label="情心 · 返回首页">
-        <span class="brand__name">情心</span>
-      </a>
-      <nav class="site-nav" aria-label="主导航">
-        <a class="site-nav__link" href="#/list" data-nav="list">诗集</a>
-        <a class="site-nav__link" href="#/authors" data-nav="authors">诗人</a>
-        <a class="site-nav__link" href="#/about" data-nav="about">关于</a>
-        <button class="site-nav__theme" type="button" data-action="theme" aria-pressed="false">夜读</button>
-      </nav>
-    </div>
-  </header>
-
-  <!-- ============ 页面容器（内容由 assets/js/*.js 按数据渲染，不写死诗文） ============ -->
-  <main class="page" id="page-home"></main>
-  <main class="page" id="page-list"></main>
-  <main class="page" id="page-poem"></main>
-  <main class="page" id="page-author"></main>
-  <main class="page" id="page-authors"></main>
-  <main class="page" id="page-about"></main>
-
-  <!-- 首屏加载态：数据就绪后被替换 -->
-  <div id="boot" class="boot"><span class="boot__mark">情心</span></div>
-
-  <!-- ============ 页脚（反色通栏；链接用 site-footer__link，router 不会给它设 aria-current） ============ -->
-  <footer class="site-footer">
-    <div class="site-footer__inner">
-      <p class="site-footer__slogan"><span>慢读古典</span><span>一日一诗</span></p>
-      <div class="site-footer__base">
-        <nav class="site-footer__nav" aria-label="页脚导航">
-          <a class="site-footer__link" href="#/home" data-nav="home">首页</a>
-          <a class="site-footer__link" href="#/list" data-nav="list">诗集</a>
-          <a class="site-footer__link" href="#/authors" data-nav="authors">诗人</a>
-          <a class="site-footer__link" href="#/about" data-nav="about">关于</a>
-        </nav>
-        <nav class="site-footer__designs" aria-label="切换界面">
-          <a class="site-footer__design latin" href="../kyne/" data-design="../kyne/" aria-current="page">Kyne</a>
-          <a class="site-footer__design latin" href="../liquidglass/" data-design="../liquidglass/">Liquid Glass</a>
-        </nav>
-        <div class="site-footer__meta">
-          <span class="site-footer__mark">情心 <span class="latin">(QingXin)</span></span>
-          <span>诗文数据 · chinese-poetry</span>
-        </div>
-      </div>
-    </div>
-  </footer>
-
-  <script type="module" src="../assets/js/app.js"></script>
-  <script>
-    // 离线/跨刷新缓存；Worker 在站点根目录，作用域覆盖两套界面（GitHub Pages 子路径 /QingXin/ 亦可）。特性检测 + 静默失败。
-    if ('serviceWorker' in navigator) {
-      // 旧版 Worker（qingxin-v1…v6，站点还只有根目录一个页面时注册）会给本页送上缓存的旧 data.js，
-      // 它按页面目录取 data/…，在子目录里 404。本页若由旧 Worker 控制，新 Worker 接管后刷新一次。
-      if (navigator.serviceWorker.controller && window.caches) {
-        var legacySW = caches.keys().then(function (keys) {
-          return keys.some(function (k) { return /^qingxin-v[1-6]$/.test(k); });
-        }, function () { return false; });
-        navigator.serviceWorker.addEventListener('controllerchange', function () {
-          legacySW.then(function (legacy) { if (legacy) window.location.reload(); });
-        });
-      }
-      window.addEventListener('load', function () {
-        navigator.serviceWorker.register('../sw.js').catch(function () {});
-      });
-    }
-    // 页脚「界面」切换：跳到另一套设计的同一页——在点击 / 中键 / 右键 / 聚焦前把当前 #/… 路由补到链接上。
-    (function () {
-      function sync(e) {
-        var a = e.target instanceof Element && e.target.closest('a[data-design]');
-        if (a) a.href = a.getAttribute('data-design') + window.location.hash;
-      }
-      ['pointerdown', 'focusin', 'click', 'auxclick'].forEach(function (type) {
-        document.addEventListener(type, sync, true);
-      });
-    })();
-  </script>
+  <noscript><p>情心已搬到新地址：<a href="../">前往情心</a></p></noscript>
 </body>
 </html>

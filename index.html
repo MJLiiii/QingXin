@@ -2,564 +2,36 @@
 <html lang="zh-Hans">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>情心 · 选择界面</title>
-  <meta name="description" content="情心 — 古诗文赏读。同一套诗文，两种界面：Kyne 编辑型极简与 Liquid Glass 液态玻璃。">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>情心 · 慢读古典</title>
+  <meta name="description" content="情心 — 液态玻璃质感的古诗文赏读。今日一诗、诗集与诗人卡片，原文与注释、译文、赏析分栏对读。">
   <script>
-    // 旧的分享链接（#/poem/… 等）直接进默认界面，路由原样带上；其余情况按阅读偏好应用主题（键名与 assets/js/reader.js 一致）。
+    // 首帧前应用阅读偏好（主题 / 字号 / 竖排），避免闪烁；键名与 assets/js/reader.js 一致。
     (function () {
-      function forward() {
-        if (!/^#\//.test(window.location.hash)) return false;
-        window.location.replace('liquidglass/' + window.location.hash);
-        return true;
-      }
-      if (forward()) return;
-      // 入口页已打开时再粘贴旧链接只触发 hashchange，不会重新执行本脚本
-      window.addEventListener('hashchange', forward);
       try {
         var prefs = JSON.parse(localStorage.getItem('qingxin:prefs')) || {};
-        if (prefs.theme === 'dark' || prefs.theme === 'light') document.documentElement.setAttribute('data-theme', prefs.theme);
+        var root = document.documentElement;
+        if (prefs.theme === 'dark' || prefs.theme === 'light') root.setAttribute('data-theme', prefs.theme);
+        var scale = Number(prefs.scale);
+        if (scale >= 0.8 && scale <= 1.5) root.style.setProperty('--reading-scale', String(scale));
+        if (prefs.vertical === true) root.setAttribute('data-vertical', '1');
+      } catch (e) {}
+      // 旧地址的跳转页为绕开旧缓存会带上空查询（…/?#/…）：地址栏里去掉。
+      try {
+        if (/\?$/.test(window.location.href.split('#')[0])) {
+          window.history.replaceState(window.history.state, '', window.location.pathname + window.location.hash);
+        }
       } catch (e) {}
     })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,400..600&family=Inter:opsz,wght@14..32,400..600&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;600;700;900&display=swap" rel="stylesheet">
-  <style>
-    /* 入口页：中性底色，跟随阅读偏好 / 系统切换深浅；两张预览卡各用自己界面的配色（Kyne 浅、Liquid Glass 深），不随主题变。 */
-    :root {
-      --paper: #F4F4F6;
-      --card: #FFFFFF;
-      --ink: #1C1C1E;
-      --muted: #5E5E63;
-      --line: rgba(28, 28, 30, 0.12);
-      --line-hover: rgba(28, 28, 30, 0.32);
-      --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.06);
-      --serif: 'Noto Serif SC', serif;
-      --sans: 'Noto Sans SC', system-ui, sans-serif;
-      --gutter: 40px;
-      --ease: cubic-bezier(0.165, 0.84, 0.44, 1);
-      color-scheme: light;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root:not([data-theme="light"]) {
-        --paper: #0A0A0A;
-        --card: #141416;
-        --ink: #F2F2F2;
-        --muted: #A1A1A6;
-        --line: rgba(255, 255, 255, 0.12);
-        --line-hover: rgba(255, 255, 255, 0.36);
-        --shadow: none;
-        color-scheme: dark;
-      }
-    }
-
-    :root[data-theme="dark"] {
-      --paper: #0A0A0A;
-      --card: #141416;
-      --ink: #F2F2F2;
-      --muted: #A1A1A6;
-      --line: rgba(255, 255, 255, 0.12);
-      --line-hover: rgba(255, 255, 255, 0.36);
-      --shadow: none;
-      color-scheme: dark;
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: var(--paper);
-      color: var(--ink);
-      font-family: var(--sans);
-      -webkit-font-smoothing: antialiased;
-    }
-
-    :focus-visible {
-      outline: 2px solid var(--ink);
-      outline-offset: 4px;
-    }
-
-    .chooser {
-      max-width: 1280px;
-      margin: 0 auto;
-      padding: 72px var(--gutter) 40px;
-    }
-
-    .chooser__brand {
-      margin: 0;
-      font-family: var(--serif);
-      font-size: 22px;
-      font-weight: 900;
-      letter-spacing: 0.02em;
-    }
-
-    .chooser__brand span {
-      margin-left: 6px;
-      font-family: 'Inter', var(--sans);
-      font-size: 13px;
-      font-weight: 500;
-      letter-spacing: 0.04em;
-      color: var(--muted);
-    }
-
-    .chooser__title {
-      margin: 48px 0 0;
-      font-family: var(--serif);
-      font-size: clamp(40px, 7vw, 88px);
-      font-weight: 600;
-      line-height: 1.1;
-      letter-spacing: -0.02em;
-      font-feature-settings: "halt"; /* 全角标点压半宽 */
-      text-wrap: balance;
-    }
-
-    .chooser__title span { color: var(--muted); }
-
-    .chooser__lead {
-      max-width: 34em;
-      margin: 20px 0 0;
-      font-size: 16px;
-      line-height: 1.8;
-      color: var(--muted);
-    }
-
-    .chooser__grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 24px;
-      margin-top: 56px;
-    }
-
-    /* ---------- 预览卡 ---------- */
-
-    .design {
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 24px;
-      box-shadow: var(--shadow);
-      color: inherit;
-      text-decoration: none;
-      transition: border-color 0.4s var(--ease);
-    }
-
-    .design:hover { border-color: var(--line-hover); }
-
-    .design__preview {
-      position: relative;
-      aspect-ratio: 16 / 10;
-      overflow: hidden;
-      container-type: inline-size;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .design__stage {
-      position: absolute;
-      inset: 0;
-      transition: transform 0.6s var(--ease);
-    }
-
-    .design:hover .design__stage { transform: scale(1.02); }
-
-    .design__info {
-      flex: 1; /* 两张卡等高时，「进入」链接对齐在卡片底部 */
-      display: grid;
-      grid-template-rows: auto auto 1fr;
-      gap: 10px;
-      padding: 24px 28px 28px;
-    }
-
-    .design__name {
-      margin: 0;
-      font-size: 28px;
-      line-height: 1.2;
-    }
-
-    .design--kyne .design__name {
-      font-family: 'Fraunces', var(--serif);
-      font-style: italic;
-      font-weight: 500;
-    }
-
-    .design--glass .design__name {
-      font-family: 'Inter', var(--sans);
-      font-weight: 600;
-      letter-spacing: -0.01em;
-    }
-
-    .design__desc {
-      margin: 0;
-      font-size: 15px;
-      line-height: 1.8;
-      color: var(--muted);
-    }
-
-    .design__go {
-      justify-self: start;
-      align-self: end;
-      margin-top: 6px;
-      font-size: 14px;
-      font-weight: 500;
-      letter-spacing: 0.04em;
-      text-decoration: underline;
-      text-decoration-thickness: 1px;
-      text-underline-offset: 0.4em;
-    }
-
-    .design__go::after {
-      content: " →";
-      content: " →" / "";
-    }
-
-    /* Kyne 预览：纸白 + 墨色，方括号标签，超大 900 衬线 */
-    .kp {
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      padding: 0 5cqi 4.5cqi;
-      background: #F6F6F6;
-      color: #2B2B2B;
-      font-family: var(--serif);
-    }
-
-    .kp__bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 10cqi;
-      border-bottom: 1px solid rgba(43, 43, 43, 0.2);
-    }
-
-    .kp__brand {
-      font-size: 3.4cqi;
-      font-weight: 900;
-    }
-
-    .kp__nav {
-      display: flex;
-      gap: 2.6cqi;
-      font-family: var(--sans);
-      font-size: 2cqi;
-      font-weight: 500;
-      color: #5C5C5C;
-    }
-
-    .kp__eyebrow {
-      margin-top: 4cqi;
-      font-family: var(--sans);
-      font-size: 2cqi;
-      font-weight: 500;
-    }
-
-    .kp__eyebrow span {
-      margin-left: 1.2cqi;
-      font-family: 'Fraunces', var(--serif);
-      font-style: italic;
-      color: #6B6B6B;
-    }
-
-    .kp__title {
-      margin-top: auto;
-      font-size: 10.5cqi;
-      font-weight: 900;
-      line-height: 1.06;
-      letter-spacing: -0.03em;
-    }
-
-    .kp__foot {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 3.4cqi;
-      padding-top: 2.2cqi;
-      border-top: 1px solid rgba(43, 43, 43, 0.2);
-      font-size: 2.3cqi;
-      color: #5C5C5C;
-    }
-
-    .kp__foot span:last-child {
-      font-family: var(--sans);
-      font-weight: 500;
-      color: #2B2B2B;
-    }
-
-    /* Liquid Glass 预览：近黑底 + 三团流光，三颗玻璃胶囊页眉（同一个 SVG 折射滤镜，压在一行文字上）+ 今日一诗与搜索卡 */
-    .gp {
-      position: relative;
-      isolation: isolate;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      padding: 0 4cqi 4cqi;
-      background:
-        radial-gradient(circle at 0% 0%, rgba(124, 77, 255, 0.42), transparent 45%),
-        radial-gradient(circle at 100% 30%, rgba(34, 160, 210, 0.3), transparent 40%),
-        radial-gradient(circle at 40% 110%, rgba(255, 130, 90, 0.24), transparent 45%),
-        #0A0A0A;
-      color: #F2F2F2;
-      font-family: var(--serif);
-    }
-
-    .gp__under {
-      position: absolute;
-      top: 3.6cqi;
-      left: 50%;
-      z-index: -1;
-      translate: -50% 0;
-      font-size: 4.4cqi;
-      font-weight: 600;
-      line-height: 1;
-      letter-spacing: -0.02em;
-      white-space: nowrap;
-      color: #F2F2F2;
-    }
-
-    .gp__bar {
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      align-items: center;
-      gap: 1.6cqi;
-      margin-top: 2.6cqi;
-    }
-
-    .gp__cap {
-      position: relative;
-      isolation: isolate; /* .gp__glass 的 z-index:-1 留在胶囊内部，与 liquidglass 页眉一致 */
-      display: inline-flex;
-      align-items: center;
-      height: 7cqi;
-      border-radius: 999px;
-      box-shadow: 0 0 20px rgba(0, 0, 0, 0.1), 0 6px 6px rgba(0, 0, 0, 0.2);
-    }
-
-    .gp__glass,
-    .gp__glass > * {
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-    }
-
-    .gp__glass {
-      z-index: -1;
-      overflow: hidden;
-    }
-
-    .gp__effect {
-      -webkit-backdrop-filter: blur(4px) saturate(1.6);
-      backdrop-filter: blur(4px) saturate(1.6);
-      filter: url(#qx-glass);
-    }
-
-    .gp__tint { background: rgba(10, 10, 10, 0.5); }
-
-    .gp__shine {
-      box-shadow:
-        inset 0 0 0 1px rgba(255, 255, 255, 0.1),
-        inset -1px -1px 1px 1px rgba(255, 255, 255, 0.3),
-        inset 2px 2px 1px rgba(255, 255, 255, 0.3);
-    }
-
-    .gp__brand {
-      justify-self: start;
-      padding: 0 2.6cqi;
-      font-size: 2.6cqi;
-      font-weight: 700;
-    }
-
-    .gp__nav {
-      gap: 0.4cqi;
-      padding: 0 0.7cqi;
-      font-family: var(--sans);
-      font-size: 1.8cqi;
-      font-weight: 500;
-    }
-
-    .gp__nav > span:not(.gp__glass) { padding: 1.1cqi 2cqi; border-radius: 999px; }
-
-    .gp__nav .gp__on {
-      background: rgba(255, 255, 255, 0.18);
-      font-weight: 600;
-      text-decoration: underline 2px #996AFF;
-      text-underline-offset: 0.45em;
-    }
-
-    .gp__mode {
-      justify-self: end;
-      justify-content: center;
-      width: 7cqi;
-    }
-
-    .gp__mode svg {
-      width: 3cqi;
-      height: 3cqi;
-      fill: none;
-      stroke: currentColor;
-      stroke-width: 1.8;
-    }
-
-    .gp__mode svg path { fill: currentColor; stroke: none; }
-
-    .gp__stack {
-      flex: 1;
-      min-height: 0;
-      width: 76%;
-      margin: 3cqi auto 0;
-      display: grid;
-      grid-template-rows: minmax(0, 1fr) auto;
-      gap: 1.6cqi;
-    }
-
-    .gp__card {
-      display: flex;
-      flex-direction: column;
-      padding: 2.4cqi 2.8cqi;
-      background: rgba(18, 18, 22, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 3cqi;
-    }
-
-    .gp__hero {
-      background:
-        radial-gradient(circle at 100% 0%, rgba(124, 77, 255, 0.26), transparent 55%),
-        rgba(18, 18, 22, 0.72);
-    }
-
-    .gp__chip {
-      align-self: flex-start;
-      padding: 0.5cqi 1.4cqi;
-      border: 1px solid rgba(153, 106, 255, 0.5);
-      border-radius: 999px;
-      font-family: var(--sans);
-      font-size: 1.5cqi;
-      color: #AB87FF;
-    }
-
-    .gp__title {
-      margin-top: auto;
-      font-size: 5.6cqi;
-      font-weight: 600;
-      line-height: 1.12;
-      letter-spacing: -0.01em;
-    }
-
-    .gp__title span {
-      display: block;
-      color: #98989D;
-    }
-
-    .gp__meta {
-      margin-top: 1.6cqi;
-      padding-top: 1.2cqi;
-      border-top: 1px solid rgba(255, 255, 255, 0.12);
-      font-size: 1.7cqi;
-      color: #AEAEB2;
-    }
-
-    .gp__find {
-      flex-direction: row;
-      align-items: center;
-      gap: 2cqi;
-      padding-block: 1.6cqi;
-    }
-
-    .gp__find-label {
-      flex: none;
-      font-size: 2cqi;
-      font-weight: 600;
-    }
-
-    .gp__find-box {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 4.6cqi;
-      padding: 0 0.5cqi 0 1.8cqi;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 999px;
-      background: rgba(18, 18, 22, 0.55);
-      font-family: var(--sans);
-      font-size: 1.6cqi;
-      color: #A1A1A6;
-    }
-
-    .gp__find-go {
-      padding: 0.8cqi 1.8cqi;
-      border-radius: 999px;
-      background: #FFFFFF;
-      font-weight: 600;
-      color: #0A0A0A;
-    }
-
-    .glass-defs {
-      position: absolute;
-      width: 0;
-      height: 0;
-      overflow: hidden;
-      pointer-events: none;
-    }
-
-    .chooser__foot {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      gap: 8px 24px;
-      margin-top: 72px;
-      padding-top: 20px;
-      border-top: 1px solid var(--line);
-      font-size: 13px;
-      letter-spacing: 0.04em;
-      color: var(--muted);
-    }
-
-    .chooser__foot a {
-      color: inherit;
-      text-underline-offset: 0.3em;
-    }
-
-    @media (max-width: 809px) {
-      :root { --gutter: 20px; }
-      .chooser { padding-top: 48px; }
-      .chooser__title { margin-top: 32px; }
-      .chooser__grid {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 16px;
-        margin-top: 40px;
-      }
-      .design { border-radius: 20px; }
-      .design__info { padding: 20px 22px 24px; }
-      .chooser__foot { margin-top: 48px; }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .design,
-      .design__stage { transition: none; }
-      .design:hover .design__stage { transform: none; }
-    }
-
-    @media (prefers-reduced-transparency: reduce) {
-      .gp__effect { display: none; }
-      .gp__tint,
-      .gp__card,
-      .gp__find-box { background: #161618; }
-    }
-
-    @media (forced-colors: active) {
-      .gp__glass,
-      .gp__under { display: none; }
-      .gp__cap,
-      .gp__card,
-      .gp__find-box { border: 1px solid CanvasText; }
-    }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..600&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/glass.css">
 </head>
 <body>
 
-  <!-- 预览卡里玻璃胶囊的折射滤镜（与 liquidglass/index.html 相同） -->
+  <!-- 玻璃折射滤镜：0×0 绝对定位（Firefox 不应用 display:none SVG 里的滤镜），仅 .glass__effect 引用 -->
   <svg class="glass-defs" width="0" height="0" aria-hidden="true" focusable="false">
     <filter id="qx-glass" x="0%" y="0%" width="100%" height="100%" filterUnits="objectBoundingBox">
       <feTurbulence type="fractalNoise" baseFrequency="0.015 0.015" numOctaves="1" seed="5" result="turbulence"/>
@@ -568,78 +40,90 @@
     </filter>
   </svg>
 
-  <div class="chooser">
-  <main>
-    <header>
-      <p class="chooser__brand">情心<span>QingXin</span></p>
-      <h1 class="chooser__title">慢读古典，<span>两种读法</span></h1>
-      <p class="chooser__lead">同一套诗文、注释与功能，两种界面设计。选一种开始阅读，之后在页脚随时切换，停留的页面会跟着过去。</p>
-    </header>
-
-    <div class="chooser__grid">
-      <a class="design design--kyne" href="kyne/" aria-labelledby="kyne-name" aria-describedby="kyne-desc">
-        <div class="design__preview" aria-hidden="true">
-          <div class="design__stage">
-            <div class="kp">
-              <div class="kp__bar">
-                <span class="kp__brand">情心</span>
-                <span class="kp__nav"><span>[诗集]</span><span>[诗人]</span><span>[关于]</span><span>[夜读]</span></span>
-              </div>
-              <div class="kp__eyebrow">(今日一词)<span>curated</span></div>
-              <div class="kp__title">明月几时有<br>把酒问青天</div>
-              <div class="kp__foot"><span>《水调歌头》　苏轼〔宋〕</span><span>[品读全文]</span></div>
-            </div>
-          </div>
-        </div>
-        <div class="design__info">
-          <h2 class="design__name" id="kyne-name">Kyne</h2>
-          <p class="design__desc" id="kyne-desc">编辑型极简：纸白与墨色，1px 细线撑起结构，超大衬线标题，方括号标签。</p>
-          <span class="design__go" aria-hidden="true">进入 Kyne 界面</span>
-        </div>
-      </a>
-
-      <a class="design design--glass" href="liquidglass/" aria-labelledby="glass-name" aria-describedby="glass-desc">
-        <div class="design__preview" aria-hidden="true">
-          <div class="design__stage">
-            <div class="gp">
-              <div class="gp__under">明月几时有</div>
-              <div class="gp__bar">
-                <span class="gp__cap gp__brand"><span class="gp__glass"><span class="gp__effect"></span><span class="gp__tint"></span><span class="gp__shine"></span></span>情心</span>
-                <span class="gp__cap gp__nav"><span class="gp__glass"><span class="gp__effect"></span><span class="gp__tint"></span><span class="gp__shine"></span></span><span class="gp__on">首页</span><span>诗集</span><span>诗人</span><span>关于</span></span>
-                <span class="gp__cap gp__mode"><span class="gp__glass"><span class="gp__effect"></span><span class="gp__tint"></span><span class="gp__shine"></span></span><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z"/></svg></span>
-              </div>
-              <div class="gp__stack">
-                <div class="gp__card gp__hero">
-                  <span class="gp__chip">今日一词</span>
-                  <div class="gp__title">明月几时有<span>把酒问青天</span></div>
-                  <div class="gp__meta">《水调歌头》　苏轼〔宋〕</div>
-                </div>
-                <div class="gp__card gp__find">
-                  <span class="gp__find-label">寻章摘句</span>
-                  <span class="gp__find-box">标题、作者或名句<span class="gp__find-go">搜索</span></span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="design__info">
-          <h2 class="design__name" id="glass-name">Liquid Glass</h2>
-          <p class="design__desc" id="glass-desc">液态玻璃：悬浮的玻璃胶囊导航与手机底部标签栏，彩色流光背景，今日一诗与搜索的简洁首页，原文与注解分栏、分段切换。</p>
-          <span class="design__go" aria-hidden="true">进入 Liquid Glass 界面</span>
-        </div>
-      </a>
-    </div>
-  </main>
-
-    <footer class="chooser__foot">
-      <span>情心 · 慢读古典　一日一诗</span>
-      <span>诗文数据 · <a href="https://github.com/chinese-poetry/chinese-poetry">chinese-poetry</a></span>
-    </footer>
+  <!-- 流光背景：三团柔光固定在视口，垫在所有内容下 -->
+  <div class="ambient" aria-hidden="true">
+    <span class="ambient__blob ambient__blob--violet"></span>
+    <span class="ambient__blob ambient__blob--cyan"></span>
+    <span class="ambient__blob ambient__blob--peach"></span>
   </div>
 
+  <!-- ============ 页眉：三颗悬浮玻璃胶囊（品牌 / 导航 / 夜读）；玻璃层用 span 以便放进 a、button ============ -->
+  <header class="site-header">
+    <a class="capsule brand" href="#/home" data-nav="home" aria-label="情心 · 返回首页">
+      <span class="glass" aria-hidden="true"><span class="glass__effect"></span><span class="glass__tint"></span><span class="glass__shine"></span></span>
+      <span class="brand__name">情心</span>
+    </a>
+    <nav class="capsule site-nav" aria-label="主导航">
+      <span class="glass" aria-hidden="true"><span class="glass__effect"></span><span class="glass__tint"></span><span class="glass__shine"></span></span>
+      <a class="site-nav__link" href="#/home" data-nav="home">首页</a>
+      <a class="site-nav__link" href="#/list" data-nav="list">诗集</a>
+      <a class="site-nav__link" href="#/authors" data-nav="authors">诗人</a>
+      <a class="site-nav__link" href="#/about" data-nav="about">关于</a>
+    </nav>
+    <button class="capsule theme-btn" type="button" data-action="theme" aria-pressed="false">
+      <span class="glass" aria-hidden="true"><span class="glass__effect"></span><span class="glass__tint"></span><span class="glass__shine"></span></span>
+      <svg class="icon theme-btn__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8"/><path class="fill" d="M12 4a8 8 0 0 1 0 16z"/></svg>
+      <span class="theme-btn__label">夜读</span>
+    </button>
+  </header>
+
+  <!-- ============ 页面容器（内容由 assets/js/*.js 按数据渲染，不写死诗文） ============ -->
+  <main class="page" id="page-home"></main>
+  <main class="page" id="page-list"></main>
+  <main class="page" id="page-poem"></main>
+  <main class="page" id="page-author"></main>
+  <main class="page" id="page-authors"></main>
+  <main class="page" id="page-about"></main>
+
+  <!-- 首屏加载态：数据就绪后被替换 -->
+  <div id="boot" class="boot"><span class="boot__mark">情心</span></div>
+
+  <!-- ============ 页脚：一条紧凑卡片（导航在页眉 / 底部标签栏里，这里不重复） ============ -->
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <p class="site-footer__brand">
+        <span class="site-footer__mark">情心 <span class="latin">(QingXin)</span></span>
+        <span>慢读古典 · 一日一诗</span>
+      </p>
+      <span>诗文数据 · chinese-poetry</span>
+    </div>
+  </footer>
+
+  <!-- ============ 手机底部标签栏（<810 显示，同时隐藏页眉导航）；router 给 .site-nav__link 设 aria-current ============ -->
+  <nav class="tabbar" aria-label="底部导航">
+    <span class="glass" aria-hidden="true"><span class="glass__effect"></span><span class="glass__tint"></span><span class="glass__shine"></span></span>
+    <a class="site-nav__link tabbar__item" href="#/home" data-nav="home">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 10.4 12 4l8 6.4V19a1 1 0 0 1-1 1h-4.2v-5.6H9.2V20H5a1 1 0 0 1-1-1z"/></svg>
+      <span class="tabbar__label">首页</span>
+    </a>
+    <a class="site-nav__link tabbar__item" href="#/list" data-nav="list">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 6.5C10 5 7.2 4.6 4 5v13.5c3.2-.4 6 0 8 1.5 2-1.5 4.8-1.9 8-1.5V5c-3.2-.4-6 0-8 1.5zM12 6.5V20"/></svg>
+      <span class="tabbar__label">诗集</span>
+    </a>
+    <a class="site-nav__link tabbar__item" href="#/authors" data-nav="authors">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.8 20c.7-3.9 3.6-6.2 7.2-6.2s6.5 2.3 7.2 6.2z"/></svg>
+      <span class="tabbar__label">诗人</span>
+    </a>
+    <a class="site-nav__link tabbar__item" href="#/about" data-nav="about">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.2M12 7.8v.1"/></svg>
+      <span class="tabbar__label">关于</span>
+    </a>
+  </nav>
+
+  <script type="module" src="assets/js/glass-app.js"></script>
   <script>
-    // 离线/跨刷新缓存；相对路径注册，作用域随部署子路径（/QingXin/），覆盖两套界面。特性检测 + 静默失败。
+    // 离线/跨刷新缓存；相对路径注册，作用域随部署子路径（/QingXin/）。特性检测 + 静默失败。
     if ('serviceWorker' in navigator) {
+      // 旧版 Worker（qingxin-v1…v9）缓存里的模块与本页不配套：缺少 glass-*.js，或导出对不上
+      // （如 v9 的 router.js 仍从 pages.js 引入已删掉的 Kyne 渲染器）。本页若由旧 Worker 控制，新 Worker 接管后刷新一次。
+      if (navigator.serviceWorker.controller && window.caches) {
+        var legacySW = caches.keys().then(function (keys) {
+          return keys.some(function (k) { return /^qingxin-v[1-9]$/.test(k); });
+        }, function () { return false; });
+        navigator.serviceWorker.addEventListener('controllerchange', function () {
+          legacySW.then(function (legacy) { if (legacy) window.location.reload(); });
+        });
+      }
       window.addEventListener('load', function () {
         navigator.serviceWorker.register('sw.js').catch(function () {});
       });

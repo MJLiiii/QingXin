@@ -1,4 +1,4 @@
-/* liquidglass/ 的页面渲染：数据与交互沿用 pages.js / reader.js，布局是玻璃界面自己的——
+/* 各页面的渲染：数据与交互辅助在 pages.js / reader.js，这里决定玻璃界面的布局——
    首页今日一诗 + 搜索、诗集 / 诗人卡片网格、诗文页左栏钉住 + 右栏分段标签、作者页资料卡。 */
 import { fetchJSON, loadAuthor, loadPoem } from './data.js';
 import { initPin, rememberTab } from './glass-ui.js';

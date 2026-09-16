@@ -1,7 +1,7 @@
 /* 生成 data/featured.json —— 首页推荐池。
    口径:注释文件中 赏析非空 且 (注释或译文非空) 的非 AI 诗(保证 hero 点进去内容最全)。
    产物为这些诗的完整索引行 {id,title,author,dynasty,kind,excerpt},与 data/index/
-   行结构一致,前端 poemRow/hero 零适配,按索引序排列(diff 稳定)。
+   行结构一致,前端诗卡 / 首页 hero 零适配,按索引序排列(diff 稳定)。
    同时生成 data/lines.json —— 名句检索正文 [[id, text], …](全部非 AI 注释诗,见下文 3)。
 
    注释覆盖变化(新爬/手写新增)后重跑:

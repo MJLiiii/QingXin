@@ -10,29 +10,30 @@ data-driven from the [chinese-poetry](https://github.com/chinese-poetry/chinese-
 dataset (~78,660 poems: 全唐诗 + 宋词). **No poem text is hardcoded in HTML** — the app pages are
 only header/footer + empty page containers; everything else is `fetch`ed from `data/`.
 
-**Two designs, one app.** The same router, reading layer, search and data serve two app shells:
-`kyne/index.html` (Kyne editorial monochrome, `assets/css/kyne.css`, entry `app.js` → the page renderers in
-`pages.js`) and `liquidglass/index.html` (app-style liquid glass, `assets/css/glass.css`, entry `glass-app.js`
-→ its own renderers in `glass-pages.js` + `glass-ui.js`), so the two layouts differ in markup, not just CSS.
-Routes, `?q=`, prefs and data are identical. The root `index.html` is a static chooser page with preview cards
-(inline CSS); any `#/…` route that lands on the root is forwarded to `liquidglass/` with the route intact,
-so old shared links keep working. Each shell's footer has a `.site-footer__design` switch whose inline
-script appends the current `location.hash` before navigation, so switching keeps the page (and `?q=`).
+**One design: app-style liquid glass.** The root `index.html` is the app shell (`assets/css/glass.css`,
+entry `assets/js/glass-app.js` → renderers in `glass-pages.js` + behaviour in `glass-ui.js`). The site once
+served two designs side by side (Kyne at `kyne/`, liquid glass at `liquidglass/`, a chooser at the root);
+Kyne was removed and liquid glass moved to the root. `kyne/index.html` and `liquidglass/index.html` are now
+identical `noindex` redirect stubs that `location.replace('../' + location.hash)`, so old shared links
+(including `#/…` routes and `?q=`) land on the same page at the root — keep them. When a stub was reached
+from the site root itself (same-origin referrer `…/` or `…/index.html`), the root is an old worker's cached
+chooser forwarding `#/…` back, so the stub goes to `'../?'` instead (a URL no old cache holds); the root's
+`<head>` script strips that empty `?` again. Keep both halves, or the two pages can bounce.
 
 ## Commands
 
 There is no build or bundling step. Things you actually run:
 
 - **Preview locally** (required — `fetch()` blocks `file://`):
-  `node tools/server/serve.mjs` → http://localhost:8080 (chooser), `/kyne/`, `/liquidglass/`
+  `node tools/server/serve.mjs` → http://localhost:8080
   (cwd-independent static server; `PORT=…` to change; like Pages it 301s `/kyne` → `/kyne/` and serves a
-  directory's `index.html`).
+  directory's `index.html`, which is how the old-path redirect stubs are reached).
   Do NOT use `python -m http.server` — it crashes under the preview launcher (`os.getcwd`).
 
 - **Check** (the closest thing to lint+tests — run after touching `assets/js/**`, `sw.js`, or `data/**`):
   `cd tools && npm run check` — `node --check` syntax-checks every frontend/tool script, runs the unit
-  tests (`node --test tests/*.test.mjs`: search ranking + line search in `search-core.test.mjs`, Kyne HTML
-  builders + utils in `templates.test.mjs`, liquid-glass fragments in `glass-templates.test.mjs`), then
+  tests (`node --test tests/*.test.mjs`: search ranking + line search in `search-core.test.mjs`, shared
+  HTML helpers + utils in `templates.test.mjs`, page fragments in `glass-templates.test.mjs`), then
   runs `node data/validate.mjs`, a read-only data-consistency audit (manifest counts vs search/index
   rows, id→shard round-trip for every poem, author slug→bucket hits, annotation shape + `source` rules,
   `lines.json` rows vs annotations and poem text; exits 1 on any error, only warns about annotated poems
@@ -79,15 +80,14 @@ There is no build or bundling step. Things you actually run:
 lookup table. Ids are unchanged by the sub-file split, so annotations/index/search still key off them.
 See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 is `c59-66`.
 
-**Front end** (`assets/js/`, native ES modules — `app.js` (Kyne) is a 3-line entry calling `startRouter()`;
-`glass-app.js` (liquid glass) calls `startRouter(RENDERERS)` with `glass-pages.js`'s map, then `initGlassUI()`):
+**Front end** (`assets/js/`, native ES modules — the entry `glass-app.js` calls `startRouter(RENDERERS)` with
+`glass-pages.js`'s map, then `initGlassUI()`):
 - `router.js` — hash router: `#/home | #/list/:page | #/poem/:id | #/author/:slug | #/authors/:page
-  | #/about`, plus an optional `?q=` live-search query → a renderer map (default `pages.js` `RENDERERS`;
-  `startRouter(renderers, { navOf })` swaps it and can extend the page → nav-item map; unknown routes fall
-  back to home). Navigation uses real
+  | #/about`, plus an optional `?q=` live-search query → the renderer map passed to `startRouter(renderers)`
+  (unknown routes fall back to home). Navigation uses real
   `<a href="#/…" data-nav="…">` links (hrefs from `hashPath()`/`hrefFor()` in `utils.js`); one delegated
   click handler intercepts plain left clicks and lets modifier/middle clicks through (new tab). The same
-  handler dispatches `data-toggle` (collapsible sections),
+  handler dispatches
   `data-action` (`shuffle` re-renders home at random; `copy/share/vertical/scale-up/scale-down/theme/
   gloss-all` go to `reader.js`) and `data-gloss` (note popover; Enter/Space/Escape via delegated keydown).
   **Render cache:** the six `#page-<name>` containers stay in the DOM and `rendered[name]` holds the
@@ -99,27 +99,22 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   — new entries scroll to top, Back/Forward restore the saved offset instantly (explicitly overriding
   the CSS `scroll-behavior: smooth`, which would otherwise drag the restored position). Renderers set
   titles with `ctx.setTitle(...)`; `show()` applies `document.title`, `hidden` and `aria-current` (on every
-  `.site-nav__link[data-nav]`, via `NAV_OF`: home/list/authors/about, author → authors; glass adds
-  poem → list), so cached re-shows
-  are correct too. After each render it idle-preloads the JSON the next click will likely need.
-- `pages.js` — the six renderers, all `(param, ctx)` (`renderHome/renderList/renderPoem/renderAuthor/
-  renderAuthors/renderAbout`), plus pager/search wiring. Each builds HTML strings **reusing the
-  existing CSS classes** and injects into `#page-<name>`. Home is 今日一诗: `data/featured.json`
-  shuffled with `seededRandom('qingxin:' + localDateKey())` (local date, so hero + 5-row 精选 list are
-  stable for the day); 换一首 shuffles with `Math.random`. 诗集 paginates 25/page (`DISPLAY`) over the
-  500-row index files; 诗人 lists all poets from `authors-index.json`. Both pagers come from
-  `pagerHTML()` — prev/next links plus a page-number input + 跳转 button, wired by `wirePager()`
-  (Enter or click, clamped to range). **Two separate searches** (both via `wireLiveSearch()`:
-  debounced, capped at 120 hits, stale responses ignored, pager hidden while active, query written to
-  `?q=` from the debounce — never per keystroke or during IME composition — and restored via
-  `start(q)`): global title/author/line search on 诗集 and name-only search on 诗人. Both show
-  loading/result status and highlight only real exact substrings. The poem page's 原文 heading
-  carries the reading toolbar (复制/分享/竖排/A−/A+; 竖排 is omitted above 60 lines) and note terms are
-  linked inside 词序 + 原文 via `glossLines()`. The data/wiring pieces a second renderer set needs are
-  exported: `wireLiveSearch`/`wireSearch` (optional `{ entry, hit }` row templates)/`wirePager`,
-  `pickFeatured`, `loadPoemData`, `poemParts` (toolbar, 原文, notes), `notesHTML`, `aiNotice`.
-- `glass-pages.js` — the liquid-glass renderers (same `(param, ctx)` contract, same data and hooks):
-  home is just two centred, stacked cards — the 今日一诗 hero (only `featured.json` + that poem are
+  `.site-nav__link[data-nav]`, via `NAV_OF`: home/list/authors/about, poem → list, author → authors), so
+  cached re-shows are correct too. After each render it idle-preloads the JSON the next click will likely need.
+- `pages.js` — data and wiring helpers the renderers share (no page layout): `wirePager()` (page-number
+  input + 跳转 button: Enter or click, clamped to range); `wireLiveSearch()` — debounced,
+  stale responses ignored, pager hidden while active, query written to `?q=` from the debounce (never per
+  keystroke or during IME composition) and restored via `start(q)`, with loading/result status — and
+  `wireSearch(host, entries, onQuery, { entry, hit })`, the 诗集 title/author/line search on top of it (诗人
+  runs a name-only search through `wireLiveSearch` directly; both cap results at 120); `pickFeatured()` — 今日一诗 is
+  `data/featured.json` shuffled with `seededRandom('qingxin:' + localDateKey())` (stable for the local day;
+  换一首 shuffles with `Math.random`); `loadPoemData()`; `poemParts()` (the reading toolbar 复制/分享/竖排/
+  A−/A+ — 竖排 omitted above 60 lines — and the 原文 with note terms linked inside 词序 + 原文 via
+  `glossLines()`); `notesHTML()`; `aiNotice()`.
+- `glass-pages.js` — the six renderers, all `(param, ctx)` (`renderHome/renderList/renderPoem/renderAuthor/
+  renderAuthors/renderAbout`), building HTML strings and injecting them into `#page-<name>`. 诗集 paginates
+  25/page (`DISPLAY`) over the 500-row index files; 诗人 lists all poets from `authors-index.json`.
+  Home is just two centred, stacked cards — the 今日一诗 hero (only `featured.json` + that poem are
   loaded) and the 寻章摘句 search form (→ `#/list?q=`, plus hint links); 诗集/诗人 are card grids with the same
   search/pager wiring; the poem page is a two-column layout (`.poem-aside[data-pin]` with title, fact chips,
   the toolbar in a glass `.tools-dock` and the 原文 card; `.poem-main` with the AI note, segmented tabs and the
@@ -144,17 +139,16 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   scroll handler keeps an open popover on a pinned term (`repositionGloss()`, closes it if the term leaves
   the viewport) and toggles `.site-header[data-scrolled]`.
 - `reader.js` — browser-only reading layer: preferences in localStorage `qingxin:prefs`
-  (`theme`, `scale`, `vertical`, `open` section ids (Kyne), `tab` (liquid glass); `readPrefs`/`writePrefs`
-  merge), toolbar actions, and the single note popover (`openGloss`/`closeGloss`/`repositionGloss`; the k-th
+  (`theme`, `scale`, `vertical`, `tab`; `readPrefs`/`writePrefs` merge; an `open` key left by Kyne is
+  ignored), toolbar actions, and the single note popover (`openGloss`/`closeGloss`/`repositionGloss`; the k-th
   `.gloss` term maps to the k-th `.notes__row`; the popover is absolute in document coordinates, or `fixed`
-  when its term sits inside a `[data-pinned]` column; it keeps clear of `--pop-inset-top/-bottom`, lengths the
-  glass stylesheet registers with `@property` for its floating header and tab bar — 0 in Kyne, where the
-  placement is unchanged). `expandNotes` (查看全部注释) dispatches a bubbling
-  `qx:expand-notes` event on the notes section before scrolling to it. The inline
-  `<head>` script in both app shells applies theme/scale/vertical before first paint (the chooser applies
+  when its term sits inside a `[data-pinned]` column; it keeps clear of `--pop-inset-top/-bottom`, lengths
+  `glass.css` registers with `@property` for the floating header and tab bar). `expandNotes` (查看全部注释)
+  dispatches a bubbling `qx:expand-notes` event on the notes section before scrolling to it. The inline
+  `<head>` script in `index.html` applies theme/scale/vertical before first paint (the redirect stubs apply
   only the theme) — keep its key and fields in sync with `reader.js`.
 - `data.js` — `fetchJSON()` (memoized via a `Map`; errors carry `status`; `data/…` paths resolve against
-  the site root via `import.meta.url`, not the page, which is what lets both shells live in subdirectories),
+  the site root via `import.meta.url`, not the page),
   `parseId()`/`loadPoem()`,
   `loadAnnotation()`/`loadAuthor()` (slug→bucket hash) — both return `null` only on 404 and rethrow
   other failures.
@@ -167,65 +161,54 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   `lines.json` fails to load, search degrades to title/author. The 诗集 scan runs inside a module Web
   Worker (keeping the multi-MB index off the main thread) and transparently uses the same core on the
   main thread if Workers fail.
-- `templates.js` — shared HTML builders (`poemRow`/`authorRow`/`searchRow`, `entryShell`, `proseEntry`,
-  `glossLines`, `pagerHTML`, `searchBoxHTML`, `navHref`, `highlighted`); `utils.js` — `esc()`,
+- `templates.js` — low-level HTML helpers (`navHref`, `displaySize`, `heroLines`, `highlighted`,
+  `emptyState`, `glossTerm`/`glossLines`, `errorSection` (the router's render-failure fallback),
+  `searchBoxHTML`); `utils.js` — `esc()`,
   `hashPath()`/`hrefFor()`,
   `groupStanzas()`, `idle()`, `localDateKey()`, `seededRandom()`. These and `glass-templates.js` are
   imported by the Node unit tests, so they must not touch `window`/`document`/`localStorage` at import time.
 
-**`sw.js` service worker** lives at the site root, so its scope covers both designs: the chooser registers
-`sw.js` and the shells register `../sw.js` (relative, so it works under the `/QingXin/` Pages subpath).
+**`sw.js` service worker** lives at the site root and `index.html` registers it as `sw.js` (relative, so it
+works under the `/QingXin/` Pages subpath; the scope covers the whole site).
 Stale-while-revalidate on every same-origin GET — cached copy returns instantly, the network refresh lands
 by the next reload, so content updates lag at most one refresh (remember this when previewing changes
 locally). The background refresh is `fetch(req, { cache: 'no-cache' })` (a conditional request), so a stale
-HTTP-cache copy of a module can never be written back next to newer ones. It pre-caches the app shells
-(root, `kyne/`, `liquidglass/`, both stylesheets, every `assets/js/*.js`) with `cache: 'reload'`, bypassing
+HTTP-cache copy of a module can never be written back next to newer ones. It pre-caches the app shell
+(root, the `kyne/` + `liquidglass/` redirect stubs, `glass.css`, every `assets/js/*.js`) with `cache: 'reload'`, bypassing
 the HTTP cache so a new worker never mixes old and new modules; one missing entry fails the whole install.
 **Adding/renaming a frontend module or shell means updating its `SHELL` list; changing any cached format
-means bumping `CACHE_NAME`** (currently `qingxin-v9`; old caches are purged on activate). Also bump it when a
+means bumping `CACHE_NAME`** (currently `qingxin-v10`; old caches are purged on activate). Also bump it when a
 module drops an export another module used to import, so the new set is precached in one step.
+`index.html` reloads the page once when an old worker hands over (it checks for `qingxin-v1…v9` caches,
+whose modules don't match this shell — e.g. a v9 `router.js` still imports the removed Kyne renderers from
+`pages.js`). An old worker may also serve the old chooser, glass or Kyne page once more; the next load is
+current. `startRouter()` called without a renderer map (only the removed Kyne `app.js` does that — in
+`kyne/` and in pre-v7 root pages) redirects to the site root, resolved from `import.meta.url`. Drop the
+reload block, that router fallback and the stubs' `'../?'` branch (with the root's `?` strip) once those
+workers have aged out.
 
-**Detail-page invariant:** all five section headings (原文/注释/译文/赏析/创作背景) always
+**Detail-page invariant:** all five sections (原文/注释/译文/赏析/创作背景) always
 render. Only 原文 + author bio come from source data; the other four come from the annotation
 overlay (`loadAnnotation()` merges it over the read-only poem) and show a
-"尚未收录，敬请期待。" faint placeholder when absent, with a faint 「未收录」 marker in the heading.
-原文 is always open. In Kyne the four overlay sections are collapsible entries, collapsed by default unless
-the reader has expanded that section type before (`entryShell(…, collapsible, { section, open, empty })` +
-`data-toggle`; empty sections never auto-open, and the popover's 查看全部注释 does not count as a
-preference). In liquid glass they are segmented tabs (one panel visible, see `glass-pages.js`); empty tabs
-get a dashed outline plus a screen-reader-only （未收录）. Annotations with `source:"ai"` additionally get a
+"尚未收录，敬请期待。" faint placeholder when absent.
+原文 is a card with its own heading; the four overlay sections are always-present segmented tabs (one panel
+visible, see `glass-pages.js`); an empty tab gets a faded label, a dashed outline and a screen-reader-only
+（未收录）. Annotations with `source:"ai"` additionally get a
 faint AI disclaimer line (`aiNotice()` in `pages.js`).
 
 ## Conventions & gotchas
 
-- **Project layout:** root keeps site entry/docs/deploy config (`index.html` chooser, `sw.js`, `README.md`,
-  `.nojekyll`); `kyne/` and `liquidglass/` hold the two app shells; `assets/css/` and `assets/js/` hold
-  browser-loaded front-end assets; `data/` holds committed static content; `tools/server/`, `tools/data/`,
-  and `tools/annotations/` hold local preview, data generation, and annotation-import tooling respectively.
-- **Keep the two shells in step.** `kyne/index.html` and `liquidglass/index.html` share the `#page-*`
-  containers, `#boot`, the `<head>` prefs script, the service-worker block and the footer design-switch
-  script (`a[data-design]`). They differ in: meta description, Google Fonts URL, stylesheet, entry module
-  (`app.js` vs `glass-app.js`), header (Kyne: one bar with `.site-nav__theme`; glass: three `.capsule`s —
-  brand, `.site-nav` with a 首页 link, icon `.theme-btn` — each with `.glass` span layers), footer (Kyne:
-  slogan + footer nav; glass: one compact card, no nav), the glass-only extras (`viewport-fit=cover`, the
-  `#qx-glass` SVG filter, the `.ambient` backdrop, the phone `.tabbar`), and which `.site-footer__design`
-  link carries `aria-current="page"`. Links that should get `aria-current` must be
-  `.site-nav__link[data-nav]` (glass uses it for both the header nav and the tab bar; only one of the two is
-  displayed at any width). The service-worker block reloads the page once when an old worker hands over:
-  Kyne checks for `qingxin-v1…v6` caches (those still serve the page-relative `data.js`), glass for
-  `v1…v8` (a v7 cache has no `glass-*.js` and stale shared modules; a v8 `glass-pages.js` still imports the
-  removed home-card templates) — drop the block once those workers have aged out. `pages.js`/`templates.js`
-  only feed Kyne now; shared modules (`router`, `reader`, `data`, search) must keep working for both, so check
-  `/kyne/` and `/liquidglass/`. Kyne is kept pixel-identical
-  across glass work (compare against `main`).
-- **Kyne design system** (`assets/css/kyne.css`, frozen from the Kyne redesign): editorial monochrome —
-  `--paper` #F6F6F6, `--surface` #FCFCFC, `--ink` #2B2B2B, muted tiers `--body`/`--muted`/`--muted-2`/`--muted-3`
-  (`--muted` #6B6B6B is its lightest text grey), 1px hairlines `--line`, an inverted footer
-  (`--invert-bg`/`--invert-fg`), `--mark-bg`; fonts Noto Serif SC (up to 900), Noto Sans SC and Fraunces
-  italic for Latin/digits. **No accent hue**: state is an underline; actions are `[ ]` bracket labels and
-  notes are `( )` parens (pseudo-elements). Breakpoints `(max-width: 809px)` and `(min-width: 1200px)`;
-  dark theme in the same two-block pattern as below. The `.row-panel` wrappers `pages.js` still emits (a
-  leftover of the first glass reskin) are unstyled; `kyne.css` has its own `.site-footer__design` rules.
+- **Project layout:** root keeps the app shell, docs and deploy config (`index.html`, `sw.js`, `README.md`,
+  `.nojekyll`); `kyne/` and `liquidglass/` only hold the old-path redirect stubs; `assets/css/` and
+  `assets/js/` hold browser-loaded front-end assets; `data/` holds committed static content; `tools/server/`,
+  `tools/data/`, and `tools/annotations/` hold local preview, data generation, and annotation-import tooling
+  respectively.
+- **App shell** (`index.html`): the `<head>` prefs script, `viewport-fit=cover`, the `#qx-glass` SVG filter,
+  the `.ambient` backdrop, a header of three `.capsule`s (brand, `.site-nav` with 首页/诗集/诗人/关于, icon
+  `.theme-btn`) each with `.glass` span layers, the six `#page-*` containers, `#boot`, a compact footer card
+  (no nav), the phone `.tabbar` and the service-worker block. Links that should get `aria-current` must be
+  `.site-nav__link[data-nav]` (used by both the header nav and the tab bar; only one of the two is displayed
+  at any width). If you edit the stubs, keep `kyne/index.html` and `liquidglass/index.html` identical.
 - **Liquid-glass design system** lives in `assets/css/glass.css` `:root` — app-style liquid glass (Apple
   Liquid Glass + the [svg-glass-navbar-effect](https://svg-glass-navbar-effect.webflow.io/) Webflow template),
   light by default. **Layers:** a fixed `.ambient` backdrop (three blurred radial blobs `--blob-violet/cyan/
@@ -281,10 +264,10 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
   viewports, its line size (`(100svh - …) / 2.3`) subtract the header, search card (and tab bar on phones), so
   both home cards fit the first screen from about 630px (desktop) / 610px (phones) of height; on phones
   `#page-home` also fills the screen so the footer starts below the fold instead of under the tab bar.
-- **`templates.js` markup is frozen by `tools/tests/templates.test.mjs`** (and `glass-templates.js` by
-  `glass-templates.test.mjs`) — restyle from CSS or add a new builder instead. Decorative pseudo-content is
-  written as `content: "x" / ""` so screen readers skip it. Page structure belongs in `pages.js` (Kyne),
-  `glass-pages.js` (glass) and the two app shells, which have no markup tests — verify those in a browser.
+- **`glass-templates.js` markup is frozen by `tools/tests/glass-templates.test.mjs`** (and the
+  `templates.js` helpers by `templates.test.mjs`) — restyle from CSS or add a new builder instead. Decorative
+  pseudo-content is written as `content: "x" / ""` so screen readers skip it. Page structure belongs in
+  `glass-pages.js` and `index.html`, which have no markup tests — verify those in a browser.
 - **`tools/data/prep.mjs`**: converts 全唐诗 繁→简 via `opencc-js` (宋词 is already simplified); strips
   lone UTF-16 surrogates; synthesizes ci titles/ids. On re-run it **preserves
   `data/annotations/`** (your hand-written overlays), only regenerating index/poems/authors +
@@ -347,8 +330,8 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
 - `data/**` (~67MB) is committed and is what the site serves; `tools/node_modules` and the
   external `../chinese-poetry-src` clone are gitignored.
 - **Deploy** is GitHub Pages "Deploy from a branch" (`main` / root — no workflow; `.github/`
-  was intentionally removed), live at https://mjliiii.github.io/QingXin/ (chooser),
-  https://mjliiii.github.io/QingXin/kyne/ and https://mjliiii.github.io/QingXin/liquidglass/. The root
+  was intentionally removed), live at https://mjliiii.github.io/QingXin/ (the old `/kyne/` and
+  `/liquidglass/` URLs redirect there). The root
   `.nojekyll` is required so Pages serves `data/**` as-is (thousands of JSON files, Chinese filenames).
   All paths are relative and routing is hash-based, so the site works under the `/QingXin/`
   subpath with no 404 fallback.

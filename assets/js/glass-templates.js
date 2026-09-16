@@ -1,5 +1,6 @@
-/* liquidglass/ 专用的页面片段（纯函数，node 可测）。Kyne 的标记在 templates.js，两者互不影响；
-   这里只复用其转义 / 链接 / 命中高亮等工具，钩子（data-nav、#pager-input 等）与 router / reader 约定一致。 */
+/* 玻璃界面的页面片段（纯函数，node 可测）：卡片、标签、分页胶囊等。
+   转义与路由链接来自 utils.js，navHref / displaySize / 命中高亮来自 templates.js；
+   钩子（data-nav、#pager-input 等）与 router / reader 约定一致。 */
 import { displaySize, highlighted, navHref } from './templates.js';
 import { esc, hrefFor } from './utils.js';
 
@@ -67,7 +68,7 @@ export function poemCard(e) {
   });
 }
 
-// 搜索命中 [id, 标题, 作者, match]：与 templates.js searchRow 同样的高亮规则，诗句命中时命中句作摘句。
+// 搜索命中 [id, 标题, 作者, match]：按 templates.js highlighted() 的规则高亮，诗句命中时命中句作摘句。
 export function hitCard(a, query) {
   var id = String(a[0] || '');
   var match = a[3] || {};

@@ -3,7 +3,7 @@
    目的：削减小文件数量（git 对象数 / 本地 iCloud 同步量）。作者记录形状不变。
    顺带把无意义的占位 bio（["--"] / [""]）归一化为 []。
 
-   分桶哈希 authorBucket 必须与 prep.mjs 及 assets/js/app.js 的 loadAuthor 完全一致——
+   分桶哈希 authorBucket 必须与 prep.mjs 及 assets/js/data.js 的 authorBucket 完全一致——
    改动三处需同步（如同 SUBCHUNK_SIZE 除数约定）。
 
    用法（在 tools/ 下）： node data/bundle-authors.mjs [--dry-run]
@@ -18,7 +18,7 @@ const BUCKETS = 256;
 const DRY = process.argv.includes('--dry-run');
 const pad3 = (n) => ('00' + n).slice(-3);
 
-// 与 prep.mjs / app.js 一致的分桶哈希（UTF-16 码元逐字，结果 0..255）
+// 与 prep.mjs / assets/js/data.js 一致的分桶哈希（UTF-16 码元逐字，结果 0..255）
 export function authorBucket(slug) {
   let h = 0;
   for (let i = 0; i < slug.length; i++) h = (h * 31 + slug.charCodeAt(i)) >>> 0;

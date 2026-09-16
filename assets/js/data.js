@@ -1,7 +1,7 @@
 import { pad3, pad4 } from './utils.js';
 
 var cache = new Map();
-// 数据路径相对站点根目录（本模块在 assets/js/ 下），与页面所在目录无关：/kyne/、/liquidglass/ 两套界面共用。
+// 数据路径相对站点根目录（本模块在 assets/js/ 下），与页面所在目录无关。
 var ROOT = new URL('../../', import.meta.url);
 
 export async function fetchJSON(path) {

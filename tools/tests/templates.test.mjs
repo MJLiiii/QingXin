@@ -2,13 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   displaySize,
-  entryShell,
   glossLines,
   glossTerm,
   heroLines,
-  pagerHTML,
-  proseEntry,
-  searchRow,
+  highlighted,
 } from '../../assets/js/templates.js';
 import {
   groupStanzas,
@@ -92,37 +89,15 @@ test('route hrefs encode each path segment and a sorted query', () => {
   assert.equal(hrefFor('home'), '#/home');
 });
 
-test('line search hits render the matched line as a highlighted excerpt', () => {
-  const exact = searchRow(['c59-66', '水调歌头·明月几时有', '苏轼', {
-    field: 'line', type: 'substring', distance: 0, start: 0, length: 5, line: '但愿人长久，千里共婵娟。',
-  }], '但愿人长久');
-  assert.match(exact, /poem-list__excerpt"><mark class="search-match">但愿人长久<\/mark>，千里共婵娟。/);
-  assert.doesNotMatch(exact, /poem-list__title"><mark/);
+test('search highlights mark exact matches in the matched field only', () => {
+  const exact = { field: 'line', type: 'substring', distance: 0, start: 0, length: 5, line: '但愿人长久，千里共婵娟。' };
+  assert.equal(highlighted(exact.line, '但愿人长久', exact, 'line'), '<mark class="search-match">但愿人长久</mark>，千里共婵娟。');
+  assert.equal(highlighted('水调歌头<', '但愿人长久', exact, 'title'), '水调歌头&lt;');
 
-  const variant = searchRow(['t8-125', '静夜思', '李白', {
-    field: 'line', type: 'fuzzy', distance: 1, start: -1, length: 0, line: '床前看月光，疑是地上霜。',
-  }], '床前明月光');
-  assert.match(variant, /床前看月光/);
-  assert.doesNotMatch(variant, /<mark/);
+  const variant = { field: 'line', type: 'fuzzy', distance: 1, start: -1, length: 0, line: '床前看月光，疑是地上霜。' };
+  assert.equal(highlighted(variant.line, '床前明月光', variant, 'line'), '床前看月光，疑是地上霜。');
 });
 
-test('collapsible sections carry section ids, open state and empty markers', () => {
-  const empty = proseEntry('译文', 'iii', [], false, { section: 'translation', open: true });
-  assert.match(empty, /data-section="translation"/);
-  assert.match(empty, /entry--collapsed/);
-  assert.match(empty, /entry-head__empty">未收录</);
-
-  const open = proseEntry('译文', 'iii', ['一段译文'], false, { section: 'translation', open: true });
-  assert.doesNotMatch(open, /entry--collapsed/);
-  assert.match(open, /aria-expanded="true"/);
-  assert.doesNotMatch(open, /未收录/);
-
-  assert.match(entryShell('关于', 'i', '<p></p>'), /^<section class="section entry"><div class="entry-head">/);
-});
-
-test('pager uses real links and stanza grouping keeps paragraph indices', () => {
-  const pager = pagerHTML('authors', 2, 3);
-  assert.match(pager, /<a class="pager__btn" href="#\/authors\/0" data-nav="authors\/0">«<\/a>/);
-  assert.match(pager, /<span class="pager__btn pager__btn--off">»<\/span>/);
+test('stanza grouping keeps paragraph indices', () => {
   assert.deepEqual(groupStanzas(['a', '', 'b', 'c'], (line, i) => line + i), [['a0'], ['b2', 'c3']]);
 });

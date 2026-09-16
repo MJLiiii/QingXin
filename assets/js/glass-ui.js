@@ -1,4 +1,4 @@
-/* liquidglass/ 的界面交互：分段标签、首页搜索、钉住的阅读栏（及其注释浮层）、页眉滚动态。
+/* 玻璃界面的交互：分段标签、首页搜索、钉住的阅读栏（及其注释浮层）、页眉滚动态。
    与 router.js 的委托点击并存：这里只认 [role=tab][data-tab] 与 form[data-find]，二者 router 都不处理。 */
 import { go } from './router.js';
 import { closeGloss, repositionGloss, writePrefs } from './reader.js';
