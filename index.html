@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>情心 · 慢读古典</title>
-  <meta name="description" content="情心 — 黑白极简的古诗文赏读。原文、注释、译文、赏析、创作背景，逐层深入。">
+  <meta name="description" content="情心 — 通透玻璃质感的古诗文赏读。原文、注释、译文、赏析、创作背景，逐层深入。">
   <script>
     // 首帧前应用阅读偏好（主题 / 字号 / 竖排），避免闪烁；键名与 assets/js/reader.js 一致。
     (function () {
@@ -20,13 +20,27 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Noto+Sans+SC:wght@400;500&family=Noto+Serif+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..600&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body>
 
-  <!-- ============ 页眉 ============ -->
+  <!-- 页眉玻璃折射滤镜：0×0 绝对定位（Firefox 不应用 display:none SVG 里的滤镜），仅 .glass__effect 引用 -->
+  <svg class="glass-defs" width="0" height="0" aria-hidden="true" focusable="false">
+    <filter id="qx-glass" x="0%" y="0%" width="100%" height="100%" filterUnits="objectBoundingBox">
+      <feTurbulence type="fractalNoise" baseFrequency="0.015 0.015" numOctaves="1" seed="5" result="turbulence"/>
+      <feGaussianBlur in="turbulence" stdDeviation="3" result="softMap"/>
+      <feDisplacementMap in="SourceGraphic" in2="softMap" scale="60" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </svg>
+
+  <!-- ============ 页眉（玻璃胶囊：折射 / 染色 / 高光三层垫在内容下） ============ -->
   <header class="site-header">
+    <div class="glass" aria-hidden="true">
+      <div class="glass__effect"></div>
+      <div class="glass__tint"></div>
+      <div class="glass__shine"></div>
+    </div>
     <div class="site-header__inner">
       <a class="brand" href="#/home" data-nav="home" aria-label="情心 · 返回首页">
         <span class="brand__name">情心</span>
@@ -51,7 +65,7 @@
   <!-- 首屏加载态：数据就绪后被替换 -->
   <div id="boot" class="boot"><span class="boot__mark">情心</span></div>
 
-  <!-- ============ 页脚（反色通栏；链接用 site-footer__link，router 不会给它设 aria-current） ============ -->
+  <!-- ============ 页脚（玻璃面板；链接用 site-footer__link，router 不会给它设 aria-current） ============ -->
   <footer class="site-footer">
     <div class="site-footer__inner">
       <p class="site-footer__slogan"><span>慢读古典</span><span>一日一诗</span></p>
