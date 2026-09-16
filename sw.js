@@ -5,7 +5,7 @@
    预缓存绕过 HTTP 缓存（cache: 'reload'），避免新旧模块混装。
    改动缓存格式时 bump CACHE_NAME，旧缓存在 activate 清除。
    作用域随注册路径（GitHub Pages 子路径 /QingXin/ 亦可）。 */
-const CACHE_NAME = 'qingxin-v5';
+const CACHE_NAME = 'qingxin-v6';
 const SHELL = [
   './',
   './index.html',

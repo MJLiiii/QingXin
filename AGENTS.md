@@ -128,7 +128,7 @@ instantly, the network refresh lands by the next reload, so content updates lag 
 (remember this when previewing changes locally). It pre-caches the app shell (`index.html`, CSS,
 every `assets/js/*.js`) with `cache: 'reload'`, bypassing the HTTP cache so a new worker never mixes
 old and new modules. **Adding/renaming a frontend module means updating its `SHELL` list;
-changing any cached format means bumping `CACHE_NAME`** (currently `qingxin-v5`; old caches are
+changing any cached format means bumping `CACHE_NAME`** (currently `qingxin-v6`; old caches are
 purged on activate).
 
 **Detail-page invariant:** all five section headings (原文/注释/译文/赏析/创作背景) always
@@ -147,33 +147,61 @@ in `pages.js`).
   `.nojekyll`); `assets/css/` and `assets/js/` hold browser-loaded front-end assets; `data/`
   holds committed static content; `tools/server/`, `tools/data/`, and `tools/annotations/`
   hold local preview, data generation, and annotation-import tooling respectively.
-- **Design system** lives in `assets/css/styles.css` `:root` — editorial monochrome (after the Kyne
-  redesign): `--paper` #F6F6F6, `--surface` #FCFCFC, `--ink` #2B2B2B, muted-ink tiers
-  `--body`/`--muted`/`--muted-2`/`--muted-3` (`--muted` #6B6B6B is the lightest grey allowed for text,
-  ~4.9:1 on paper), 1px hairlines `--line`/`--line-strong`, inverted footer `--invert-bg`/`--invert-fg`
-  (+`--invert-fg-rgb`), `--mark-bg` (search hits, gloss hover), RGB channels `--ink-rgb`/`--paper-rgb`,
-  `--shadow`, `--selection-alpha`, `--reading-scale`, and layout `--max`/`--gutter`/`--measure`/`--header-h`.
-  Three font roles: `--serif` Noto Serif SC for anything containing Chinese (display sizes included),
-  `--latin` Fraunces for Latin letters and digits only (its Google subset covers `·` and `—…“”`, so a
-  Chinese-first stack must come first, or that punctuation switches to Western glyphs), `--sans`
-  Noto Sans SC for labels, nav and buttons. **There is no accent hue** — never signal state by colour
-  alone: the current page and pressed toggles get an underline, search hits get `--mark-bg` + underline.
+- **Design system** lives in `assets/css/styles.css` `:root` — liquid glass (after the
+  [svg-glass-navbar-effect](https://svg-glass-navbar-effect.webflow.io/) Webflow template), light by default.
+  Token groups: ground/ink `--paper` #F4F4F6, `--surface` #FFF (opaque fallback for glass), `--ink` #1C1C1E
+  (+`--ink-rgb`), muted-ink tiers `--body`/`--muted`/`--muted-2`/`--muted-3` (`--muted` #636368 is the
+  lightest grey allowed for text, ~5.4:1 on paper and ~5.0:1 at the glow's peak; small text sitting directly
+  on the hero dot grid uses `--muted-2`), `--line`, `--mark-bg`, `--selection`; the violet accent
+  `--accent`/`--accent-rgb`/`--accent-text`/`--accent-halo` (#6A3FD6 in light; #996AFF in dark, with
+  `--accent-text` #AB87FF); backgrounds `--glow-1`/`--glow-2`/`--dot`; glass `--glass-*` and popover `--pop-*`;
+  surfaces `--card-*`, `--row-hover-bg`, `--chip-*`, `--badge-*`, `--tile-*`, `--input-bg`, `--nav-*-bg`;
+  buttons `--btn-bg`/`--btn-bg-hover`/`--btn-fg` (primary fill) and `--btn2-bg`/`--btn2-bg-hover` (secondary,
+  accent border); radii `--r-sm/md/lg/xl/pill`; motion `--ease`/`--dur`; plus `--reading-scale` and layout
+  `--max`/`--gutter`/`--measure`/`--header-h`/`--header-gap`/`--header-space`/`--content-w` (the navbar,
+  entry cards and footer panel all use `--content-w`).
+  Three font roles: `--serif` Noto Serif SC for anything containing Chinese (display 600, reading text 400),
+  `--latin` Inter, upright, for Latin letters and digits only (tags, counts, dates, ids, row numbers), and
+  `--sans` Noto Sans SC for labels, nav and buttons — keep `--sans` Chinese-first: Inter's Google subset covers
+  `·` and `—…“”`, so an Inter-first stack would switch that punctuation to Western glyphs. Only the loaded
+  weights exist (Inter 400–600, Sans 400/500/600, Serif 400/500/600/700): never use 300 or 800/900.
+  **Violet is an accent, never the only signal.** It marks focus rings, secondary-button borders, the current
+  nav link's underline, search hits (tint + underline), open note terms (dotted → solid underline) and the
+  selection; accent used as text must be `--accent-text` (≥4.5:1). Every state keeps a non-hue cue: current
+  page = tinted pill + underline, pressed toggles = filled button/chip + underline, open sections = filled
+  +/− circle, empty sections = dashed 「未收录」 badge, disabled chips = dashed border.
+  **Glass is limited to two surfaces:** the sticky pill header (`.site-header > .glass` with `__effect` =
+  backdrop-filter + `filter: url(#qx-glass)` — the inline SVG displacement filter at the top of `<body>` —
+  then `__tint` and `__shine`) and `.gloss-pop`. Cards, row panels and the footer are plain translucent fills
+  (no backdrop-filter, for scroll performance). The SVG distortion is effectively Chromium-only and degrades
+  to blur + tint elsewhere; contrast is sized for the worst case with no blur. Fallbacks live in
+  `@supports not (backdrop-filter…)`, `prefers-reduced-transparency` and `forced-colors` blocks.
+  **Root rules:** the background glow is a fixed `body::before` (z-index −1), and `body` is a column flex
+  container (so the header's top margin can't collapse through it and the footer sits at the bottom of short
+  pages; `.page.is-active`/`.boot` flex-grow). Keep `html` background-less and `body` `position: static`
+  with no transform/filter/backdrop-filter/contain/will-change — that is also what keeps
+  `reader.js positionGloss()` (absolute, document coordinates, popover appended to `body`) correct.
   Build any new UI from these tokens (that's how search/pagination were added).
   **夜读 (dark theme)** only redefines tokens, in two identical blocks —
   `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {…} }` and
   `:root[data-theme="dark"] {…}` — so never hard-code a color: add a token to `:root` and to both dark
   blocks. Reading text sizes are `calc(<px> * var(--reading-scale))` (including the mobile media
-  query). Vertical 原文 is `:root[data-vertical="1"] .original__body` — the scroll container itself is
-  `vertical-rl`, so it opens on the first column (left-aligned, `margin: 0`).
+  queries). Vertical 原文 is `:root[data-vertical="1"] .original__body` — the scroll container itself is
+  `vertical-rl`, so it opens on the first column (left-aligned, `margin: 0`), and a left-edge shadow
+  hints at columns still hidden inside the card.
 - **Display headings** use `.display[data-size]`, the tier coming from `displaySize()` in
   `templates.js`; the home hero sizes itself from `--hero-chars` + `cqi` (its lines come from
-  `heroLines()`). CJK needs `line-height ≥ 1.05` and tracking no tighter than `-0.03em`, so Kyne's
-  0.9/-0.06em are not copied verbatim. Breakpoints are `(max-width: 1199px)` and `(max-width: 809px)`;
-  at ≥1200 entry bodies and the author bio indent by 33% for the case-study look.
+  `heroLines()`). CJK needs `line-height ≥ 1.05` and tracking no tighter than `-0.03em` (display uses
+  1.08 / -0.02em). Breakpoints are `(max-width: 809px)`, `(max-width: 389px)` (search tag hidden) and
+  `(max-width: 359px)` (tighter nav, rows, meta, toolbar and stanza size so the pill navbar and 12-character
+  lines fit at 320), plus `(min-width: 1200px)`, where entry bodies and the author bio indent by 33%
+  inside/aligned with the entry cards.
 - **`templates.js` markup is frozen by `tools/tests/templates.test.mjs`** — restyle it from CSS instead.
-  Row numbers, brackets `[…]`, parens `(…)`, arrows and +/− are pseudo-elements written as
-  `content: "x" / ""` so screen readers skip them. Structural changes belong in `pages.js`/`index.html`,
-  which have no markup tests.
+  Row numbers, arrows and +/− are pseudo-elements written as `content: "x" / ""` so screen readers skip
+  them; actions are pill buttons (primary / secondary / chip) and the old `( )` notes are pill badges — no
+  bracket or paren pseudo-content any more. Row lists sit in a `.row-panel` wrapper added in `pages.js`,
+  which owns `counter-reset: row`, so give any new row list that class. Structural changes belong in
+  `pages.js`/`index.html`, which have no markup tests.
 - **`tools/data/prep.mjs`**: converts 全唐诗 繁→简 via `opencc-js` (宋词 is already simplified); strips
   lone UTF-16 surrogates; synthesizes ci titles/ids. On re-run it **preserves
   `data/annotations/`** (your hand-written overlays), only regenerating index/poems/authors +
