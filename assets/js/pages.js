@@ -4,8 +4,8 @@ import { searchAuthorIndex } from './search-core.js';
 import { searchPoems } from './search.js';
 import { esc, groupStanzas, localDateKey, pad4, seededRandom } from './utils.js';
 import {
-  authorRow, emptyState, entryShell, errorSection, glossLines, navHref, pagerHTML,
-  poemRow, proseEntry, searchBoxHTML, searchRow,
+  authorRow, displaySize, emptyState, entryShell, errorSection, glossLines, heroLines, listRow,
+  navHref, pagerHTML, poemRow, proseEntry, searchBoxHTML, searchRow,
 } from './templates.js';
 
 // 竖排按列横向滚动；行数过多的长篇（如歌行）不提供竖排。
@@ -147,6 +147,23 @@ function aiNotice(ann) {
   return '<p class="prose--faint">本篇注释、译文、赏析由 AI 生成，仅供参考。</p>';
 }
 
+// 页面大标题 + 计数（诗集页 / 诗人页）
+function pageHead(title, count) {
+  return '<header class="page-head">'
+    + '<h1 class="page-head__title display" data-size="' + displaySize(title) + '">' + esc(title) + '</h1>'
+    + '<span class="page-head__count latin">' + Number(count).toLocaleString('en-US') + '</span>'
+    + '</header>';
+}
+
+// 元信息行：每格一个 dt/dd；值为已转义或已构造的 HTML，空值不出格。
+function metaRow(items) {
+  var cells = items.filter(function (item) { return item && item.value; }).map(function (item) {
+    return '<div class="meta__item"><dt>' + esc(item.label) + '</dt>'
+      + '<dd>' + item.value + '</dd></div>';
+  });
+  return cells.length ? '<dl class="meta">' + cells.join('') + '</dl>' : '';
+}
+
 export async function renderHome(param, ctx) {
   var entries = await fetchJSON('data/featured.json');
   var daily = !ctx.shuffle;
@@ -169,30 +186,36 @@ export async function renderHome(param, ctx) {
   if (!hero) hero = pick[0];
   var heroPoem = await loadPoem(hero.id);
   if (!ctx.isCurrent()) return;
-  var lines = ((heroPoem && heroPoem.paragraphs) || []).slice(0, 2).map(esc).join('<br>');
+  var lines = heroLines((heroPoem && heroPoem.paragraphs) || []);
+  if (!lines.length) lines = [hero.excerpt || hero.title];
+  // 超大标题字号按最长一行的字数铺满版心（styles.css .hero__title）。
+  var heroChars = Math.max.apply(null, lines.map(function (line) { return Array.from(line).length; }).concat(4));
   var cipai = (heroPoem && heroPoem.rhythmic) || hero.title;
   var kindLabel = hero.id.charAt(0) === 'c' ? '词' : '诗';
   var list = pick.filter(function (e) { return e.id !== hero.id; }).slice(0, 5);
 
   document.getElementById('page-home').innerHTML =
     '<section class="hero">'
-    + '<div class="moon"></div>'
-    + '<div class="hero__body">'
-    + '<div class="hero__eyebrow">' + (daily ? '今日 · ' : '') + esc(hero.dynasty) + ' · ' + kindLabel + '</div>'
-    + '<h1 class="hero__title">' + lines + '</h1>'
+    + '<div class="hero__top">'
+    + '<span class="hero__eyebrow">' + (daily ? '今日一' : '随机一') + kindLabel + '</span>'
+    + (daily ? '<span class="hero__date latin">' + localDateKey().replace(/-/g, '.') + '</span>' : '')
+    + '</div>'
+    + '<h1 class="hero__title" style="--hero-chars:' + heroChars + '">'
+    + lines.map(function (line) { return '<span class="hero__line">' + esc(line) + '</span>'; }).join('')
+    + '</h1>'
+    + '<div class="hero__foot">'
     + '<div class="hero__meta">《' + esc(cipai) + '》　' + esc(hero.author) + '〔' + esc(hero.dynasty) + '〕</div>'
     + '<div class="hero__actions">'
-    + '<a class="hero__cta" href="' + navHref('poem/' + hero.id) + '" data-nav="poem/' + esc(hero.id) + '">'
-    + '<span>品读全文</span><span>→</span></a>'
-    + '<button class="hero__shuffle" type="button" data-action="shuffle">换一首 ↻</button>'
+    + '<a class="hero__cta" href="' + navHref('poem/' + hero.id) + '" data-nav="poem/' + esc(hero.id) + '">品读全文</a>'
+    + '<button class="hero__shuffle" type="button" data-action="shuffle">换一首</button>'
     + '</div>'
     + '</div>'
     + '</section>'
     + '<section class="section section--list">'
-    + '<div class="section-head"><span class="section-head__title">精选诗词</span>'
+    + '<div class="section-head"><h2 class="section-head__title">精选诗词</h2>'
     + '<span class="section-head__tag latin">curated</span></div>'
-    + '<div class="rule"></div>'
     + list.map(poemRow).join('')
+    + '<a class="section__more" href="' + navHref('list') + '" data-nav="list">浏览全部诗集</a>'
     + '</section>';
 }
 
@@ -214,10 +237,8 @@ export async function renderList(param, ctx) {
   var host = document.getElementById('page-list');
   host.innerHTML =
     '<section class="section section--top">'
-    + '<div class="section-head"><span class="section-head__title">诗集</span>'
-    + '<span class="section-head__tag latin">' + manifest.total + '</span></div>'
+    + pageHead('诗集', manifest.total)
     + searchBoxHTML()
-    + '<div class="rule"></div>'
     + '<div id="list-rows">' + slice.map(poemRow).join('') + '</div>'
     + pagerHTML('list', dp, totalPages)
     + '</section>';
@@ -254,23 +275,21 @@ export async function renderPoem(id, ctx) {
   if (degraded) ctx.noCache();
 
   var isCi = poem.kind === 'ci';
-  var cipai = isCi ? ('词牌 · ' + esc(poem.rhythmic || '')) : (esc(poem.dynasty) + '诗');
-  var title = isCi ? esc(poem.rhythmic || poem.title) : esc(poem.title);
+  var titleText = isCi ? (poem.rhythmic || poem.title) : poem.title;
   var sub = isCi ? esc((poem.title.split('·')[1] || '')) : '';
-  var seal = esc((poem.author || '').charAt(0));
   var authorHref = navHref('author/' + poem.authorSlug);
   var authorNav = 'author/' + esc(poem.authorSlug);
 
-  var html = '<section class="poem-hero"><div class="moon"></div><div class="poem-hero__body">'
-    + '<div class="poem-hero__cipai">' + cipai + '</div>'
-    + '<h1 class="poem-hero__title">' + title + '</h1>'
-    + (sub ? '<div class="poem-hero__sub">' + sub + '</div>' : '')
-    + '<div class="poem-hero__author">'
-    + '<a class="author-link" href="' + authorHref + '" data-nav="' + authorNav + '">' + esc(poem.author) + '</a>'
-    + '<span class="dot"></span>'
-    + '<span class="poem-hero__dynasty">' + esc(poem.dynasty) + '</span>'
-    + '<span class="seal poem-hero__seal">' + seal + '</span>'
-    + '</div></div></section>';
+  var html = '<section class="poem-hero">'
+    + '<h1 class="poem-hero__title display" data-size="' + displaySize(titleText) + '">' + esc(titleText) + '</h1>'
+    + (sub ? '<p class="poem-hero__sub">' + sub + '</p>' : '')
+    + metaRow([
+      { label: '作者', value: '<a class="author-link" href="' + authorHref + '" data-nav="' + authorNav + '">' + esc(poem.author) + '</a>' },
+      { label: '朝代', value: esc(poem.dynasty) },
+      { label: '体裁', value: isCi ? ('词 · ' + esc(poem.rhythmic || '')) : '诗' },
+      { label: '编号', value: '<span class="latin">' + esc(poem.id) + '</span>' },
+    ])
+    + '</section>';
 
   var paragraphs = poem.paragraphs || [];
   var hasNotes = !!(ann.notes && ann.notes.length && ann.notes.some(function (n) { return n.term || n.def; }));
@@ -320,11 +339,21 @@ export async function renderPoem(id, ctx) {
   html += proseEntry('赏析', 'iv', ann.appreciation || [], false, { section: 'appreciation', open: isOpen('appreciation') });
   html += proseEntry('创作背景', 'v', ann.background || [], false, { section: 'background', open: isOpen('background') });
 
+  // 关于作者：大号作者名入口 + 同一作者的其他作品（作者数据加载失败时只出入口）
   var styleSmall = author && author.style ? '　<small>' + esc(author.style) + '</small>' : '';
-  html += '<section class="section author-cta"><a class="author-cta__link" href="' + authorHref + '" data-nav="' + authorNav + '">'
-    + '<div><div class="author-cta__label">关于作者</div>'
-    + '<div class="author-cta__name">' + esc(poem.author) + styleSmall + '</div></div>'
-    + '<span class="author-cta__arrow">→</span></a></section>';
+  var others = ((author && author.works) || []).filter(function (w) { return w.id !== poem.id; }).slice(0, 3);
+  html += '<section class="section author-cta">'
+    + '<div class="section-head"><h2 class="section-head__title">关于作者</h2>'
+    + '<span class="section-head__tag latin">more</span></div>'
+    + '<a class="author-cta__link" href="' + authorHref + '" data-nav="' + authorNav + '">'
+    + '<span class="author-cta__name">' + esc(poem.author) + styleSmall + '</span>'
+    + '<span class="author-cta__arrow" aria-hidden="true">→</span></a>'
+    + (others.length
+      ? '<div class="author-cta__works">' + others.map(function (w) {
+        return listRow('poem/' + w.id, w.title, esc(w.kind));
+      }).join('') + '</div>'
+      : '')
+    + '</section>';
 
   ctx.setTitle('《' + poem.title + '》' + poem.author);
   host.innerHTML = html;
@@ -348,10 +377,6 @@ export async function renderAuthor(slug, ctx) {
     return;
   }
 
-  var facts = [];
-  facts.push('<span>' + esc(a.dynasty) + (a.origin ? ' · ' + esc(a.origin) : '') + '</span>');
-  if (a.life) facts.push('<span class="dot"></span><span class="latin">' + esc(a.life) + '</span>');
-
   var bio = (a.bio && a.bio.length)
     ? a.bio.map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('')
     : '<p class="prose--faint">尚未收录，敬请期待。</p>';
@@ -367,18 +392,20 @@ export async function renderAuthor(slug, ctx) {
 
   ctx.setTitle(a.name, '诗人');
   host.innerHTML =
-    '<section class="author-hero"><div class="moon"></div><div class="author-hero__body">'
-    + '<div class="author-hero__eyebrow">诗 人</div>'
-    + '<div class="author-hero__namerow"><h1 class="author-hero__name">' + esc(a.name) + '</h1>'
-    + '<span class="seal author-hero__seal">' + esc((a.seal || a.name || '').charAt(0)) + '</span></div>'
-    + (a.style ? '<div class="author-hero__style">' + esc(a.style) + '</div>' : '')
-    + '<div class="author-hero__facts">' + facts.join('') + '</div>'
-    + '</div></section>'
+    '<section class="author-hero">'
+    + '<h1 class="author-hero__name display" data-size="' + displaySize(a.name) + '">' + esc(a.name) + '</h1>'
+    + (a.style ? '<p class="author-hero__style">' + esc(a.style) + '</p>' : '')
+    + metaRow([
+      { label: '朝代', value: esc(a.dynasty) },
+      { label: '籍贯', value: a.origin ? esc(a.origin) : '' },
+      { label: '生卒', value: a.life ? '<span class="latin">' + esc(a.life) + '</span>' : '' },
+      { label: '作品', value: (a.works && a.works.length) ? esc(a.works.length) + ' 首' : '' },
+    ])
+    + '</section>'
     + '<section class="author-bio"><div class="prose">' + bio + '</div></section>'
     + '<section class="section author-works">'
-    + '<div class="section-head"><span class="section-head__title">代表作品</span>'
-    + '<span class="section-head__tag latin">works</span></div>'
-    + '<div class="rule"></div>' + works
+    + '<div class="section-head"><h2 class="section-head__title">代表作品</h2>'
+    + '<span class="section-head__tag latin">works</span></div>' + works
     + '</section>';
 }
 
@@ -396,8 +423,7 @@ export async function renderAuthors(param, ctx) {
   var host = document.getElementById('page-authors');
   host.innerHTML =
     '<section class="section section--top">'
-    + '<div class="section-head"><span class="section-head__title">诗人</span>'
-    + '<span class="section-head__tag latin">' + idx.length + '</span></div>'
+    + pageHead('诗人', idx.length)
     + searchBoxHTML({
       id: 'author-search',
       placeholder: '搜索诗人姓名或近似关键词…',
@@ -405,7 +431,6 @@ export async function renderAuthors(param, ctx) {
       tag: 'poets',
       controls: 'authors-rows',
     })
-    + '<div class="rule"></div>'
     + '<div id="authors-rows">' + slice.map(authorRow).join('') + '</div>'
     + pagerHTML('authors', page, totalPages)
     + '</section>';
@@ -444,11 +469,10 @@ export async function renderAbout(param, ctx) {
       + (paras || []).map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('')
       + '</div>';
   };
-  var html = '<section class="poem-hero"><div class="moon"></div><div class="poem-hero__body">'
-    + '<div class="poem-hero__cipai">关 于</div>'
-    + '<h1 class="poem-hero__title">' + esc(about.title) + '</h1>'
-    + (about.subtitle ? '<div class="poem-hero__sub">' + esc(about.subtitle) + '</div>' : '')
-    + '</div></section>';
+  var html = '<section class="poem-hero">'
+    + '<h1 class="poem-hero__title display" data-size="' + displaySize(about.title) + '">' + esc(about.title) + '</h1>'
+    + (about.subtitle ? '<p class="poem-hero__sub">' + esc(about.subtitle) + '</p>' : '')
+    + '</section>';
   if (about.lead && about.lead.length) {
     html += '<section class="author-bio">' + proseOf(about.lead) + '</section>';
   }
