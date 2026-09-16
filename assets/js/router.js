@@ -6,9 +6,11 @@ import { hrefFor, idle, localDateKey } from './utils.js';
 import { RENDERERS } from './pages.js';
 
 var PAGES = ['home', 'list', 'poem', 'author', 'authors', 'about'];
-var NAV_OF = { list: 'list', authors: 'authors', author: 'authors', about: 'about' };
+var NAV_OF = { home: 'home', list: 'list', authors: 'authors', author: 'authors', about: 'about' };
 var DEFAULT_TITLE = '情心 · 慢读古典';
 
+var renderers = RENDERERS;  // 页面 → 渲染函数；各界面可在 startRouter() 时替换（liquidglass/ 用 glass-pages.js）
+var navOf = NAV_OF;         // 页面 → 高亮的导航项；startRouter(pages, { navOf }) 可补充
 var rendered = {};          // 页面 → 当前 DOM 对应的规范化路由键；命中时返回不重建 DOM
 var titles = {};            // 页面 → document.title
 var seq = 0;                // 导航序号：过期的异步渲染不得写 DOM、不得切换页面
@@ -70,7 +72,7 @@ function show(name) {
     el.hidden = p !== name;
   });
   document.title = titles[name] || DEFAULT_TITLE;
-  var current = NAV_OF[name] || '';
+  var current = navOf[name] || '';
   document.querySelectorAll('.site-nav__link[data-nav]').forEach(function (link) {
     if (link.getAttribute('data-nav') === current) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
@@ -134,7 +136,7 @@ export async function render(opts) {
       },
     };
     try {
-      await RENDERERS[route.name](route.param, ctx);
+      await renderers[route.name](route.param, ctx);
       if (token === seq && cacheable) rendered[route.name] = route.key;
     } catch (e) {
       if (window.console) console.error(e);
@@ -200,7 +202,9 @@ function onKeydown(e) {
   }
 }
 
-export function startRouter() {
+export function startRouter(pages, opts) {
+  if (pages) renderers = pages;
+  if (opts && opts.navOf) navOf = Object.assign({}, NAV_OF, opts.navOf);
   if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
   document.addEventListener('click', onClick);
   document.addEventListener('keydown', onKeydown);

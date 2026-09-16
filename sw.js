@@ -1,12 +1,13 @@
 /* 情心 Service Worker —— 跨刷新/离线缓存。纯原生、零依赖。
    策略：对同源 GET 一律 stale-while-revalidate——命中缓存立即返回、后台再拉新写回，
-   故二次访问秒开，而代码/注释更新至多滞后一次刷新（不会卡在旧版本）。
+   故二次访问秒开，而代码/注释更新至多滞后一次刷新（不会卡在旧版本）；后台更新带 cache:'no-cache'，
+   不会把浏览器 HTTP 缓存里的旧文件写回来。
    预缓存仅应用外壳与前端模块；大文件（search.json、lines.json 等）按访问懒缓存。
    预缓存绕过 HTTP 缓存（cache: 'reload'），避免新旧模块混装。
    改动缓存格式时 bump CACHE_NAME，旧缓存在 activate 清除。
    Worker 放在站点根目录：两套界面（kyne/、liquidglass/）都用 '../sw.js' 注册，作用域覆盖整站
    （GitHub Pages 子路径 /QingXin/ 亦可）。 */
-const CACHE_NAME = 'qingxin-v7';
+const CACHE_NAME = 'qingxin-v8';
 const SHELL = [
   './',
   './index.html',
@@ -18,6 +19,10 @@ const SHELL = [
   './assets/css/glass.css',
   './assets/js/app.js',
   './assets/js/data.js',
+  './assets/js/glass-app.js',
+  './assets/js/glass-pages.js',
+  './assets/js/glass-templates.js',
+  './assets/js/glass-ui.js',
   './assets/js/pages.js',
   './assets/js/reader.js',
   './assets/js/router.js',
@@ -53,7 +58,9 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.open(CACHE_NAME).then((cache) =>
       cache.match(req).then((cached) => {
-        const network = fetch(req)
+        // 后台更新绕过浏览器 HTTP 缓存（条件请求，未改动时只回 304）：否则 HTTP 缓存里尚未过期的旧模块
+        // 会被写回本缓存，与已更新的模块混装（新页面引用旧模块里没有的导出 → 整页起不来）。
+        const network = fetch(req, { cache: 'no-cache' })
           .then((res) => {
             if (res && res.ok) cache.put(req, res.clone());
             return res;
