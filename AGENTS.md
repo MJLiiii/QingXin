@@ -7,15 +7,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 情心 (QingXin) — a static, **no-backend** classical-Chinese poetry reading site. Vanilla
 HTML/CSS/JS: no framework, no bundler, no npm dependencies at runtime. The site is fully
 data-driven from the [chinese-poetry](https://github.com/chinese-poetry/chinese-poetry)
-dataset (~78,660 poems: 全唐诗 + 宋词). **No poem text is hardcoded in HTML** — `index.html`
-is only header/footer + empty page containers; everything else is `fetch`ed from `data/`.
+dataset (~78,660 poems: 全唐诗 + 宋词). **No poem text is hardcoded in HTML** — the app pages are
+only header/footer + empty page containers; everything else is `fetch`ed from `data/`.
+
+**Two designs, one app.** The same JS, markup and data are served under two app shells:
+`kyne/index.html` (Kyne editorial monochrome, `assets/css/kyne.css`) and `liquidglass/index.html`
+(liquid glass, `assets/css/glass.css`). The root `index.html` is a static chooser page with preview cards
+(inline CSS); any `#/…` route that lands on the root is forwarded to `liquidglass/` with the route intact,
+so old shared links keep working. Each shell's footer has a `.site-footer__design` switch whose inline
+script appends the current `location.hash` before navigation, so switching keeps the page (and `?q=`).
 
 ## Commands
 
 There is no build or bundling step. Things you actually run:
 
 - **Preview locally** (required — `fetch()` blocks `file://`):
-  `node tools/server/serve.mjs` → http://localhost:8080  (cwd-independent static server; `PORT=…` to change).
+  `node tools/server/serve.mjs` → http://localhost:8080 (chooser), `/kyne/`, `/liquidglass/`
+  (cwd-independent static server; `PORT=…` to change; like Pages it 301s `/kyne` → `/kyne/` and serves a
+  directory's `index.html`).
   Do NOT use `python -m http.server` — it crashes under the preview launcher (`os.getcwd`).
 
 - **Check** (the closest thing to lint+tests — run after touching `assets/js/**`, `sw.js`, or `data/**`):
@@ -103,9 +112,11 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
 - `reader.js` — browser-only reading layer: preferences in localStorage `qingxin:prefs`
   (`theme`, `scale`, `vertical`, `open` section ids), toolbar actions, and the single note popover
   (`openGloss`/`closeGloss`; the k-th `.gloss` term maps to the k-th `.notes__row`). The inline
-  `<head>` script in `index.html` applies theme/scale/vertical before first paint — keep its key and
-  fields in sync with `reader.js`.
-- `data.js` — `fetchJSON()` (memoized via a `Map`; errors carry `status`), `parseId()`/`loadPoem()`,
+  `<head>` script in both app shells applies theme/scale/vertical before first paint (the chooser applies
+  only the theme) — keep its key and fields in sync with `reader.js`.
+- `data.js` — `fetchJSON()` (memoized via a `Map`; errors carry `status`; `data/…` paths resolve against
+  the site root via `import.meta.url`, not the page, which is what lets both shells live in subdirectories),
+  `parseId()`/`loadPoem()`,
   `loadAnnotation()`/`loadAuthor()` (slug→bucket hash) — both return `null` only on 404 and rethrow
   other failures.
 - `search-core.js` + `search.js` + `search-worker.js` — shared ranked exact/fuzzy matching for
@@ -122,14 +133,15 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   `groupStanzas()`, `idle()`, `localDateKey()`, `seededRandom()`. Both are imported by the Node unit
   tests, so they must not touch `window`/`document`/`localStorage` at import time.
 
-**`sw.js` service worker** (registered from `index.html` with a relative path, so it works under the
-`/QingXin/` Pages subpath): stale-while-revalidate on every same-origin GET — cached copy returns
-instantly, the network refresh lands by the next reload, so content updates lag at most one refresh
-(remember this when previewing changes locally). It pre-caches the app shell (`index.html`, CSS,
-every `assets/js/*.js`) with `cache: 'reload'`, bypassing the HTTP cache so a new worker never mixes
-old and new modules. **Adding/renaming a frontend module means updating its `SHELL` list;
-changing any cached format means bumping `CACHE_NAME`** (currently `qingxin-v6`; old caches are
-purged on activate).
+**`sw.js` service worker** lives at the site root, so its scope covers both designs: the chooser registers
+`sw.js` and the shells register `../sw.js` (relative, so it works under the `/QingXin/` Pages subpath).
+Stale-while-revalidate on every same-origin GET — cached copy returns instantly, the network refresh lands
+by the next reload, so content updates lag at most one refresh (remember this when previewing changes
+locally). It pre-caches the app shells (root, `kyne/`, `liquidglass/`, both stylesheets, every
+`assets/js/*.js`) with `cache: 'reload'`, bypassing the HTTP cache so a new worker never mixes old and new
+modules; one missing entry fails the whole install. **Adding/renaming a frontend module or shell means
+updating its `SHELL` list; changing any cached format means bumping `CACHE_NAME`** (currently
+`qingxin-v7`; old caches are purged on activate).
 
 **Detail-page invariant:** all five section headings (原文/注释/译文/赏析/创作背景) always
 render. Only 原文 + author bio come from source data; the other four come from the annotation
@@ -143,11 +155,27 @@ in `pages.js`).
 
 ## Conventions & gotchas
 
-- **Project layout:** root keeps site entry/docs/deploy config (`index.html`, `sw.js`, `README.md`,
-  `.nojekyll`); `assets/css/` and `assets/js/` hold browser-loaded front-end assets; `data/`
-  holds committed static content; `tools/server/`, `tools/data/`, and `tools/annotations/`
-  hold local preview, data generation, and annotation-import tooling respectively.
-- **Design system** lives in `assets/css/styles.css` `:root` — liquid glass (after the
+- **Project layout:** root keeps site entry/docs/deploy config (`index.html` chooser, `sw.js`, `README.md`,
+  `.nojekyll`); `kyne/` and `liquidglass/` hold the two app shells; `assets/css/` and `assets/js/` hold
+  browser-loaded front-end assets; `data/` holds committed static content; `tools/server/`, `tools/data/`,
+  and `tools/annotations/` hold local preview, data generation, and annotation-import tooling respectively.
+- **Keep the two shells in step.** `kyne/index.html` and `liquidglass/index.html` share the same header,
+  page containers, footer (incl. the design switch) and inline scripts; they differ only in the
+  `<meta name="description">` text, the Google Fonts URL, the stylesheet, which `.site-footer__design` link
+  carries `aria-current="page"` (the shell's own design), and the glass-only bits (the `#qx-glass` SVG filter
+  and the header's `.glass` layers). The shells' service-worker block also reloads the page once when a
+  pre-v7 worker (cache `qingxin-v1…v6`, which still serves the old page-relative `data.js`) hands over
+  control to the new one — drop it once those workers have aged out. Any change to `pages.js`/`templates.js` markup must look right under **both** stylesheets —
+  check `/kyne/` and `/liquidglass/`.
+- **Kyne design system** (`assets/css/kyne.css`, frozen from the Kyne redesign): editorial monochrome —
+  `--paper` #F6F6F6, `--surface` #FCFCFC, `--ink` #2B2B2B, muted tiers `--body`/`--muted`/`--muted-2`/`--muted-3`
+  (`--muted` #6B6B6B is its lightest text grey), 1px hairlines `--line`, an inverted footer
+  (`--invert-bg`/`--invert-fg`), `--mark-bg`; fonts Noto Serif SC (up to 900), Noto Sans SC and Fraunces
+  italic for Latin/digits. **No accent hue**: state is an underline; actions are `[ ]` bracket labels and
+  notes are `( )` parens (pseudo-elements). Breakpoints `(max-width: 809px)` and `(min-width: 1200px)`;
+  dark theme in the same two-block pattern as below. It ignores `.row-panel` (the wrapper is unstyled
+  there) and has its own `.site-footer__design` rules.
+- **Liquid-glass design system** lives in `assets/css/glass.css` `:root` — liquid glass (after the
   [svg-glass-navbar-effect](https://svg-glass-navbar-effect.webflow.io/) Webflow template), light by default.
   Token groups: ground/ink `--paper` #F4F4F6, `--surface` #FFF (opaque fallback for glass), `--ink` #1C1C1E
   (+`--ink-rgb`), muted-ink tiers `--body`/`--muted`/`--muted-2`/`--muted-3` (`--muted` #636368 is the
@@ -201,7 +229,7 @@ in `pages.js`).
   them; actions are pill buttons (primary / secondary / chip) and the old `( )` notes are pill badges — no
   bracket or paren pseudo-content any more. Row lists sit in a `.row-panel` wrapper added in `pages.js`,
   which owns `counter-reset: row`, so give any new row list that class. Structural changes belong in
-  `pages.js`/`index.html`, which have no markup tests.
+  `pages.js` and the two app shells, which have no markup tests.
 - **`tools/data/prep.mjs`**: converts 全唐诗 繁→简 via `opencc-js` (宋词 is already simplified); strips
   lone UTF-16 surrogates; synthesizes ci titles/ids. On re-run it **preserves
   `data/annotations/`** (your hand-written overlays), only regenerating index/poems/authors +
@@ -264,8 +292,9 @@ in `pages.js`).
 - `data/**` (~67MB) is committed and is what the site serves; `tools/node_modules` and the
   external `../chinese-poetry-src` clone are gitignored.
 - **Deploy** is GitHub Pages "Deploy from a branch" (`main` / root — no workflow; `.github/`
-  was intentionally removed), live at https://mjliiii.github.io/QingXin/. The root `.nojekyll`
-  is required so Pages serves `data/**` as-is (thousands of JSON files, Chinese filenames).
+  was intentionally removed), live at https://mjliiii.github.io/QingXin/ (chooser),
+  https://mjliiii.github.io/QingXin/kyne/ and https://mjliiii.github.io/QingXin/liquidglass/. The root
+  `.nojekyll` is required so Pages serves `data/**` as-is (thousands of JSON files, Chinese filenames).
   All paths are relative and routing is hash-based, so the site works under the `/QingXin/`
   subpath with no 404 fallback.
 - This repo sits under iCloud-synced `~/Documents`: re-running `tools/data/prep.mjs` can spawn conflict
