@@ -1,10 +1,10 @@
 /* liquidglass/ 的页面渲染：数据与交互沿用 pages.js / reader.js，布局是玻璃界面自己的——
-   首页便当卡片墙、诗集 / 诗人卡片网格、诗文页左栏钉住 + 右栏分段标签、作者页资料卡。 */
+   首页今日一诗 + 搜索、诗集 / 诗人卡片网格、诗文页左栏钉住 + 右栏分段标签、作者页资料卡。 */
 import { fetchJSON, loadAuthor, loadPoem } from './data.js';
 import { initPin, rememberTab } from './glass-ui.js';
 import {
   GLASS, ICONS, errorCard, fmt, findForm, hitCard, metaChips, pageTitle, pagerDock, pickTab,
-  poemCard, poemTabs, poetTile, proseBody, quoteCard, seal, sealOf, statTile, workCard,
+  poemCard, poemTabs, poetTile, proseBody, seal, sealOf, workCard,
 } from './glass-templates.js';
 import {
   aiNotice, loadPoemData, notesHTML, pickFeatured, poemParts, wireLiveSearch, wirePager, wireSearch,
@@ -16,7 +16,6 @@ import { esc, localDateKey, pad4 } from './utils.js';
 
 var DISPLAY = 25;
 var HINTS = ['明月', '春风', '李白', '江南'];
-var ANONYMOUS = ['无名氏', '不详'];
 
 // 统计类数据只是点缀：加载失败时不拖垮页面，但这次渲染不缓存，返回时重试。
 function soft(promise, ctx) {
@@ -59,18 +58,11 @@ function cardHead(id, title, extra) {
 }
 
 export async function renderHome(param, ctx) {
-  var loaded = await Promise.all([
-    fetchJSON('data/featured.json'),
-    soft(fetchJSON('data/manifest.json'), ctx),
-    soft(fetchJSON('data/authors-index.json'), ctx),
-  ]);
+  var entries = await fetchJSON('data/featured.json');
   var daily = !ctx.shuffle;
-  var picked = pickFeatured(loaded[0], daily);
-  var hero = picked.hero;
+  var hero = pickFeatured(entries, daily).hero;
   var heroPoem = await loadPoem(hero.id);
   if (!ctx.isCurrent()) return;
-  var manifest = loaded[1];
-  var authors = loaded[2];
 
   var lines = heroLines((heroPoem && heroPoem.paragraphs) || []);
   if (!lines.length) lines = [hero.excerpt || hero.title];
@@ -78,7 +70,6 @@ export async function renderHome(param, ctx) {
   var heroChars = Math.max.apply(null, lines.map(function (line) { return Array.from(line).length; }).concat(4));
   var cipai = (heroPoem && heroPoem.rhythmic) || hero.title;
   var kindLabel = hero.id.charAt(0) === 'c' ? '词' : '诗';
-  var quotes = picked.pick.filter(function (e) { return e.id !== hero.id && e.excerpt; }).slice(0, 6);
 
   var heroCard = '<article class="gcard hero-card" aria-labelledby="home-hero-title">'
     + '<div class="hero-card__top">'
@@ -103,56 +94,8 @@ export async function renderHome(param, ctx) {
     + findForm(HINTS)
     + '</section>';
 
-  var stats = '';
-  if (manifest) {
-    stats += statTile({ nav: 'list', label: '诗集', value: manifest.total, unit: '首', cls: 'stat-tile--poems' });
-  }
-  if (authors) {
-    stats += statTile({ nav: 'authors', label: '诗人', value: authors.length, unit: '位', cls: 'stat-tile--poets' });
-  }
-
-  var era = '';
-  var dyn = manifest && manifest.dynasties;
-  if (dyn && dyn['唐'] && dyn['宋']) {
-    var tang = Math.round(dyn['唐'] / (dyn['唐'] + dyn['宋']) * 1000) / 10;
-    era = '<section class="gcard era-tile" aria-labelledby="home-era-h">'
-      + cardHead('home-era-h', '唐诗 · 宋词')
-      + '<div class="era-tile__bar" aria-hidden="true"><span style="--share:' + tang + '%"></span></div>'
-      + '<dl class="era-tile__list">'
-      + '<div class="era-tile__item era-tile__item--tang"><dt>唐诗</dt><dd>' + latinNum(dyn['唐']) + ' 首</dd></div>'
-      + '<div class="era-tile__item era-tile__item--song"><dt>宋词</dt><dd>' + latinNum(dyn['宋']) + ' 首</dd></div>'
-      + '</dl></section>';
-  }
-
-  var masters = '';
-  if (authors) {
-    var top = authors.filter(function (a) { return ANONYMOUS.indexOf(a.name) < 0; })
-      .sort(function (a, b) { return b.count - a.count; }).slice(0, 5);
-    masters = '<section class="gcard masters-tile" aria-labelledby="home-masters-h">'
-      + cardHead('home-masters-h', '名家',
-        '<a class="card-head__more" href="' + navHref('authors') + '" data-nav="authors">全部诗人</a>')
-      + '<ul class="masters">' + top.map(function (a) {
-        return '<li><a class="master" href="' + navHref('author/' + a.slug) + '" data-nav="author/' + esc(a.slug) + '">'
-          + seal(a.name, a.dynasty, 'md')
-          + '<span class="master__name">' + esc(a.name) + '</span>'
-          + '<span class="master__count">' + latinNum(a.count) + ' 首</span></a></li>';
-      }).join('') + '</ul></section>';
-  }
-
-  var about = '<a class="gcard about-tile" href="' + navHref('about') + '" data-nav="about">'
-    + '<span class="about-tile__title">关于情心</span>'
-    + '<span class="about-tile__sub">数据来源与致谢</span>'
-    + '<span class="stat-tile__go" aria-hidden="true">' + ICONS.arrow + '</span></a>';
-
   document.getElementById('page-home').innerHTML = '<div class="gpage home">'
-    + '<div class="bento' + (manifest ? '' : ' bento--no-manifest') + (authors ? '' : ' bento--no-authors') + '">'
-    + heroCard + find + stats + era + masters + about
-    + '</div>'
-    + '<section class="home-picks" aria-labelledby="home-picks-h">'
-    + '<div class="gpage-bar"><h2 class="gpage-bar__title" id="home-picks-h">精选诗词</h2>'
-    + '<a class="btn btn--chip" href="' + navHref('list') + '" data-nav="list">浏览全部</a></div>'
-    + '<div class="card-grid card-grid--quotes">' + quotes.map(quoteCard).join('') + '</div>'
-    + '</section>'
+    + '<div class="home-stack">' + heroCard + find + '</div>'
     + '</div>';
   // 「换一首」重建了卡片：焦点落回新的「换一首」，键盘读者不必从头找起。
   if (ctx.shuffle && document.activeElement === document.body) {

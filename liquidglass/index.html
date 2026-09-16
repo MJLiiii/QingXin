@@ -115,10 +115,11 @@
     // 离线/跨刷新缓存；Worker 在站点根目录，作用域覆盖两套界面（GitHub Pages 子路径 /QingXin/ 亦可）。特性检测 + 静默失败。
     if ('serviceWorker' in navigator) {
       // 旧版 Worker 会给本页送上缓存的旧模块：v1…v6 的 data.js 按页面目录取 data/…（子目录里 404），
-      // v7 缓存里没有本页依赖的 glass-*.js 与新导出。本页若由旧 Worker 控制，新 Worker 接管后刷新一次。
+      // v7 缓存里没有本页依赖的 glass-*.js 与新导出，v8 缓存里的 glass-pages.js 还引用已删掉的首页卡片模板。
+      // 本页若由旧 Worker 控制，新 Worker 接管后刷新一次。
       if (navigator.serviceWorker.controller && window.caches) {
         var legacySW = caches.keys().then(function (keys) {
-          return keys.some(function (k) { return /^qingxin-v[1-7]$/.test(k); });
+          return keys.some(function (k) { return /^qingxin-v[1-8]$/.test(k); });
         }, function () { return false; });
         navigator.serviceWorker.addEventListener('controllerchange', function () {
           legacySW.then(function (legacy) { if (legacy) window.location.reload(); });

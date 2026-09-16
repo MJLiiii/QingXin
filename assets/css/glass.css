@@ -55,7 +55,6 @@
   --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px -12px rgba(60, 40, 120, 0.16);
   --card-glow: rgba(153, 106, 255, 0.16);
   --card-glow-2: rgba(56, 189, 248, 0.12);
-  --card-glow-3: rgba(255, 150, 100, 0.14);
   --row-hover-bg: rgba(var(--ink-rgb), 0.04);
   --chip-bg: rgba(255, 255, 255, 0.72);
   --chip-border: rgba(var(--ink-rgb), 0.12);
@@ -63,13 +62,11 @@
   --input-bg: rgba(255, 255, 255, 0.72);
   --nav-hover-bg: rgba(var(--ink-rgb), 0.06);
 
-  /* 印章头像 / 唐宋占比 */
+  /* 印章头像（唐紫 / 宋青） */
   --seal-bg: rgba(var(--ink-rgb), 0.06);
   --seal-fg: var(--ink);
-  --tang: #6A3FD6;
   --tang-bg: rgba(106, 63, 214, 0.12);
   --tang-fg: #4E2BB0;
-  --song: #0E8FC7;
   --song-bg: rgba(14, 143, 199, 0.12);
   --song-fg: #0A5E86;
 
@@ -166,7 +163,6 @@
     --card-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
     --card-glow: rgba(124, 77, 255, 0.2);
     --card-glow-2: rgba(34, 160, 210, 0.12);
-    --card-glow-3: rgba(255, 130, 90, 0.1);
     --row-hover-bg: rgba(255, 255, 255, 0.06);
     --chip-bg: rgba(18, 18, 22, 0.55);
     --chip-border: rgba(255, 255, 255, 0.16);
@@ -174,10 +170,8 @@
     --input-bg: rgba(18, 18, 22, 0.55);
     --nav-hover-bg: rgba(255, 255, 255, 0.08);
     --seal-bg: rgba(255, 255, 255, 0.08);
-    --tang: #996AFF;
     --tang-bg: rgba(153, 106, 255, 0.2);
     --tang-fg: #CDB8FF;
-    --song: #38BDF8;
     --song-bg: rgba(56, 189, 248, 0.16);
     --song-fg: #A5E1FB;
     --btn-bg: #FFFFFF;
@@ -228,7 +222,6 @@
   --card-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
   --card-glow: rgba(124, 77, 255, 0.2);
   --card-glow-2: rgba(34, 160, 210, 0.12);
-  --card-glow-3: rgba(255, 130, 90, 0.1);
   --row-hover-bg: rgba(255, 255, 255, 0.06);
   --chip-bg: rgba(18, 18, 22, 0.55);
   --chip-border: rgba(255, 255, 255, 0.16);
@@ -236,10 +229,8 @@
   --input-bg: rgba(18, 18, 22, 0.55);
   --nav-hover-bg: rgba(255, 255, 255, 0.08);
   --seal-bg: rgba(255, 255, 255, 0.08);
-  --tang: #996AFF;
   --tang-bg: rgba(153, 106, 255, 0.2);
   --tang-fg: #CDB8FF;
-  --song: #38BDF8;
   --song-bg: rgba(56, 189, 248, 0.16);
   --song-fg: #A5E1FB;
   --btn-bg: #FFFFFF;
@@ -843,19 +834,6 @@ body {
   letter-spacing: 0.02em;
 }
 
-.card-head__more {
-  font-family: var(--sans);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  color: var(--accent-text);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.35em;
-}
-
-.card-head__more:hover { text-decoration-thickness: 2px; }
-
 .card-label {
   margin: 0 0 16px;
   font-family: var(--sans);
@@ -871,7 +849,6 @@ body {
 .gcard,
 .pcard,
 .ptile,
-.qcard,
 .tab-panel,
 .poem-list__empty,
 .section--top > .prose,
@@ -882,10 +859,8 @@ body {
   box-shadow: var(--card-shine), var(--card-shadow);
 }
 
-a.gcard,
 .pcard,
-.ptile,
-.qcard {
+.ptile {
   color: inherit;
   text-decoration: none;
   cursor: pointer;
@@ -895,60 +870,38 @@ a.gcard,
     transform 0.3s var(--ease);
 }
 
-a.gcard:hover,
 .pcard:hover,
-.ptile:hover,
-.qcard:hover {
+.ptile:hover {
   background-color: var(--card-bg-hover);
   border-color: var(--card-border-hover);
   transform: translateY(-2px);
 }
 
-a.gcard:active,
 .pcard:active,
-.ptile:active,
-.qcard:active { transform: scale(0.99); }
+.ptile:active { transform: scale(0.99); }
 
 /* 卡片圆角大：焦点环贴着卡片边 */
-a.gcard:focus-visible,
 .pcard:focus-visible,
-.ptile:focus-visible,
-.qcard:focus-visible { outline-offset: 2px; }
+.ptile:focus-visible { outline-offset: 2px; }
 
-/* ---------- 首页：便当卡片墙 ---------- */
+/* ---------- 首页：今日一诗 + 寻章摘句，居中上下叠放 ---------- */
 
-.bento {
+.home-stack {
   display: grid;
   gap: var(--bento-gap);
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  grid-template-areas:
-    "hero hero hero hero hero hero"
-    "find find find find find find"
-    "poems poems poets poets era era"
-    "masters masters masters masters about about";
+  max-width: 960px;
+  margin-inline: auto;
+  padding-top: 12px;
 }
 
-.hero-card { grid-area: hero; }
-.find-tile { grid-area: find; }
-.stat-tile--poems { grid-area: poems; }
-.stat-tile--poets { grid-area: poets; }
-.era-tile { grid-area: era; }
-.masters-tile { grid-area: masters; }
-.about-tile { grid-area: about; }
-
-/* 统计数据没加载到时，剩下的卡片占满空出来的格子（区域名在各断点通用） */
-.bento--no-authors .stat-tile--poems { grid-column: poems-start / poets-end; }
-.bento--no-authors .about-tile { grid-column: masters-start / about-end; }
-.bento--no-manifest .stat-tile--poets { grid-column: poems-start / era-end; }
-
-/* 今日一诗：大字铺满卡片，右下角淡色印章水印 */
+/* 今日一诗：大字铺满卡片，右下角淡色印章水印；视口够高（桌面约 630px 起）时与搜索卡一起放进首屏 */
 .hero-card {
   position: relative;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 28px;
-  min-height: clamp(400px, 58vh, 560px);
+  min-height: clamp(360px, calc(100svh - var(--header-space) - 280px), 560px);
   padding: 28px 32px 30px;
   border-radius: var(--r-xl);
   background:
@@ -983,6 +936,8 @@ a.gcard:focus-visible,
 .hero-card__lines {
   margin: auto 0 0;
   font-size: clamp(28px, calc(100cqi / (var(--hero-chars, 5) + 0.6)), 112px);
+  /* 矮窗口再按视口高度收小（480px ≈ 卡片上方 + 卡片其余部分 + 搜索卡），两行大字留在首屏 */
+  font-size: clamp(28px, min(100cqi / (var(--hero-chars, 5) + 0.6), (100svh - 480px) / 2.3), 112px);
   font-weight: 600;
   line-height: 1.14;
   letter-spacing: -0.01em;
@@ -1035,14 +990,17 @@ a.gcard:focus-visible,
   user-select: none;
 }
 
-/* 寻章摘句：胶囊搜索框 + 热门词 */
+/* 寻章摘句：标题 + 胶囊搜索框一行，热门词在搜索框下（手机上纵向排） */
 .find-tile {
-  display: flex;
-  flex-direction: column;
-  padding: 22px 22px 20px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 24px;
+  padding: 22px 24px 20px 28px;
 }
 
-.find-tile .card-head { margin-bottom: 14px; }
+.find-tile .card-head { margin: 0; }
+.find-tile .find__hints { grid-column: 2; }
 
 .find {
   display: flex;
@@ -1118,230 +1076,13 @@ a.gcard:focus-visible,
   color: var(--muted);
 }
 
-/* 统计卡：标签在上、大数字在下，右上角箭头块 */
-.stat-tile,
-.about-tile {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 20px;
-  min-height: 148px;
-  padding: 20px 22px;
-}
-
-.stat-tile--poems {
-  background-image: linear-gradient(140deg, rgba(var(--accent-rgb), 0.14), transparent 60%);
-}
-
-.stat-tile__label {
-  font-family: var(--sans);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-}
-
-.stat-tile__value {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 2px 6px;
-}
-
-.stat-tile__value .latin {
-  font-size: clamp(30px, 2.8vw, 44px);
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-
-.stat-tile__unit {
-  font-family: var(--sans);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--muted);
-}
-
-.stat-tile__go {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: var(--tile-bg);
-  font-size: 16px;
-  color: var(--ink);
-  transition: transform 0.3s var(--ease), background-color var(--dur) var(--ease);
-}
-
-.stat-tile__go .icon { transform: rotate(-45deg); }
-
-a.gcard:hover .stat-tile__go {
-  background: var(--btn-bg);
-  color: var(--btn-fg);
-  transform: scale(1.06);
-}
-
-/* 唐诗 / 宋词：比例条（装饰）+ 带色块的数字 */
-.era-tile { padding: 20px 22px; }
-
-.era-tile .card-head { margin-bottom: 18px; }
-
-.era-tile__bar {
-  display: flex;
-  gap: 3px;
-  height: 10px;
-}
-
-.era-tile__bar::after {
-  content: "";
-  flex: 1;
-  border-radius: var(--r-pill);
-  background: var(--song);
-}
-
-.era-tile__bar > span {
-  width: var(--share);
-  border-radius: var(--r-pill);
-  background: var(--tang);
-}
-
-.era-tile__list {
-  margin: 16px 0 0;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.era-tile__item dt {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--sans);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-}
-
-/* 色块形状不同（圆 / 方），不只靠颜色区分 */
-.era-tile__item dt::before {
-  content: "";
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--tang);
-}
-
-.era-tile__item--song dt::before {
-  border-radius: 2px;
-  background: var(--song);
-}
-
-.era-tile__item dd {
-  margin: 6px 0 0;
-  font-size: 14px;
-  color: var(--muted);
-}
-
-.era-tile__item .latin {
-  font-size: 24px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-}
-
-/* 名家：印章 + 姓名 + 作品数 */
-.masters-tile { padding: 20px 22px 16px; }
-
-.masters-tile .card-head { margin-bottom: 8px; }
-
-.masters {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 4px;
-}
-
-.master {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  height: 100%;
-  padding: 12px 4px;
-  border-radius: var(--r-md);
-  color: inherit;
-  text-align: center;
-  text-decoration: none;
-  transition: background-color var(--dur) var(--ease);
-}
-
-.master:hover { background-color: var(--row-hover-bg); }
-
-.master:hover .master__name {
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.25em;
-}
-
-.master__name {
-  font-size: 16px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  overflow-wrap: anywhere;
-}
-
-.master__count {
-  font-family: var(--sans);
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.master__count .latin { font-variant-numeric: tabular-nums; }
-
-/* 关于情心 */
-.about-tile {
-  justify-content: flex-end;
-  gap: 6px;
-  background-image:
-    radial-gradient(circle at 100% 0%, var(--card-glow-2), transparent 60%),
-    radial-gradient(circle at 0% 100%, var(--card-glow-3), transparent 60%);
-}
-
-.about-tile__title {
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.about-tile__sub {
-  font-family: var(--sans);
-  font-size: 13px;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-}
-
-/* 精选诗词 */
-.home-picks { margin-top: 64px; }
-
-/* ---------- 卡片网格：诗 / 诗人 / 名句 / 作品 ---------- */
+/* ---------- 卡片网格：诗 / 诗人 / 作品 ---------- */
 
 .card-grid {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
 }
-
-.card-grid--quotes { --cols: 2; }
 
 /* 诗卡 */
 .pcard {
@@ -1517,55 +1258,6 @@ a.gcard:hover .stat-tile__go {
   height: 96px;
   border-radius: 30px;
   font-size: 50px;
-}
-
-/* 名句卡：摘句为主 */
-.qcard {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  min-width: 0;
-  min-height: 176px;
-  padding: 24px 26px 20px;
-}
-
-.qcard::before {
-  content: "";
-  width: 28px;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--accent);
-}
-
-.qcard__line {
-  word-break: keep-all;
-  font-size: clamp(21px, 1.9vw, 26px);
-  font-weight: 500;
-  line-height: 1.55;
-  letter-spacing: 0.04em;
-  text-wrap: balance;
-  overflow-wrap: anywhere;
-}
-
-.qcard__foot {
-  margin-top: auto;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 12px;
-  font-family: var(--sans);
-  font-size: 13px;
-  letter-spacing: 0.04em;
-}
-
-.qcard__title { overflow-wrap: anywhere; }
-.qcard__by { color: var(--muted); }
-
-.qcard:hover .qcard__title {
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.3em;
 }
 
 /* 空态 / 搜索出错（templates.js emptyState 的标记） */
@@ -2607,7 +2299,6 @@ a.gcard:hover .stat-tile__go {
   .gcard,
   .pcard,
   .ptile,
-  .qcard,
   .tab-panel,
   .poem-list__empty,
   .section--top > .prose,
@@ -2645,33 +2336,18 @@ a.gcard:hover .stat-tile__go {
   .search:focus-within,
   .find:focus-within { outline: 2px solid CanvasText; }
   .pager__input:focus { outline: 2px solid CanvasText; }
-  .era-tile__bar > span,
-  .era-tile__bar::after { border: 1px solid CanvasText; }
   .search::before,
-  .era-tile__item dt::before,
   .chip--accent::before {
     forced-color-adjust: none;
     background: CanvasText;
   }
 }
 
-/* ---------- 宽屏 ≥1200：便当 12 列、两栏详情页、五列网格 ---------- */
+/* ---------- 宽屏 ≥1200：两栏详情页、五列网格 ---------- */
 
 @media (min-width: 1200px) {
-  .bento {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    grid-template-areas:
-      "hero hero hero hero hero hero hero hero find find find find"
-      "hero hero hero hero hero hero hero hero poems poems poets poets"
-      "hero hero hero hero hero hero hero hero era era era era"
-      "masters masters masters masters masters masters masters masters about about about about";
-  }
-
-  .hero-card { min-height: 0; }
-
   .card-grid--poems,
   .card-grid--poets { --cols: 5; }
-  .card-grid--quotes { --cols: 3; }
 
   /* 左栏约 46%：24px 原文一行 20 字不折行 */
   .poem-layout {
@@ -2761,54 +2437,35 @@ a.gcard:hover .stat-tile__go {
 
   .gpage { padding-top: 16px; }
 
-  .bento {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-areas:
-      "hero hero"
-      "find find"
-      "poems poets"
-      "era era"
-      "masters masters"
-      "about about";
-  }
+  .home-stack { padding-top: 0; }
 
+  /* 视口够高（约 610px 起）时，今日一诗与搜索卡都停在底部标签栏之上 */
   .hero-card {
-    min-height: min(440px, 64svh);
+    min-height: clamp(260px, calc(100svh - var(--header-space) - var(--tabbar-space) - 300px), 460px);
     gap: 20px;
     padding: 20px 20px 22px;
   }
-  .hero-card__lines { font-size: clamp(22px, calc(100cqi / (var(--hero-chars, 5) + 0.5)), 112px); } /* 12 字的句子在 320 也不折行 */
+  /* 12 字的句子在 320 也不折行；矮屏再按视口高度收小（560px ≈ 卡片其余部分 + 搜索卡 + 标签栏） */
+  .hero-card__lines {
+    font-size: clamp(22px, calc(100cqi / (var(--hero-chars, 5) + 0.5)), 112px);
+    font-size: clamp(22px, min(100cqi / (var(--hero-chars, 5) + 0.5), (100svh - 560px) / 2.3), 112px);
+  }
   .hero-card__foot {
     flex-direction: column;
     align-items: stretch;
   }
   .hero-card__actions > * { flex: 1 1 0; }
 
-  .find-tile,
-  .era-tile,
-  .masters-tile { padding: 18px 18px 16px; }
+  .find-tile {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 14px;
+    padding: 18px 18px 16px;
+  }
+  .find-tile .find__hints {
+    grid-column: auto;
+    margin-top: 0;
+  }
   .find { padding-left: 14px; }
-
-  .stat-tile,
-  .about-tile {
-    min-height: 128px;
-    padding: 16px 18px;
-  }
-  .stat-tile__go {
-    top: 12px;
-    right: 12px;
-    width: 30px;
-    height: 30px;
-  }
-  .about-tile { min-height: 0; padding-right: 56px; }
-  .about-tile .stat-tile__go {
-    top: 50%;
-    margin-top: -15px;
-  }
-
-  .home-picks { margin-top: 48px; }
-  .card-grid--quotes { --cols: 1; }
-  .qcard { min-height: 0; padding: 20px 22px 18px; }
 
   .card-grid { --cols: 1; }
   .pcard { min-height: 0; }
@@ -2873,6 +2530,11 @@ a.gcard:hover .stat-tile__go {
   .section--top > .prose { padding: 36px 24px; }
 
   .site-footer { margin-top: 64px; }
+  /* 首页只有两张卡：页脚推到首屏之下（64px = 上面的页脚外边距），不被底部标签栏压住 */
+  #page-home.is-active {
+    min-height: calc(100vh - var(--header-space) - 64px);
+    min-height: calc(100lvh - var(--header-space) - 64px);
+  }
   .site-footer__inner {
     flex-direction: column;
     align-items: flex-start;
@@ -2889,17 +2551,8 @@ a.gcard:hover .stat-tile__go {
   .card-grid--works { --cols: 2; }
 }
 
-/* 小屏手机：名家与分页再收紧，「创作背景」只显示「背景」（完整名称仍给读屏） */
+/* 小屏手机：分页再收紧，注释上下排，「创作背景」只显示「背景」（完整名称仍给读屏） */
 @media (max-width: 389px) {
-  .masters .seal--md {
-    width: 44px;
-    height: 44px;
-    border-radius: 14px;
-    font-size: 22px;
-  }
-  .master { padding-inline: 2px; }
-  .master__name { font-size: 14px; }
-
   .pager__btn--edge { display: none; }
 
   /* 注释词与释义上下排，词不再挤在窄栏里 */
@@ -2919,25 +2572,24 @@ a.gcard:hover .stat-tile__go {
   }
 }
 
-/* 极窄屏：统计卡、名家、工具与标签再收一点 */
+/* 极窄屏：搜索按钮、工具与标签再收一点 */
 @media (max-width: 359px) {
-  .stat-tile { padding-inline: 14px; }
-  .stat-tile__value {
-    flex-wrap: nowrap;
-    gap: 4px;
+  .find-tile { padding-inline: 14px; }
+  .find {
+    gap: 6px;
+    padding-left: 12px;
   }
-  .stat-tile__value .latin { font-size: 24px; }
-  .master { padding-inline: 0; }
-  .master__count {
-    font-size: 11px;
+  .find__input { letter-spacing: 0; } /* 占位提示「标题、作者或名句」完整显示 */
+  .find__go { padding: 0 14px; }
+  /* 「试试」只留给读屏，热门词排成一行 */
+  .find__hint-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
     white-space: nowrap;
   }
-  .masters .seal--md {
-    width: 40px;
-    height: 40px;
-    font-size: 20px;
-  }
-  .find__go { padding: 0 14px; }
   .reader-tools__btn { padding: 0 10px; }
   .tabs__tab { font-size: 13px; letter-spacing: 0; }
 }

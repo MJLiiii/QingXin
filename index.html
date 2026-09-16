@@ -287,7 +287,7 @@
       color: #2B2B2B;
     }
 
-    /* Liquid Glass 预览：近黑底 + 三团流光，三颗玻璃胶囊页眉（同一个 SVG 折射滤镜，压在一行文字上）+ 便当卡片 */
+    /* Liquid Glass 预览：近黑底 + 三团流光，三颗玻璃胶囊页眉（同一个 SVG 折射滤镜，压在一行文字上）+ 今日一诗与搜索卡 */
     .gp {
       position: relative;
       isolation: isolate;
@@ -403,27 +403,26 @@
 
     .gp__mode svg path { fill: currentColor; stroke: none; }
 
-    .gp__bento {
+    .gp__stack {
       flex: 1;
       min-height: 0;
+      width: 76%;
+      margin: 3cqi auto 0;
       display: grid;
-      grid-template-columns: 1.9fr 1fr;
-      grid-template-rows: 1fr 1fr;
-      gap: 1.8cqi;
-      margin-top: 3cqi;
+      grid-template-rows: minmax(0, 1fr) auto;
+      gap: 1.6cqi;
     }
 
     .gp__card {
       display: flex;
       flex-direction: column;
-      padding: 2.4cqi 2.6cqi;
+      padding: 2.4cqi 2.8cqi;
       background: rgba(18, 18, 22, 0.6);
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 3cqi;
     }
 
     .gp__hero {
-      grid-row: 1 / 3;
       background:
         radial-gradient(circle at 100% 0%, rgba(124, 77, 255, 0.26), transparent 55%),
         rgba(18, 18, 22, 0.72);
@@ -441,7 +440,7 @@
 
     .gp__title {
       margin-top: auto;
-      font-size: 6cqi;
+      font-size: 5.6cqi;
       font-weight: 600;
       line-height: 1.12;
       letter-spacing: -0.01em;
@@ -453,33 +452,47 @@
     }
 
     .gp__meta {
-      margin-top: 1.8cqi;
-      padding-top: 1.4cqi;
+      margin-top: 1.6cqi;
+      padding-top: 1.2cqi;
       border-top: 1px solid rgba(255, 255, 255, 0.12);
       font-size: 1.7cqi;
       color: #AEAEB2;
     }
 
-    .gp__label {
-      font-family: var(--sans);
-      font-size: 1.6cqi;
-      color: #98989D;
+    .gp__find {
+      flex-direction: row;
+      align-items: center;
+      gap: 2cqi;
+      padding-block: 1.6cqi;
     }
 
-    .gp__num {
-      margin-top: auto;
-      font-family: 'Inter', var(--sans);
-      font-size: 4.2cqi;
+    .gp__find-label {
+      flex: none;
+      font-size: 2cqi;
       font-weight: 600;
-      letter-spacing: -0.02em;
     }
 
-    .gp__num small {
-      margin-left: 0.6cqi;
+    .gp__find-box {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 4.6cqi;
+      padding: 0 0.5cqi 0 1.8cqi;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      background: rgba(18, 18, 22, 0.55);
       font-family: var(--sans);
       font-size: 1.6cqi;
-      font-weight: 500;
-      color: #98989D;
+      color: #A1A1A6;
+    }
+
+    .gp__find-go {
+      padding: 0.8cqi 1.8cqi;
+      border-radius: 999px;
+      background: #FFFFFF;
+      font-weight: 600;
+      color: #0A0A0A;
     }
 
     .glass-defs {
@@ -531,14 +544,16 @@
     @media (prefers-reduced-transparency: reduce) {
       .gp__effect { display: none; }
       .gp__tint,
-      .gp__card { background: #161618; }
+      .gp__card,
+      .gp__find-box { background: #161618; }
     }
 
     @media (forced-colors: active) {
       .gp__glass,
       .gp__under { display: none; }
       .gp__cap,
-      .gp__card { border: 1px solid CanvasText; }
+      .gp__card,
+      .gp__find-box { border: 1px solid CanvasText; }
     }
   </style>
 </head>
@@ -593,21 +608,23 @@
                 <span class="gp__cap gp__nav"><span class="gp__glass"><span class="gp__effect"></span><span class="gp__tint"></span><span class="gp__shine"></span></span><span class="gp__on">首页</span><span>诗集</span><span>诗人</span><span>关于</span></span>
                 <span class="gp__cap gp__mode"><span class="gp__glass"><span class="gp__effect"></span><span class="gp__tint"></span><span class="gp__shine"></span></span><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z"/></svg></span>
               </div>
-              <div class="gp__bento">
+              <div class="gp__stack">
                 <div class="gp__card gp__hero">
                   <span class="gp__chip">今日一词</span>
                   <div class="gp__title">明月几时有<span>把酒问青天</span></div>
                   <div class="gp__meta">《水调歌头》　苏轼〔宋〕</div>
                 </div>
-                <div class="gp__card"><span class="gp__label">诗集</span><span class="gp__num">78,660<small>首</small></span></div>
-                <div class="gp__card"><span class="gp__label">诗人</span><span class="gp__num">5,119<small>位</small></span></div>
+                <div class="gp__card gp__find">
+                  <span class="gp__find-label">寻章摘句</span>
+                  <span class="gp__find-box">标题、作者或名句<span class="gp__find-go">搜索</span></span>
+                </div>
               </div>
             </div>
           </div>
         </div>
         <div class="design__info">
           <h2 class="design__name" id="glass-name">Liquid Glass</h2>
-          <p class="design__desc" id="glass-desc">液态玻璃：悬浮的玻璃胶囊导航与手机底部标签栏，彩色流光背景，便当式卡片布局，原文与注解分栏、分段切换。</p>
+          <p class="design__desc" id="glass-desc">液态玻璃：悬浮的玻璃胶囊导航与手机底部标签栏，彩色流光背景，今日一诗与搜索的简洁首页，原文与注解分栏、分段切换。</p>
           <span class="design__go" aria-hidden="true">进入 Liquid Glass 界面</span>
         </div>
       </a>

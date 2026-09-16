@@ -119,9 +119,8 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   exported: `wireLiveSearch`/`wireSearch` (optional `{ entry, hit }` row templates)/`wirePager`,
   `pickFeatured`, `loadPoemData`, `poemParts` (toolbar, 原文, notes), `notesHTML`, `aiNotice`.
 - `glass-pages.js` — the liquid-glass renderers (same `(param, ctx)` contract, same data and hooks):
-  home is a bento wall (今日一诗 hero card, 寻章摘句 search form → `#/list?q=`, stat tiles from
-  `manifest.json`/`authors-index.json` (soft-loaded: failures hide the tile and `noCache()`), 唐/宋 split,
-  top-5 名家 excluding 无名氏/不详, about tile, six quote cards); 诗集/诗人 are card grids with the same
+  home is just two centred, stacked cards — the 今日一诗 hero (only `featured.json` + that poem are
+  loaded) and the 寻章摘句 search form (→ `#/list?q=`, plus hint links); 诗集/诗人 are card grids with the same
   search/pager wiring; the poem page is a two-column layout (`.poem-aside[data-pin]` with title, fact chips,
   the toolbar in a glass `.tools-dock` and the 原文 card; `.poem-main` with the AI note, segmented tabs and the
   author card; poems over 60 lines get `.poem-layout--long` and no `data-pin`; each 原文 line is wrapped in a
@@ -183,7 +182,8 @@ HTTP-cache copy of a module can never be written back next to newer ones. It pre
 (root, `kyne/`, `liquidglass/`, both stylesheets, every `assets/js/*.js`) with `cache: 'reload'`, bypassing
 the HTTP cache so a new worker never mixes old and new modules; one missing entry fails the whole install.
 **Adding/renaming a frontend module or shell means updating its `SHELL` list; changing any cached format
-means bumping `CACHE_NAME`** (currently `qingxin-v8`; old caches are purged on activate).
+means bumping `CACHE_NAME`** (currently `qingxin-v9`; old caches are purged on activate). Also bump it when a
+module drops an export another module used to import, so the new set is precached in one step.
 
 **Detail-page invariant:** all five section headings (原文/注释/译文/赏析/创作背景) always
 render. Only 原文 + author bio come from source data; the other four come from the annotation
@@ -213,9 +213,10 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
   `.site-nav__link[data-nav]` (glass uses it for both the header nav and the tab bar; only one of the two is
   displayed at any width). The service-worker block reloads the page once when an old worker hands over:
   Kyne checks for `qingxin-v1…v6` caches (those still serve the page-relative `data.js`), glass for
-  `v1…v7` (a v7 cache has no `glass-*.js` and stale shared modules) — drop the block once those workers
-  have aged out. `pages.js`/`templates.js` only feed Kyne now; shared modules (`router`, `reader`, `data`,
-  search) must keep working for both, so check `/kyne/` and `/liquidglass/`. Kyne is kept pixel-identical
+  `v1…v8` (a v7 cache has no `glass-*.js` and stale shared modules; a v8 `glass-pages.js` still imports the
+  removed home-card templates) — drop the block once those workers have aged out. `pages.js`/`templates.js`
+  only feed Kyne now; shared modules (`router`, `reader`, `data`, search) must keep working for both, so check
+  `/kyne/` and `/liquidglass/`. Kyne is kept pixel-identical
   across glass work (compare against `main`).
 - **Kyne design system** (`assets/css/kyne.css`, frozen from the Kyne redesign): editorial monochrome —
   `--paper` #F6F6F6, `--surface` #FCFCFC, `--ink` #2B2B2B, muted tiers `--body`/`--muted`/`--muted-2`/`--muted-3`
@@ -229,7 +230,7 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
   Liquid Glass + the [svg-glass-navbar-effect](https://svg-glass-navbar-effect.webflow.io/) Webflow template),
   light by default. **Layers:** a fixed `.ambient` backdrop (three blurred radial blobs `--blob-violet/cyan/
   peach`, drifting via transform-only keyframes; static under reduced motion) → translucent content cards
-  (`.gcard`, `.pcard`, `.ptile`, `.qcard`, `.tab-panel`, footer card: `--card-bg`/`--card-strong`, no
+  (`.gcard`, `.pcard`, `.ptile`, `.tab-panel`, footer card: `--card-bg`/`--card-strong`, no
   backdrop-filter — the backdrop is already soft) → floating glass controls. **Real glass** (`.glass` span
   layers: `__effect` = backdrop-filter + `filter: url(#qx-glass)`, then `__tint`, `__shine`) is used only on
   floating controls: the three header `.capsule`s, the phone `.tabbar`, the sticky `.tabs`, the `.tools-dock`
@@ -242,8 +243,8 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
   `--accent-text`/`--accent-halo` (#6A3FD6 light; #996AFF dark with `--accent-text` #AB87FF — accent text
   only on cards); `--blob-*`; glass `--glass-*` (incl. `--glass-tint-strong` for the scrolled header),
   `--pop-*`, `--seg-selected-*`; surfaces `--card-*` (dark cards are a dark tint, `rgba(18,18,22,.55)`),
-  `--row-hover-bg`, `--chip-*`, `--tile-bg`, `--input-bg`, `--nav-hover-bg`; seals/eras `--seal-*`,
-  `--tang*`, `--song*`; buttons `--btn-*`/`--btn2-*`; radii `--r-*`; motion `--ease`/`--dur`; layout
+  `--row-hover-bg`, `--chip-*`, `--tile-bg`, `--input-bg`, `--nav-hover-bg`; seals `--seal-*`,
+  `--tang-*`, `--song-*`; buttons `--btn-*`/`--btn2-*`; radii `--r-*`; motion `--ease`/`--dur`; layout
   `--max` 1360, `--gutter`, `--measure`, `--capsule-h`, `--header-h/gap/space`, `--sticky-top` (sticky
   controls and pinned columns), `--tabs-h`, `--tabbar-h/gap/space` (`--tabbar-space` is 0 on desktop; body
   bottom padding, pager offset and scroll padding use it), `--bento-gap`, `--content-w` (safe-area aware).
@@ -272,11 +273,14 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
   `templates.js`; sizes use `cqi`, so the heading's parent sets `container-type` (glass: `.poem-head`,
   `.gpage-head`, `.profile-card__id`, `.about-hero`); the home hero sizes itself from `--hero-chars` + `cqi`
   (its lines come from `heroLines()`). CJK needs `line-height ≥ 1.05` and tracking no tighter than `-0.03em`.
-  Glass breakpoints: `(min-width: 1200px)` (12-column bento, two-column poem/author pages, 5-column grids),
-  810–1199 (6-column bento, single centred column), `(max-width: 809px)` (tab bar replaces the header nav,
-  2-column bento, 1-column grids; 600–809 gets 2-column grids), `(max-width: 389px)` (smaller 名家 seals, no
-  «/» pager edges, 创作背景 tab shows 背景 with the full name kept for screen readers) and
-  `(max-width: 359px)` (19px stanzas so 12-character lines fit at 320).
+  Glass breakpoints: `(min-width: 1200px)` (two-column poem/author pages, 5-column grids), 810–1199 (single
+  centred column, 3-column grids), `(max-width: 809px)` (tab bar replaces the header nav, the home search card
+  stacks, 1-column grids; 600–809 gets 2-column grids), `(max-width: 389px)` (no «/» pager edges, notes stack,
+  创作背景 tab shows 背景 with the full name kept for screen readers) and `(max-width: 359px)` (tighter search
+  card, toolbar and tabs; the 试试 hint label is visually hidden). The home hero's `min-height` and, on short
+  viewports, its line size (`(100svh - …) / 2.3`) subtract the header, search card (and tab bar on phones), so
+  both home cards fit the first screen from about 630px (desktop) / 610px (phones) of height; on phones
+  `#page-home` also fills the screen so the footer starts below the fold instead of under the tab bar.
 - **`templates.js` markup is frozen by `tools/tests/templates.test.mjs`** (and `glass-templates.js` by
   `glass-templates.test.mjs`) — restyle from CSS or add a new builder instead. Decorative pseudo-content is
   written as `content: "x" / ""` so screen readers skip it. Page structure belongs in `pages.js` (Kyne),
