@@ -18,8 +18,9 @@
       var fromRoot = false;
       try {
         var root = new URL('../', window.location.href).pathname;
-        var from = new URL(document.referrer).pathname;
-        fromRoot = from === root || from === root + 'index.html';
+        var from = new URL(document.referrer);
+        fromRoot = from.origin === window.location.origin
+          && (from.pathname === root || from.pathname === root + 'index.html');
       } catch (e) {}
       window.location.replace((fromRoot ? '../?' : '../') + window.location.hash);
     })();

@@ -194,9 +194,10 @@ function onKeydown(e) {
 
 export function startRouter(pages) {
   if (!pages) {
-    // 只有已删除的 Kyne 入口（kyne/ 里的 app.js）不传渲染器：那是旧版 Worker 从缓存送来的旧页面，
-    // 直接去根目录的新站（../? 不在旧缓存里，不会再拿到旧页面）。旧 Worker 淘汰后可删。
-    window.location.replace(new URL('../?', window.location.href).href + window.location.hash);
+    // 不传渲染器的只有已删除的 Kyne 入口 app.js（kyne/ 页面，及 v7 之前根目录的旧版页面）：
+    // 那是旧版 Worker 从缓存送来的旧页面，直接去站点根目录的新站。目标按本模块位置（assets/js/）求，
+    // 与旧页面在哪一层无关；带空查询（?）是为了不在旧缓存里命中旧页面。旧 Worker 淘汰后可删。
+    window.location.replace(new URL('../../?', import.meta.url).href + window.location.hash);
     return;
   }
   renderers = pages;

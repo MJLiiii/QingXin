@@ -492,7 +492,7 @@ body {
   border-color: var(--card-border-hover);
 }
 
-/* 胶囊标签：体裁、数量、词序、「未收录」等小注记 */
+/* 胶囊标签：体裁、数量、词序等小注记 */
 .chip,
 .badge {
   display: inline-flex;
