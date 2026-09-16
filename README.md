@@ -4,13 +4,13 @@
 
 情心是一个纯静态、无后端的古诗词阅读项目。前端使用原生 HTML、CSS、JavaScript 编写，不依赖框架或打包工具；运行时所有内容都由浏览器从 `data/` 目录下的 JSON 文件中 `fetch` 加载，诗词正文不写死在 HTML 里。
 
-同一套数据与功能提供两种界面，可在页脚随时切换（停留的页面会跟着过去）：
+同一套数据与功能提供两种界面，各有自己的页面布局，可在页脚随时切换（停留的页面会跟着过去）：
 
 | 界面 | 风格 | 线上地址 |
 | --- | --- | --- |
 | 入口 | 并排预览两种界面 | <https://mjliiii.github.io/QingXin/> |
 | Kyne | 黑白极简、编辑排版 | <https://mjliiii.github.io/QingXin/kyne/> |
-| Liquid Glass | 玻璃胶囊导航、半透明卡片、紫色点缀 | <https://mjliiii.github.io/QingXin/liquidglass/> |
+| Liquid Glass | 应用式液态玻璃：悬浮胶囊导航（手机为底部标签栏）、彩色流光背景、便当卡片首页、原文与注解分栏 | <https://mjliiii.github.io/QingXin/liquidglass/> |
 
 以前分享的 `…/QingXin/#/poem/…` 链接会自动转到 Liquid Glass 界面的同一页。
 
@@ -21,7 +21,7 @@
 - 诗集浏览支持分页，以及标题 / 作者 / 名句搜索：繁简、标点归一和轻微错字容错；名句检索覆盖有注释的名篇，并容忍一字异文（如全唐诗《静夜思》作“床前看月光”）。
 - 搜索词写入地址栏：从结果进入诗词再返回，搜索词、结果和滚动位置都会保留；链接可在新标签页打开。
 - 诗人页支持按作品数浏览全部作者、近似姓名搜索，并可进入作者详情页。
-- 诗词详情页固定展示原文、注释、译文、赏析、创作背景五个板块；原文与词序中的注释词可点按查看释义，无内容的栏目在标题处标明“未收录”，读者展开过的栏目会被记住。
+- 诗词详情页固定展示原文、注释、译文、赏析、创作背景五个板块；原文与词序中的注释词可点按查看释义，无内容的栏目标明“未收录”。Kyne 界面逐栏折叠并记住展开过的栏目；Liquid Glass 界面在宽屏上左栏钉住原文、右栏用分段标签切换注解，并记住上次看的栏目。
 - 阅读工具：复制全文、分享链接、原文竖排、字号调节，以及跟随系统或手动切换的夜读模式。
 - 注释、译文、赏析、创作背景使用独立叠加层维护，不需要修改大体量原文数据。
 - 可直接部署到 GitHub Pages、Netlify、Vercel 或任意静态文件服务。
@@ -101,18 +101,22 @@ npm run annotate:import -- --dry-run
 QingXin/
 ├── index.html                # 入口页：两种界面的预览与选择
 ├── kyne/index.html           # Kyne 界面骨架：页眉、页脚和空容器
-├── liquidglass/index.html    # Liquid Glass 界面骨架（多了玻璃页眉的滤镜与图层）
+├── liquidglass/index.html    # Liquid Glass 界面骨架：胶囊页眉、底部标签栏、流光背景、折射滤镜
 ├── sw.js                     # Service Worker：离线与跨刷新缓存（作用域覆盖两套界面）
-├── assets/                   # 浏览器直接加载的前端资源（两套界面共用 JS）
+├── assets/                   # 浏览器直接加载的前端资源（路由、阅读、搜索、数据模块两套界面共用）
 │   ├── css/
 │   │   ├── kyne.css          # Kyne 视觉样式和设计变量（含夜读主题）
 │   │   └── glass.css         # Liquid Glass 视觉样式和设计变量（含夜读主题）
 │   └── js/
-│       ├── app.js            # 入口：启动路由
+│       ├── app.js            # Kyne 入口：启动路由
+│       ├── glass-app.js      # Liquid Glass 入口：换上玻璃版渲染器并启动界面交互
 │       ├── router.js         # hash 路由、渲染缓存与滚动恢复
-│       ├── pages.js          # 各页面渲染
+│       ├── pages.js          # Kyne 各页面渲染（及两套共用的搜索 / 分页 / 诗文数据辅助函数）
+│       ├── glass-pages.js    # Liquid Glass 各页面渲染
+│       ├── glass-ui.js       # Liquid Glass 交互：分段标签、首页搜索、钉住的阅读栏
 │       ├── reader.js         # 阅读偏好、原文工具栏与注释浮层
-│       ├── templates.js      # HTML 片段构建
+│       ├── templates.js      # Kyne HTML 片段构建
+│       ├── glass-templates.js # Liquid Glass HTML 片段构建
 │       ├── search*.js        # 标题 / 作者 / 名句检索（含 Web Worker）
 │       └── data.js、utils.js # 数据加载与工具函数
 ├── data/
@@ -142,7 +146,7 @@ QingXin/
 
 分类规则：
 
-- 根目录保留站点入口、项目说明和部署配置，例如 `index.html`、`README.md`、`.nojekyll`；`kyne/`、`liquidglass/` 各放一个界面骨架。
+- 根目录保留站点入口、项目说明和部署配置，例如 `index.html`、`README.md`、`.nojekyll`；`kyne/`、`liquidglass/` 各放一个界面骨架，分别加载 `app.js` 与 `glass-app.js`。
 - `assets/` 放浏览器直接加载的前端资源，按类型拆分为 `css/` 和 `js/`。
 - `data/` 放站点运行所需的静态内容数据，包含可重建数据和手工注释叠加层。
 - `tools/server/` 放本地静态服务器。

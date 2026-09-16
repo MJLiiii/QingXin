@@ -10,9 +10,11 @@ data-driven from the [chinese-poetry](https://github.com/chinese-poetry/chinese-
 dataset (~78,660 poems: 全唐诗 + 宋词). **No poem text is hardcoded in HTML** — the app pages are
 only header/footer + empty page containers; everything else is `fetch`ed from `data/`.
 
-**Two designs, one app.** The same JS, markup and data are served under two app shells:
-`kyne/index.html` (Kyne editorial monochrome, `assets/css/kyne.css`) and `liquidglass/index.html`
-(liquid glass, `assets/css/glass.css`). The root `index.html` is a static chooser page with preview cards
+**Two designs, one app.** The same router, reading layer, search and data serve two app shells:
+`kyne/index.html` (Kyne editorial monochrome, `assets/css/kyne.css`, entry `app.js` → the page renderers in
+`pages.js`) and `liquidglass/index.html` (app-style liquid glass, `assets/css/glass.css`, entry `glass-app.js`
+→ its own renderers in `glass-pages.js` + `glass-ui.js`), so the two layouts differ in markup, not just CSS.
+Routes, `?q=`, prefs and data are identical. The root `index.html` is a static chooser page with preview cards
 (inline CSS); any `#/…` route that lands on the root is forwarded to `liquidglass/` with the route intact,
 so old shared links keep working. Each shell's footer has a `.site-footer__design` switch whose inline
 script appends the current `location.hash` before navigation, so switching keeps the page (and `?q=`).
@@ -29,11 +31,12 @@ There is no build or bundling step. Things you actually run:
 
 - **Check** (the closest thing to lint+tests — run after touching `assets/js/**`, `sw.js`, or `data/**`):
   `cd tools && npm run check` — `node --check` syntax-checks every frontend/tool script, runs the unit
-  tests (`node --test tests/*.test.mjs`: search ranking + line search in `search-core.test.mjs`, HTML
-  builders + utils in `templates.test.mjs`), then runs `node data/validate.mjs`, a read-only
-  data-consistency audit (manifest counts vs search/index rows, id→shard round-trip for every poem,
-  author slug→bucket hits, annotation shape + `source` rules, `lines.json` rows vs annotations and
-  poem text; exits 1 on any error, only warns about annotated poems not yet in `lines.json`).
+  tests (`node --test tests/*.test.mjs`: search ranking + line search in `search-core.test.mjs`, Kyne HTML
+  builders + utils in `templates.test.mjs`, liquid-glass fragments in `glass-templates.test.mjs`), then
+  runs `node data/validate.mjs`, a read-only data-consistency audit (manifest counts vs search/index
+  rows, id→shard round-trip for every poem, author slug→bucket hits, annotation shape + `source` rules,
+  `lines.json` rows vs annotations and poem text; exits 1 on any error, only warns about annotated poems
+  not yet in `lines.json`).
 
 - **Regenerate the data** (only when refreshing/rebuilding `data/**`):
   ```bash
@@ -76,12 +79,14 @@ There is no build or bundling step. Things you actually run:
 lookup table. Ids are unchanged by the sub-file split, so annotations/index/search still key off them.
 See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 is `c59-66`.
 
-**Front end** (`assets/js/`, native ES modules — `app.js` is a 3-line entry calling `startRouter()`):
+**Front end** (`assets/js/`, native ES modules — `app.js` (Kyne) is a 3-line entry calling `startRouter()`;
+`glass-app.js` (liquid glass) calls `startRouter(RENDERERS)` with `glass-pages.js`'s map, then `initGlassUI()`):
 - `router.js` — hash router: `#/home | #/list/:page | #/poem/:id | #/author/:slug | #/authors/:page
-  | #/about`, plus an optional `?q=` live-search query → `RENDERERS` map (unknown routes fall back to
-  home). Navigation uses real `<a href="#/…" data-nav="…">` links (hrefs from `hashPath()`/`hrefFor()`
-  in `utils.js`); one delegated click handler intercepts plain left clicks and lets modifier/middle
-  clicks through (new tab). The same handler dispatches `data-toggle` (collapsible sections),
+  | #/about`, plus an optional `?q=` live-search query → a renderer map (default `pages.js` `RENDERERS`;
+  `startRouter(renderers)` swaps it; unknown routes fall back to home). Navigation uses real
+  `<a href="#/…" data-nav="…">` links (hrefs from `hashPath()`/`hrefFor()` in `utils.js`); one delegated
+  click handler intercepts plain left clicks and lets modifier/middle clicks through (new tab). The same
+  handler dispatches `data-toggle` (collapsible sections),
   `data-action` (`shuffle` re-renders home at random; `copy/share/vertical/scale-up/scale-down/theme/
   gloss-all` go to `reader.js`) and `data-gloss` (note popover; Enter/Space/Escape via delegated keydown).
   **Render cache:** the six `#page-<name>` containers stay in the DOM and `rendered[name]` holds the
@@ -92,9 +97,9 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   **Scroll:** `history.scrollRestoration='manual'`; each history entry gets an id in `history.state.qx`
   — new entries scroll to top, Back/Forward restore the saved offset instantly (explicitly overriding
   the CSS `scroll-behavior: smooth`, which would otherwise drag the restored position). Renderers set
-  titles with `ctx.setTitle(...)`; `show()` applies `document.title`, `hidden` and `aria-current`, so
-  cached re-shows are correct too. After each render it idle-preloads the JSON the next click will
-  likely need.
+  titles with `ctx.setTitle(...)`; `show()` applies `document.title`, `hidden` and `aria-current` (on every
+  `.site-nav__link[data-nav]`, via `NAV_OF`: home/list/authors/about, author → authors), so cached re-shows
+  are correct too. After each render it idle-preloads the JSON the next click will likely need.
 - `pages.js` — the six renderers, all `(param, ctx)` (`renderHome/renderList/renderPoem/renderAuthor/
   renderAuthors/renderAbout`), plus pager/search wiring. Each builds HTML strings **reusing the
   existing CSS classes** and injects into `#page-<name>`. Home is 今日一诗: `data/featured.json`
@@ -108,10 +113,36 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   `start(q)`): global title/author/line search on 诗集 and name-only search on 诗人. Both show
   loading/result status and highlight only real exact substrings. The poem page's 原文 heading
   carries the reading toolbar (复制/分享/竖排/A−/A+; 竖排 is omitted above 60 lines) and note terms are
-  linked inside 词序 + 原文 via `glossLines()`.
+  linked inside 词序 + 原文 via `glossLines()`. The data/wiring pieces a second renderer set needs are
+  exported: `wireLiveSearch`/`wireSearch` (optional `{ entry, hit }` row templates)/`wirePager`,
+  `pickFeatured`, `loadPoemData`, `poemParts` (toolbar, 原文, notes), `notesHTML`, `aiNotice`, `metaRow`.
+- `glass-pages.js` — the liquid-glass renderers (same `(param, ctx)` contract, same data and hooks):
+  home is a bento wall (今日一诗 hero card, 寻章摘句 search form → `#/list?q=`, stat tiles from
+  `manifest.json`/`authors-index.json` (soft-loaded: failures hide the tile and `noCache()`), 唐/宋 split,
+  top-5 名家 excluding 无名氏/不详, about tile, six quote cards); 诗集/诗人 are card grids with the same
+  search/pager wiring; the poem page is a two-column layout (`.poem-aside[data-pin]` with title, fact chips,
+  the toolbar in a glass `.tools-dock` and the 原文 card; `.poem-main` with the AI note, segmented tabs and the
+  author card; poems over 60 lines get `.poem-layout--long` and no `data-pin`); the author page is a pinned
+  profile card + bio + works grid; about is a card grid. `glass-templates.js` holds its pure HTML fragments
+  (cards, `seal()` glyph avatars — first code point of the name, never the data's `seal` field, which is a
+  lone surrogate for astral names — `pagerDock` (keeps `#pager`/`#pager-input[data-route]`/`#pager-go`),
+  `poemTabs`/`pickTab`, `findForm`, `GLASS` layers, `ICONS`). **Tabs:** `role=tablist/tab/tabpanel`, roving
+  tabindex, ←/→/Home/End; panels keep `class="tab-panel entry" data-section` (hidden panels stay in the DOM,
+  so `openGloss` and `expandNotes` work unchanged). The initial tab is `prefs.tab` if that section has
+  content, else the first non-empty one, else 注释; fallbacks never overwrite the pref.
+- `glass-ui.js` — liquid-glass behaviour, all delegated: tab clicks/keys (`selectTab` writes `prefs.tab`
+  on user choice and, when the tab bar is stuck, scrolls the new panel under it), the `qx:expand-notes`
+  event (switches to 注释 without persisting), the home search submit (ignores the IME-confirm Enter), and
+  pinning — `initPin(host)` watches the page's `[data-pin]` column (ResizeObserver + `(min-width: 1200px)` +
+  resize) and sets `data-pinned` (CSS makes it sticky) only when the whole column fits the viewport; a rAF
+  scroll handler keeps an open popover on a pinned term (`repositionGloss()`, closes it if the term leaves
+  the viewport) and toggles `.site-header[data-scrolled]`.
 - `reader.js` — browser-only reading layer: preferences in localStorage `qingxin:prefs`
-  (`theme`, `scale`, `vertical`, `open` section ids), toolbar actions, and the single note popover
-  (`openGloss`/`closeGloss`; the k-th `.gloss` term maps to the k-th `.notes__row`). The inline
+  (`theme`, `scale`, `vertical`, `open` section ids (Kyne), `tab` (liquid glass); `readPrefs`/`writePrefs`
+  merge), toolbar actions, and the single note popover (`openGloss`/`closeGloss`/`repositionGloss`; the k-th
+  `.gloss` term maps to the k-th `.notes__row`; the popover is absolute in document coordinates, or `fixed`
+  when its term sits inside a `[data-pinned]` column). `expandNotes` (查看全部注释) dispatches a bubbling
+  `qx:expand-notes` event on the notes section before scrolling to it. The inline
   `<head>` script in both app shells applies theme/scale/vertical before first paint (the chooser applies
   only the theme) — keep its key and fields in sync with `reader.js`.
 - `data.js` — `fetchJSON()` (memoized via a `Map`; errors carry `status`; `data/…` paths resolve against
@@ -129,9 +160,10 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   Worker (keeping the multi-MB index off the main thread) and transparently uses the same core on the
   main thread if Workers fail.
 - `templates.js` — shared HTML builders (`poemRow`/`authorRow`/`searchRow`, `entryShell`, `proseEntry`,
-  `glossLines`, `pagerHTML`, `searchBoxHTML`, `navHref`); `utils.js` — `esc()`, `hashPath()`/`hrefFor()`,
-  `groupStanzas()`, `idle()`, `localDateKey()`, `seededRandom()`. Both are imported by the Node unit
-  tests, so they must not touch `window`/`document`/`localStorage` at import time.
+  `glossLines`, `pagerHTML`, `searchBoxHTML`, `navHref`, `highlighted`); `utils.js` — `esc()`,
+  `hashPath()`/`hrefFor()`,
+  `groupStanzas()`, `idle()`, `localDateKey()`, `seededRandom()`. These and `glass-templates.js` are
+  imported by the Node unit tests, so they must not touch `window`/`document`/`localStorage` at import time.
 
 **`sw.js` service worker** lives at the site root, so its scope covers both designs: the chooser registers
 `sw.js` and the shells register `../sw.js` (relative, so it works under the `/QingXin/` Pages subpath).
@@ -141,17 +173,18 @@ locally). It pre-caches the app shells (root, `kyne/`, `liquidglass/`, both styl
 `assets/js/*.js`) with `cache: 'reload'`, bypassing the HTTP cache so a new worker never mixes old and new
 modules; one missing entry fails the whole install. **Adding/renaming a frontend module or shell means
 updating its `SHELL` list; changing any cached format means bumping `CACHE_NAME`** (currently
-`qingxin-v7`; old caches are purged on activate).
+`qingxin-v8`; old caches are purged on activate).
 
 **Detail-page invariant:** all five section headings (原文/注释/译文/赏析/创作背景) always
 render. Only 原文 + author bio come from source data; the other four come from the annotation
 overlay (`loadAnnotation()` merges it over the read-only poem) and show a
 "尚未收录，敬请期待。" faint placeholder when absent, with a faint 「未收录」 marker in the heading.
-原文 is always open; the four overlay sections are collapsible entries, collapsed by default unless the
-reader has expanded that section type before (`entryShell(…, collapsible, { section, open, empty })` +
+原文 is always open. In Kyne the four overlay sections are collapsible entries, collapsed by default unless
+the reader has expanded that section type before (`entryShell(…, collapsible, { section, open, empty })` +
 `data-toggle`; empty sections never auto-open, and the popover's 查看全部注释 does not count as a
-preference). Annotations with `source:"ai"` additionally get a faint AI disclaimer line (`aiNotice()`
-in `pages.js`).
+preference). In liquid glass they are segmented tabs (one panel visible, see `glass-pages.js`); empty tabs
+get a dashed outline plus a screen-reader-only （未收录）. Annotations with `source:"ai"` additionally get a
+faint AI disclaimer line (`aiNotice()` in `pages.js`).
 
 ## Conventions & gotchas
 
@@ -159,57 +192,65 @@ in `pages.js`).
   `.nojekyll`); `kyne/` and `liquidglass/` hold the two app shells; `assets/css/` and `assets/js/` hold
   browser-loaded front-end assets; `data/` holds committed static content; `tools/server/`, `tools/data/`,
   and `tools/annotations/` hold local preview, data generation, and annotation-import tooling respectively.
-- **Keep the two shells in step.** `kyne/index.html` and `liquidglass/index.html` share the same header,
-  page containers, footer (incl. the design switch) and inline scripts; they differ only in the
-  `<meta name="description">` text, the Google Fonts URL, the stylesheet, which `.site-footer__design` link
-  carries `aria-current="page"` (the shell's own design), and the glass-only bits (the `#qx-glass` SVG filter
-  and the header's `.glass` layers). The shells' service-worker block also reloads the page once when a
-  pre-v7 worker (cache `qingxin-v1…v6`, which still serves the old page-relative `data.js`) hands over
-  control to the new one — drop it once those workers have aged out. Any change to `pages.js`/`templates.js` markup must look right under **both** stylesheets —
-  check `/kyne/` and `/liquidglass/`.
+- **Keep the two shells in step.** `kyne/index.html` and `liquidglass/index.html` share the `#page-*`
+  containers, `#boot`, the `<head>` prefs script, the service-worker block and the footer design-switch
+  script (`a[data-design]`). They differ in: meta description, Google Fonts URL, stylesheet, entry module
+  (`app.js` vs `glass-app.js`), header (Kyne: one bar with `.site-nav__theme`; glass: three `.capsule`s —
+  brand, `.site-nav` with a 首页 link, icon `.theme-btn` — each with `.glass` span layers), footer (Kyne:
+  slogan + footer nav; glass: one compact card, no nav), the glass-only extras (`viewport-fit=cover`, the
+  `#qx-glass` SVG filter, the `.ambient` backdrop, the phone `.tabbar`), and which `.site-footer__design`
+  link carries `aria-current="page"`. Links that should get `aria-current` must be
+  `.site-nav__link[data-nav]` (glass uses it for both the header nav and the tab bar; only one of the two is
+  displayed at any width). The service-worker block reloads the page once when an old worker hands over:
+  Kyne checks for `qingxin-v1…v6` caches (those still serve the page-relative `data.js`), glass for
+  `v1…v7` (a v7 cache has no `glass-*.js` and stale shared modules) — drop the block once those workers
+  have aged out. `pages.js`/`templates.js` only feed Kyne now; shared modules (`router`, `reader`, `data`,
+  search) must keep working for both, so check `/kyne/` and `/liquidglass/`. Kyne is kept pixel-identical
+  across glass work (compare against `main`).
 - **Kyne design system** (`assets/css/kyne.css`, frozen from the Kyne redesign): editorial monochrome —
   `--paper` #F6F6F6, `--surface` #FCFCFC, `--ink` #2B2B2B, muted tiers `--body`/`--muted`/`--muted-2`/`--muted-3`
   (`--muted` #6B6B6B is its lightest text grey), 1px hairlines `--line`, an inverted footer
   (`--invert-bg`/`--invert-fg`), `--mark-bg`; fonts Noto Serif SC (up to 900), Noto Sans SC and Fraunces
   italic for Latin/digits. **No accent hue**: state is an underline; actions are `[ ]` bracket labels and
   notes are `( )` parens (pseudo-elements). Breakpoints `(max-width: 809px)` and `(min-width: 1200px)`;
-  dark theme in the same two-block pattern as below. It ignores `.row-panel` (the wrapper is unstyled
-  there) and has its own `.site-footer__design` rules.
-- **Liquid-glass design system** lives in `assets/css/glass.css` `:root` — liquid glass (after the
-  [svg-glass-navbar-effect](https://svg-glass-navbar-effect.webflow.io/) Webflow template), light by default.
-  Token groups: ground/ink `--paper` #F4F4F6, `--surface` #FFF (opaque fallback for glass), `--ink` #1C1C1E
-  (+`--ink-rgb`), muted-ink tiers `--body`/`--muted`/`--muted-2`/`--muted-3` (`--muted` #636368 is the
-  lightest grey allowed for text, ~5.4:1 on paper and ~5.0:1 at the glow's peak; small text sitting directly
-  on the hero dot grid uses `--muted-2`), `--line`, `--mark-bg`, `--selection`; the violet accent
-  `--accent`/`--accent-rgb`/`--accent-text`/`--accent-halo` (#6A3FD6 in light; #996AFF in dark, with
-  `--accent-text` #AB87FF); backgrounds `--glow-1`/`--glow-2`/`--dot`; glass `--glass-*` and popover `--pop-*`;
-  surfaces `--card-*`, `--row-hover-bg`, `--chip-*`, `--badge-*`, `--tile-*`, `--input-bg`, `--nav-*-bg`;
-  buttons `--btn-bg`/`--btn-bg-hover`/`--btn-fg` (primary fill) and `--btn2-bg`/`--btn2-bg-hover` (secondary,
-  accent border); radii `--r-sm/md/lg/xl/pill`; motion `--ease`/`--dur`; plus `--reading-scale` and layout
-  `--max`/`--gutter`/`--measure`/`--header-h`/`--header-gap`/`--header-space`/`--content-w` (the navbar,
-  entry cards and footer panel all use `--content-w`).
+  dark theme in the same two-block pattern as below. The `.row-panel` wrappers `pages.js` still emits (a
+  leftover of the first glass reskin) are unstyled; `kyne.css` has its own `.site-footer__design` rules.
+- **Liquid-glass design system** lives in `assets/css/glass.css` `:root` — app-style liquid glass (Apple
+  Liquid Glass + the [svg-glass-navbar-effect](https://svg-glass-navbar-effect.webflow.io/) Webflow template),
+  light by default. **Layers:** a fixed `.ambient` backdrop (three blurred radial blobs `--blob-violet/cyan/
+  peach`, drifting via transform-only keyframes; static under reduced motion) → translucent content cards
+  (`.gcard`, `.pcard`, `.ptile`, `.qcard`, `.tab-panel`, footer card: `--card-bg`/`--card-strong`, no
+  backdrop-filter — the backdrop is already soft) → floating glass controls. **Real glass** (`.glass` span
+  layers: `__effect` = backdrop-filter + `filter: url(#qx-glass)`, then `__tint`, `__shine`) is used only on
+  floating controls: the three header `.capsule`s, the phone `.tabbar`, the sticky `.tabs`, the `.tools-dock`
+  and the `.pager` dock; `.search` (sticky) and `.gloss-pop` blur without the SVG filter. They never stack by
+  construction (z-index: header/tab bar 30, tabs/pager/search 20, popover 40).
+  Token groups: ground/ink `--paper` #F4F4F6, `--surface` #FFF (opaque fallback), `--ink` #1C1C1E
+  (+`--ink-rgb`), `--body`, `--muted` #636368 (text on cards/chips/glass only, ≥4.9:1 there),
+  `--muted-ambient` #4A4A4F (small text sitting directly on the backdrop, ≥4.8:1 even where all three blobs
+  overlap), `--muted-3`, `--line`, `--mark-bg`, `--selection`; violet `--accent`/`--accent-rgb`/
+  `--accent-text`/`--accent-halo` (#6A3FD6 light; #996AFF dark with `--accent-text` #AB87FF — accent text
+  only on cards); `--blob-*`; glass `--glass-*` (incl. `--glass-tint-strong` for the scrolled header),
+  `--pop-*`, `--seg-selected-*`; surfaces `--card-*` (dark cards are a dark tint, `rgba(18,18,22,.55)`),
+  `--row-hover-bg`, `--chip-*`, `--tile-bg`, `--input-bg`, `--nav-hover-bg`; seals/eras `--seal-*`,
+  `--tang*`, `--song*`; buttons `--btn-*`/`--btn2-*`; radii `--r-*`; motion `--ease`/`--dur`; layout
+  `--max` 1360, `--gutter`, `--measure`, `--capsule-h`, `--header-h/gap/space`, `--sticky-top` (sticky
+  controls and pinned columns), `--tabs-h`, `--tabbar-h/gap/space` (`--tabbar-space` is 0 on desktop; body
+  bottom padding, pager offset and scroll padding use it), `--bento-gap`, `--content-w` (safe-area aware).
   Three font roles: `--serif` Noto Serif SC for anything containing Chinese (display 600, reading text 400),
-  `--latin` Inter, upright, for Latin letters and digits only (tags, counts, dates, ids, row numbers), and
-  `--sans` Noto Sans SC for labels, nav and buttons — keep `--sans` Chinese-first: Inter's Google subset covers
-  `·` and `—…“”`, so an Inter-first stack would switch that punctuation to Western glyphs. Only the loaded
-  weights exist (Inter 400–600, Sans 400/500/600, Serif 400/500/600/700): never use 300 or 800/900.
-  **Violet is an accent, never the only signal.** It marks focus rings, secondary-button borders, the current
-  nav link's underline, search hits (tint + underline), open note terms (dotted → solid underline) and the
-  selection; accent used as text must be `--accent-text` (≥4.5:1). Every state keeps a non-hue cue: current
-  page = tinted pill + underline, pressed toggles = filled button/chip + underline, open sections = filled
-  +/− circle, empty sections = dashed 「未收录」 badge, disabled chips = dashed border.
-  **Glass is limited to two surfaces:** the sticky pill header (`.site-header > .glass` with `__effect` =
-  backdrop-filter + `filter: url(#qx-glass)` — the inline SVG displacement filter at the top of `<body>` —
-  then `__tint` and `__shine`) and `.gloss-pop`. Cards, row panels and the footer are plain translucent fills
-  (no backdrop-filter, for scroll performance). The SVG distortion is effectively Chromium-only and degrades
-  to blur + tint elsewhere; contrast is sized for the worst case with no blur. Fallbacks live in
-  `@supports not (backdrop-filter…)`, `prefers-reduced-transparency` and `forced-colors` blocks.
-  **Root rules:** the background glow is a fixed `body::before` (z-index −1), and `body` is a column flex
-  container (so the header's top margin can't collapse through it and the footer sits at the bottom of short
-  pages; `.page.is-active`/`.boot` flex-grow). Keep `html` background-less and `body` `position: static`
-  with no transform/filter/backdrop-filter/contain/will-change — that is also what keeps
-  `reader.js positionGloss()` (absolute, document coordinates, popover appended to `body`) correct.
-  Build any new UI from these tokens (that's how search/pagination were added).
+  `--latin` Inter, upright, for Latin letters and digits only, and `--sans` Noto Sans SC for labels, nav and
+  buttons — keep `--sans` Chinese-first: Inter's Google subset covers `·` and `—…“”`. Only the loaded
+  weights exist (Inter 400–600, Sans 400/500/600, Serif 400/500/600/700).
+  **Violet is an accent, never the only signal:** current nav/tab-bar item = raised pill + underline (tab
+  bar: filled icon), selected tab = raised pill + underlined label, pressed 夜读 = filled capsule + flipped
+  icon, pressed toolbar buttons = fill + underline, empty tabs = dashed outline, 唐/宋 swatches differ in
+  shape (circle/square), search hits = tint + underline, open note terms = dotted → solid underline.
+  **Root rules:** keep `html` background-less and `body` `position: static` with no transform/filter/
+  backdrop-filter/contain/will-change (the `.ambient` layer sits at z-index −1 over body's canvas
+  background, and `reader.js positionGloss()` uses document coordinates). `body` is a column flex container
+  with `padding-bottom: var(--tabbar-space)`. Fallbacks live in `@supports not (backdrop-filter…)`,
+  `prefers-reduced-transparency` (no backdrop, opaque `--surface` cards and controls) and `forced-colors`
+  (Canvas + CanvasText borders, Highlight outline on current/selected items). Build new UI from these tokens.
   **夜读 (dark theme)** only redefines tokens, in two identical blocks —
   `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {…} }` and
   `:root[data-theme="dark"] {…}` — so never hard-code a color: add a token to `:root` and to both dark
@@ -218,18 +259,18 @@ in `pages.js`).
   `vertical-rl`, so it opens on the first column (left-aligned, `margin: 0`), and a left-edge shadow
   hints at columns still hidden inside the card.
 - **Display headings** use `.display[data-size]`, the tier coming from `displaySize()` in
-  `templates.js`; the home hero sizes itself from `--hero-chars` + `cqi` (its lines come from
-  `heroLines()`). CJK needs `line-height ≥ 1.05` and tracking no tighter than `-0.03em` (display uses
-  1.08 / -0.02em). Breakpoints are `(max-width: 809px)`, `(max-width: 389px)` (search tag hidden) and
-  `(max-width: 359px)` (tighter nav, rows, meta, toolbar and stanza size so the pill navbar and 12-character
-  lines fit at 320), plus `(min-width: 1200px)`, where entry bodies and the author bio indent by 33%
-  inside/aligned with the entry cards.
-- **`templates.js` markup is frozen by `tools/tests/templates.test.mjs`** — restyle it from CSS instead.
-  Row numbers, arrows and +/− are pseudo-elements written as `content: "x" / ""` so screen readers skip
-  them; actions are pill buttons (primary / secondary / chip) and the old `( )` notes are pill badges — no
-  bracket or paren pseudo-content any more. Row lists sit in a `.row-panel` wrapper added in `pages.js`,
-  which owns `counter-reset: row`, so give any new row list that class. Structural changes belong in
-  `pages.js` and the two app shells, which have no markup tests.
+  `templates.js`; sizes use `cqi`, so the heading's parent sets `container-type` (glass: `.poem-head`,
+  `.gpage-head`, `.profile-card__id`, `.about-hero`); the home hero sizes itself from `--hero-chars` + `cqi`
+  (its lines come from `heroLines()`). CJK needs `line-height ≥ 1.05` and tracking no tighter than `-0.03em`.
+  Glass breakpoints: `(min-width: 1200px)` (12-column bento, two-column poem/author pages, 5-column grids),
+  810–1199 (6-column bento, single centred column), `(max-width: 809px)` (tab bar replaces the header nav,
+  2-column bento, 1-column grids; 600–809 gets 2-column grids), `(max-width: 389px)` (smaller 名家 seals, no
+  «/» pager edges, 创作背景 tab shows 背景 with the full name kept for screen readers) and
+  `(max-width: 359px)` (19px stanzas so 12-character lines fit at 320).
+- **`templates.js` markup is frozen by `tools/tests/templates.test.mjs`** (and `glass-templates.js` by
+  `glass-templates.test.mjs`) — restyle from CSS or add a new builder instead. Decorative pseudo-content is
+  written as `content: "x" / ""` so screen readers skip it. Page structure belongs in `pages.js` (Kyne),
+  `glass-pages.js` (glass) and the two app shells, which have no markup tests — verify those in a browser.
 - **`tools/data/prep.mjs`**: converts 全唐诗 繁→简 via `opencc-js` (宋词 is already simplified); strips
   lone UTF-16 surrogates; synthesizes ci titles/ids. On re-run it **preserves
   `data/annotations/`** (your hand-written overlays), only regenerating index/poems/authors +
