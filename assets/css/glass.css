@@ -1,7 +1,8 @@
 /* ===========================================================
-   情心 · 古诗文网站
+   情心 · 古诗文网站 —— Liquid Glass 界面（/liquidglass/）
    液态玻璃（参照 svg-glass-navbar-effect）— 浅色默认 + 夜读同构；
    玻璃胶囊页眉（SVG 折射）+ 半透明卡片 + #996AFF 紫色点缀
+   与 kyne.css（/kyne/）共用同一套 JS 与标记
    =========================================================== */
 
 :root {
@@ -1384,6 +1385,48 @@ body::before {
   color: var(--ink);
   text-decoration-line: underline;
 }
+
+/* 界面切换：小号分段胶囊，当前界面 = 填充 + 下划线 */
+.site-footer__designs {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--chip-bg);
+  border: 1px solid var(--chip-border);
+  border-radius: var(--r-pill);
+}
+
+.site-footer__design {
+  display: inline-block;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 28px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: var(--muted-2);
+  text-decoration: none;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.35em;
+  transition:
+    background-color var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+.site-footer__design:hover {
+  background-color: var(--nav-hover-bg);
+  color: var(--ink);
+}
+
+.site-footer__design[aria-current="page"] {
+  background-color: var(--btn-bg);
+  color: var(--btn-fg);
+  text-decoration-line: underline;
+}
+
+.site-footer__design:focus-visible { outline-offset: 2px; }
 
 .site-footer__meta {
   display: flex;

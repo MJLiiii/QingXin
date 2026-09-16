@@ -46,7 +46,7 @@ function historyEntry() {
   return { id: id, fresh: true };
 }
 
-// 路由复位/恢复滚动必须瞬时完成：styles.css 的 smooth 若残留动画，会把恢复的位置又拉走。
+// 路由复位/恢复滚动必须瞬时完成：kyne.css / glass.css 的 smooth 若残留动画，会把恢复的位置又拉走。
 function scrollToY(y) {
   var root = document.documentElement;
   var behavior = root.style.scrollBehavior;

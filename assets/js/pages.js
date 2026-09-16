@@ -188,7 +188,7 @@ export async function renderHome(param, ctx) {
   if (!ctx.isCurrent()) return;
   var lines = heroLines((heroPoem && heroPoem.paragraphs) || []);
   if (!lines.length) lines = [hero.excerpt || hero.title];
-  // 超大标题字号按最长一行的字数铺满版心（styles.css .hero__title）。
+  // 超大标题字号按最长一行的字数铺满版心（kyne.css / glass.css .hero__title）。
   var heroChars = Math.max.apply(null, lines.map(function (line) { return Array.from(line).length; }).concat(4));
   var cipai = (heroPoem && heroPoem.rhythmic) || hero.title;
   var kindLabel = hero.id.charAt(0) === 'c' ? '词' : '诗';
