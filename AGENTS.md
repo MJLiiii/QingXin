@@ -169,7 +169,8 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
 `sw.js` and the shells register `../sw.js` (relative, so it works under the `/QingXin/` Pages subpath).
 Stale-while-revalidate on every same-origin GET — cached copy returns instantly, the network refresh lands
 by the next reload, so content updates lag at most one refresh (remember this when previewing changes
-locally). It pre-caches the app shells (root, `kyne/`, `liquidglass/`, both stylesheets, every
+locally). The background refresh is `fetch(req, { cache: 'no-cache' })` (a conditional request), so a stale
+HTTP-cache copy of a module can never be written back next to newer ones. It pre-caches the app shells (root, `kyne/`, `liquidglass/`, both stylesheets, every
 `assets/js/*.js`) with `cache: 'reload'`, bypassing the HTTP cache so a new worker never mixes old and new
 modules; one missing entry fails the whole install. **Adding/renaming a frontend module or shell means
 updating its `SHELL` list; changing any cached format means bumping `CACHE_NAME`** (currently

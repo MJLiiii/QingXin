@@ -11,7 +11,7 @@
   --ink: #1C1C1E;     /* 墨色：标题与强调 */
   --ink-rgb: 28, 28, 30; /* = --ink 的 RGB 分量，供半透明墨色 rgba(var(--ink-rgb), α) 复用 */
   --body: #3A3A3C;    /* 正文墨 */
-  --muted: #636368;   /* 淡墨：只用在卡片 / 胶囊 / 玻璃上（最坏底色约 4.9:1） */
+  --muted: #636368;   /* 淡墨：只用在卡片 / 胶囊 / 玻璃上（最坏底色约 4.7:1） */
   --muted-ambient: #4A4A4F; /* 直接压在流光背景上的小字（三团光叠加处仍约 4.8:1） */
   --muted-3: #454548; /* 注释墨 */
   --line: rgba(var(--ink-rgb), 0.1);           /* 1px 结构细线 */
@@ -117,7 +117,7 @@
     --ink: #F2F2F2;
     --ink-rgb: 242, 242, 242;
     --body: #C7C7CC;
-    --muted: #98989D;
+    --muted: #A1A1A6;
     --muted-ambient: #C0C0C4;
     --muted-3: #C0C0C4;
     --line: rgba(var(--ink-rgb), 0.12);
@@ -153,7 +153,7 @@
     --row-hover-bg: rgba(255, 255, 255, 0.06);
     --chip-bg: rgba(18, 18, 22, 0.55);
     --chip-border: rgba(255, 255, 255, 0.16);
-    --tile-bg: rgba(255, 255, 255, 0.07);
+    --tile-bg: rgba(255, 255, 255, 0.05);
     --input-bg: rgba(18, 18, 22, 0.55);
     --nav-hover-bg: rgba(255, 255, 255, 0.08);
     --seal-bg: rgba(255, 255, 255, 0.08);
@@ -178,7 +178,7 @@
   --ink: #F2F2F2;
   --ink-rgb: 242, 242, 242;
   --body: #C7C7CC;
-  --muted: #98989D;
+  --muted: #A1A1A6;
   --muted-ambient: #C0C0C4;
   --muted-3: #C0C0C4;
   --line: rgba(var(--ink-rgb), 0.12);
@@ -214,7 +214,7 @@
   --row-hover-bg: rgba(255, 255, 255, 0.06);
   --chip-bg: rgba(18, 18, 22, 0.55);
   --chip-border: rgba(255, 255, 255, 0.16);
-  --tile-bg: rgba(255, 255, 255, 0.07);
+  --tile-bg: rgba(255, 255, 255, 0.05);
   --input-bg: rgba(18, 18, 22, 0.55);
   --nav-hover-bg: rgba(255, 255, 255, 0.08);
   --seal-bg: rgba(255, 255, 255, 0.08);
@@ -726,12 +726,12 @@ body {
 .tabbar__item[aria-current="page"] {
   background-color: var(--seg-selected-bg);
   box-shadow: var(--seg-selected-shadow);
-  color: var(--accent-text);
   font-weight: 600;
 }
 
-/* 当前项图标实心（形状线索） */
+/* 当前项图标紫色实心（形状线索；紫色在亮胶囊上不够做文字，只给图标） */
 .tabbar__item[aria-current="page"] .icon {
+  color: var(--accent-text);
   fill: currentColor;
   fill-opacity: 0.22;
 }
@@ -2081,8 +2081,8 @@ a.gcard:hover .stat-tile__go {
 
 .tabs__tab:focus-visible { outline-offset: -2px; }
 
-/* 未收录的栏：字色变淡 + 虚线框（形状线索） */
-.tabs__tab--empty { color: var(--muted); }
+/* 未收录的栏：字色变淡 + 虚线框（形状线索）；玻璃最坏底色上 --muted 不够，用 --muted-ambient */
+.tabs__tab--empty { color: var(--muted-ambient); }
 
 .tabs__tab--empty::after {
   content: "";

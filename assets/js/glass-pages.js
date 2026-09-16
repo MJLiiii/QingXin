@@ -228,6 +228,7 @@ export async function renderPoem(id, ctx) {
   if (!poem) {
     ctx.setTitle('未找到这首诗');
     host.innerHTML = errorSection('未找到这首诗。');
+    initPin(host);
     return;
   }
   if (data.degraded) ctx.noCache();
@@ -313,6 +314,7 @@ export async function renderAuthor(slug, ctx) {
   if (!a) {
     ctx.setTitle('未找到这位作者');
     host.innerHTML = errorSection('未找到这位作者。');
+    initPin(host);
     return;
   }
   var works = a.works || [];
