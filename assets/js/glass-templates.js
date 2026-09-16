@@ -99,25 +99,6 @@ export function poetTile(a, query, match) {
     + '</span>');
 }
 
-// 名句卡（首页精选）：摘句为主，题目与作者次之。
-export function quoteCard(e) {
-  return link('poem/' + e.id, 'qcard',
-    '<span class="qcard__line">' + esc(e.excerpt || e.title) + '</span>'
-    + '<span class="qcard__foot">'
-    + '<span class="qcard__title">《' + esc(e.title) + '》</span>'
-    + '<span class="qcard__by">' + esc(e.author) + ' · ' + esc(e.dynasty) + '</span>'
-    + '</span>');
-}
-
-// 统计卡：o = { nav, label, value, unit, cls }
-export function statTile(o) {
-  return link(o.nav, 'gcard stat-tile' + (o.cls ? ' ' + o.cls : ''),
-    '<span class="stat-tile__label">' + esc(o.label) + '</span>'
-    + '<span class="stat-tile__value"><span class="latin">' + fmt(o.value) + '</span>'
-    + '<span class="stat-tile__unit">' + esc(o.unit) + '</span></span>'
-    + '<span class="stat-tile__go" aria-hidden="true">' + ICONS.arrow + '</span>');
-}
-
 // 元信息胶囊：dt/dd 成对，值为已转义或已构造的 HTML，空值不出。
 export function metaChips(items) {
   var cells = (items || []).filter(function (item) { return item && item.value; }).map(function (item) {

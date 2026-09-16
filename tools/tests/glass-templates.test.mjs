@@ -13,7 +13,6 @@ import {
   poemTabs,
   poetTile,
   proseBody,
-  quoteCard,
   seal,
   sealOf,
   workCard,
@@ -71,12 +70,6 @@ test('poet tiles work with Array#map and with search matches', () => {
   assert.match(mapped, /唐 · <span class="latin">1,207<\/span> 首/);
   const hit = poetTile({ slug: '李白', name: '李白', dynasty: '唐', count: 3 }, '李', { field: 'name', start: 0, length: 1 });
   assert.match(hit, /ptile__name"><mark class="search-match">李<\/mark>白</);
-});
-
-test('quote cards lead with the excerpt', () => {
-  const html = quoteCard({ id: 't0-856', title: '战城南', author: '卢照邻', dynasty: '唐', excerpt: '将军出紫塞' });
-  assert.match(html, /^<a class="qcard" href="#\/poem\/t0-856" data-nav="poem\/t0-856"><span class="qcard__line">将军出紫塞<\/span>/);
-  assert.match(html, /qcard__title">《战城南》</);
 });
 
 test('meta chips skip empty values', () => {
