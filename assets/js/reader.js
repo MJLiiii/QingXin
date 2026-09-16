@@ -183,11 +183,14 @@ function positionGloss() {
   }
   left = Math.max(margin, Math.min(window.innerWidth - width - margin, left));
   top = Math.max(margin, Math.min(window.innerHeight - height - margin, top));
-  pop.style.left = Math.round(left + window.scrollX) + 'px';
-  pop.style.top = Math.round(top + window.scrollY) + 'px';
+  // 触发词在钉住的栏里（[data-pinned]，liquidglass/）时浮层按视口定位，页面滚动时不与之脱开。
+  var fixed = !!popTrigger.closest('[data-pinned]');
+  pop.style.position = fixed ? 'fixed' : '';
+  pop.style.left = Math.round(left + (fixed ? 0 : window.scrollX)) + 'px';
+  pop.style.top = Math.round(top + (fixed ? 0 : window.scrollY)) + 'px';
 }
 
-// 浮层所在的原文栏被钉住（sticky）时，页面滚动后按触发词的新位置重新摆放。
+// 页面滚动后按触发词的新位置重新摆放（触发词所在的栏被钉住时由 liquidglass/ 调用）。
 export function repositionGloss() {
   if (pop && popTrigger && popTrigger.isConnected) positionGloss();
 }
