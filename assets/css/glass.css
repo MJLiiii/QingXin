@@ -894,7 +894,7 @@ body {
   padding-top: 12px;
 }
 
-/* 今日一诗：大字铺满卡片，右下角淡色印章水印；与搜索卡一起放进首屏 */
+/* 今日一诗：大字铺满卡片，右下角淡色印章水印；视口够高（桌面约 630px 起）时与搜索卡一起放进首屏 */
 .hero-card {
   position: relative;
   overflow: hidden;
@@ -936,6 +936,8 @@ body {
 .hero-card__lines {
   margin: auto 0 0;
   font-size: clamp(28px, calc(100cqi / (var(--hero-chars, 5) + 0.6)), 112px);
+  /* 矮窗口再按视口高度收小（480px ≈ 卡片上方 + 卡片其余部分 + 搜索卡），两行大字留在首屏 */
+  font-size: clamp(28px, min(100cqi / (var(--hero-chars, 5) + 0.6), (100svh - 480px) / 2.3), 112px);
   font-weight: 600;
   line-height: 1.14;
   letter-spacing: -0.01em;
@@ -2437,13 +2439,17 @@ body {
 
   .home-stack { padding-top: 0; }
 
-  /* 今日一诗与搜索卡都停在底部标签栏之上 */
+  /* 视口够高（约 610px 起）时，今日一诗与搜索卡都停在底部标签栏之上 */
   .hero-card {
     min-height: clamp(260px, calc(100svh - var(--header-space) - var(--tabbar-space) - 300px), 460px);
     gap: 20px;
     padding: 20px 20px 22px;
   }
-  .hero-card__lines { font-size: clamp(22px, calc(100cqi / (var(--hero-chars, 5) + 0.5)), 112px); } /* 12 字的句子在 320 也不折行 */
+  /* 12 字的句子在 320 也不折行；矮屏再按视口高度收小（560px ≈ 卡片其余部分 + 搜索卡 + 标签栏） */
+  .hero-card__lines {
+    font-size: clamp(22px, calc(100cqi / (var(--hero-chars, 5) + 0.5)), 112px);
+    font-size: clamp(22px, min(100cqi / (var(--hero-chars, 5) + 0.5), (100svh - 560px) / 2.3), 112px);
+  }
   .hero-card__foot {
     flex-direction: column;
     align-items: stretch;
@@ -2524,6 +2530,11 @@ body {
   .section--top > .prose { padding: 36px 24px; }
 
   .site-footer { margin-top: 64px; }
+  /* 首页只有两张卡：页脚推到首屏之下（64px = 上面的页脚外边距），不被底部标签栏压住 */
+  #page-home.is-active {
+    min-height: calc(100vh - var(--header-space) - 64px);
+    min-height: calc(100lvh - var(--header-space) - 64px);
+  }
   .site-footer__inner {
     flex-direction: column;
     align-items: flex-start;
@@ -2563,8 +2574,22 @@ body {
 
 /* 极窄屏：搜索按钮、工具与标签再收一点 */
 @media (max-width: 359px) {
+  .find-tile { padding-inline: 14px; }
+  .find {
+    gap: 6px;
+    padding-left: 12px;
+  }
+  .find__input { letter-spacing: 0; } /* 占位提示「标题、作者或名句」完整显示 */
   .find__go { padding: 0 14px; }
-  .find__hint-label { display: none; } /* 热门词排成一行，搜索卡整张留在首屏 */
+  /* 「试试」只留给读屏，热门词排成一行 */
+  .find__hint-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
   .reader-tools__btn { padding: 0 10px; }
   .tabs__tab { font-size: 13px; letter-spacing: 0; }
 }

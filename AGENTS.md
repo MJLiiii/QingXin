@@ -182,7 +182,8 @@ HTTP-cache copy of a module can never be written back next to newer ones. It pre
 (root, `kyne/`, `liquidglass/`, both stylesheets, every `assets/js/*.js`) with `cache: 'reload'`, bypassing
 the HTTP cache so a new worker never mixes old and new modules; one missing entry fails the whole install.
 **Adding/renaming a frontend module or shell means updating its `SHELL` list; changing any cached format
-means bumping `CACHE_NAME`** (currently `qingxin-v8`; old caches are purged on activate).
+means bumping `CACHE_NAME`** (currently `qingxin-v9`; old caches are purged on activate). Also bump it when a
+module drops an export another module used to import, so the new set is precached in one step.
 
 **Detail-page invariant:** all five section headings (原文/注释/译文/赏析/创作背景) always
 render. Only 原文 + author bio come from source data; the other four come from the annotation
@@ -212,9 +213,10 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
   `.site-nav__link[data-nav]` (glass uses it for both the header nav and the tab bar; only one of the two is
   displayed at any width). The service-worker block reloads the page once when an old worker hands over:
   Kyne checks for `qingxin-v1…v6` caches (those still serve the page-relative `data.js`), glass for
-  `v1…v7` (a v7 cache has no `glass-*.js` and stale shared modules) — drop the block once those workers
-  have aged out. `pages.js`/`templates.js` only feed Kyne now; shared modules (`router`, `reader`, `data`,
-  search) must keep working for both, so check `/kyne/` and `/liquidglass/`. Kyne is kept pixel-identical
+  `v1…v8` (a v7 cache has no `glass-*.js` and stale shared modules; a v8 `glass-pages.js` still imports the
+  removed home-card templates) — drop the block once those workers have aged out. `pages.js`/`templates.js`
+  only feed Kyne now; shared modules (`router`, `reader`, `data`, search) must keep working for both, so check
+  `/kyne/` and `/liquidglass/`. Kyne is kept pixel-identical
   across glass work (compare against `main`).
 - **Kyne design system** (`assets/css/kyne.css`, frozen from the Kyne redesign): editorial monochrome —
   `--paper` #F6F6F6, `--surface` #FCFCFC, `--ink` #2B2B2B, muted tiers `--body`/`--muted`/`--muted-2`/`--muted-3`
@@ -275,8 +277,10 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
   centred column, 3-column grids), `(max-width: 809px)` (tab bar replaces the header nav, the home search card
   stacks, 1-column grids; 600–809 gets 2-column grids), `(max-width: 389px)` (no «/» pager edges, notes stack,
   创作背景 tab shows 背景 with the full name kept for screen readers) and `(max-width: 359px)` (tighter search
-  button, toolbar and tabs). The home hero's `min-height` subtracts the header (and tab bar on phones) so both
-  home cards fit the first screen.
+  card, toolbar and tabs; the 试试 hint label is visually hidden). The home hero's `min-height` and, on short
+  viewports, its line size (`(100svh - …) / 2.3`) subtract the header, search card (and tab bar on phones), so
+  both home cards fit the first screen from about 630px (desktop) / 610px (phones) of height; on phones
+  `#page-home` also fills the screen so the footer starts below the fold instead of under the tab bar.
 - **`templates.js` markup is frozen by `tools/tests/templates.test.mjs`** (and `glass-templates.js` by
   `glass-templates.test.mjs`) — restyle from CSS or add a new builder instead. Decorative pseudo-content is
   written as `content: "x" / ""` so screen readers skip it. Page structure belongs in `pages.js` (Kyne),
