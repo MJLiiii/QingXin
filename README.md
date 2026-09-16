@@ -1,10 +1,18 @@
 # 情心 · 慢读古典
 
-> 黑白极简、编辑排版风格的古典诗词阅读站。以静态 JSON 数据驱动，提供诗词原文、注释、译文、赏析、创作背景和诗人信息浏览。
+> 慢读古典的诗词阅读站，提供黑白编辑排版（Kyne）与液态玻璃（Liquid Glass）两种界面。以静态 JSON 数据驱动，提供诗词原文、注释、译文、赏析、创作背景和诗人信息浏览。
 
-情心是一个纯静态、无后端的古诗词阅读项目。前端使用原生 HTML、CSS、JavaScript 编写，不依赖框架或打包工具；运行时所有内容都由浏览器从 `data/` 目录下的 JSON 文件中 `fetch` 加载，诗词正文不写死在 `index.html` 里。
+情心是一个纯静态、无后端的古诗词阅读项目。前端使用原生 HTML、CSS、JavaScript 编写，不依赖框架或打包工具；运行时所有内容都由浏览器从 `data/` 目录下的 JSON 文件中 `fetch` 加载，诗词正文不写死在 HTML 里。
 
-线上地址：<https://mjliiii.github.io/QingXin/>
+同一套数据与功能提供两种界面，可在页脚随时切换（停留的页面会跟着过去）：
+
+| 界面 | 风格 | 线上地址 |
+| --- | --- | --- |
+| 入口 | 并排预览两种界面 | <https://mjliiii.github.io/QingXin/> |
+| Kyne | 黑白极简、编辑排版 | <https://mjliiii.github.io/QingXin/kyne/> |
+| Liquid Glass | 玻璃胶囊导航、半透明卡片、紫色点缀 | <https://mjliiii.github.io/QingXin/liquidglass/> |
+
+以前分享的 `…/QingXin/#/poem/…` 链接会自动转到 Liquid Glass 界面的同一页。
 
 ## 功能特性
 
@@ -38,7 +46,9 @@ node tools/server/serve.mjs
 然后访问：
 
 ```text
-http://localhost:8080
+http://localhost:8080              # 入口页
+http://localhost:8080/kyne/        # Kyne 界面
+http://localhost:8080/liquidglass/ # Liquid Glass 界面
 ```
 
 如需更换端口：
@@ -89,11 +99,14 @@ npm run annotate:import -- --dry-run
 
 ```text
 QingXin/
-├── index.html                # 页面骨架：页眉、页脚和空容器
-├── sw.js                     # Service Worker：离线与跨刷新缓存
-├── assets/                   # 浏览器直接加载的前端资源
+├── index.html                # 入口页：两种界面的预览与选择
+├── kyne/index.html           # Kyne 界面骨架：页眉、页脚和空容器
+├── liquidglass/index.html    # Liquid Glass 界面骨架（多了玻璃页眉的滤镜与图层）
+├── sw.js                     # Service Worker：离线与跨刷新缓存（作用域覆盖两套界面）
+├── assets/                   # 浏览器直接加载的前端资源（两套界面共用 JS）
 │   ├── css/
-│   │   └── styles.css        # 视觉样式和设计变量（含夜读主题）
+│   │   ├── kyne.css          # Kyne 视觉样式和设计变量（含夜读主题）
+│   │   └── glass.css         # Liquid Glass 视觉样式和设计变量（含夜读主题）
 │   └── js/
 │       ├── app.js            # 入口：启动路由
 │       ├── router.js         # hash 路由、渲染缓存与滚动恢复
@@ -129,7 +142,7 @@ QingXin/
 
 分类规则：
 
-- 根目录保留站点入口、项目说明和部署配置，例如 `index.html`、`README.md`、`.nojekyll`。
+- 根目录保留站点入口、项目说明和部署配置，例如 `index.html`、`README.md`、`.nojekyll`；`kyne/`、`liquidglass/` 各放一个界面骨架。
 - `assets/` 放浏览器直接加载的前端资源，按类型拆分为 `css/` 和 `js/`。
 - `data/` 放站点运行所需的静态内容数据，包含可重建数据和手工注释叠加层。
 - `tools/server/` 放本地静态服务器。
@@ -248,7 +261,7 @@ node annotations/annotate-import.mjs
 - Branch：`main`
 - Folder：`/ (root)`
 
-根目录中的 `.nojekyll` 用于让 GitHub Pages 原样服务 `data/` 目录中的 JSON 文件和中文文件名。项目使用相对路径和 hash 路由，部署在 `/QingXin/` 子路径下不需要额外 rewrite 配置。
+根目录中的 `.nojekyll` 用于让 GitHub Pages 原样服务 `data/` 目录中的 JSON 文件和中文文件名。项目使用相对路径和 hash 路由，部署在 `/QingXin/` 子路径下不需要额外 rewrite 配置；`/kyne/`、`/liquidglass/` 由 Pages 直接返回各自目录下的 `index.html`。
 
 ## 数据来源与致谢
 

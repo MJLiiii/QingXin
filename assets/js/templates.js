@@ -6,7 +6,7 @@ export function navHref(path) {
   return esc('#/' + hashPath(path));
 }
 
-// 超大标题按字数（码点，生僻扩展字算一个）分档，对应 styles.css 的 [data-size]。
+// 超大标题按字数（码点，生僻扩展字算一个）分档，对应 kyne.css / glass.css 的 [data-size]。
 export function displaySize(text) {
   var n = Array.from(String(text == null ? '' : text)).length;
   if (n <= 4) return 's';

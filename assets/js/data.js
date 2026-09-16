@@ -1,10 +1,12 @@
 import { pad3, pad4 } from './utils.js';
 
 var cache = new Map();
+// 数据路径相对站点根目录（本模块在 assets/js/ 下），与页面所在目录无关：/kyne/、/liquidglass/ 两套界面共用。
+var ROOT = new URL('../../', import.meta.url);
 
 export async function fetchJSON(path) {
   if (cache.has(path)) return cache.get(path);
-  var res = await fetch(path);
+  var res = await fetch(new URL(path, ROOT));
   if (!res.ok) {
     var err = new Error(path + ' -> ' + res.status);
     err.status = res.status;

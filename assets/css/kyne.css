@@ -1,6 +1,7 @@
 /* ===========================================================
-   情心 · 古诗文网站
+   情心 · 古诗文网站 —— Kyne 界面（/kyne/）
    编辑型极简（参照 Kyne）— 纸白底 + 墨色，1px 细线撑结构，超大衬线标题
+   与 glass.css（/liquidglass/）共用同一套 JS 与标记
    =========================================================== */
 
 :root {
@@ -109,6 +110,7 @@ body {
 .hero__shuffle::before,
 .section__more::before,
 .site-footer__link::before,
+.site-footer__design::before,
 .reader-tools__btn::before,
 .pager__btn::before,
 .pager__go::before,
@@ -125,6 +127,7 @@ body {
 .hero__shuffle::after,
 .section__more::after,
 .site-footer__link::after,
+.site-footer__design::after,
 .reader-tools__btn::after,
 .pager__btn::after,
 .pager__go::after,
@@ -517,7 +520,7 @@ body {
 
 #list-rows > :last-child,
 #authors-rows > :last-child,
-.author-works > .works-list__item:last-child { border-bottom: 1px solid var(--line); }
+.author-works .works-list__item:last-child { border-bottom: 1px solid var(--line); }
 
 .poem-list__title,
 .works-list__title {
@@ -908,11 +911,15 @@ body {
 
 .prose p:last-child { margin-bottom: 0; }
 
-.prose p.prose--faint {
+.prose p.prose--faint,
+.notes > .prose--faint {
   font-size: calc(16.5px * var(--reading-scale));
   line-height: 2;
   color: var(--muted);
 }
+
+.notes > .prose--faint { margin: 0; } /* 不在 .prose 里：去掉 UA 段落外边距 */
+.works-list__title.prose--faint { color: var(--muted); }
 
 /* 关于作者：Kyne 底部「More」式入口 */
 
@@ -1032,6 +1039,30 @@ body {
 }
 
 .site-footer__link:hover { text-decoration-line: underline; }
+
+/* 界面切换：Kyne / Liquid Glass，当前界面加下划线 */
+.site-footer__designs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 16px;
+}
+
+.site-footer__design {
+  padding: 6px 0;
+  color: var(--invert-fg);
+  text-decoration: none;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.4em;
+}
+
+.site-footer__design:hover,
+.site-footer__design[aria-current="page"] { text-decoration-line: underline; }
+
+/* 三组（导航 / 界面切换 / 署名）一行约需 761px 内容宽，平板竖屏放不下 → 提前竖排 */
+@media (max-width: 899px) {
+  .site-footer__base { flex-direction: column; }
+}
 
 .site-footer__meta {
   display: flex;

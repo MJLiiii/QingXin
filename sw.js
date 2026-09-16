@@ -4,12 +4,18 @@
    预缓存仅应用外壳与前端模块；大文件（search.json、lines.json 等）按访问懒缓存。
    预缓存绕过 HTTP 缓存（cache: 'reload'），避免新旧模块混装。
    改动缓存格式时 bump CACHE_NAME，旧缓存在 activate 清除。
-   作用域随注册路径（GitHub Pages 子路径 /QingXin/ 亦可）。 */
-const CACHE_NAME = 'qingxin-v5';
+   Worker 放在站点根目录：两套界面（kyne/、liquidglass/）都用 '../sw.js' 注册，作用域覆盖整站
+   （GitHub Pages 子路径 /QingXin/ 亦可）。 */
+const CACHE_NAME = 'qingxin-v7';
 const SHELL = [
   './',
   './index.html',
-  './assets/css/styles.css',
+  './kyne/',
+  './kyne/index.html',
+  './liquidglass/',
+  './liquidglass/index.html',
+  './assets/css/kyne.css',
+  './assets/css/glass.css',
   './assets/js/app.js',
   './assets/js/data.js',
   './assets/js/pages.js',

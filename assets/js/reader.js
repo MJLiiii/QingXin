@@ -1,5 +1,5 @@
 /* 阅读体验：主题 / 字号 / 竖排偏好、记住展开的栏目、原文工具栏（复制、分享）与注释浮层。
-   仅在浏览器中使用；偏好键 qingxin:prefs 与 index.html 的首帧脚本共用。 */
+   仅在浏览器中使用；偏好键 qingxin:prefs 与入口页及 kyne/、liquidglass/ 两个 index.html 的首帧脚本共用。 */
 var PREFS_KEY = 'qingxin:prefs';
 var SCALES = [0.9, 1, 1.12, 1.25];
 

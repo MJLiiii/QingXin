@@ -188,7 +188,7 @@ export async function renderHome(param, ctx) {
   if (!ctx.isCurrent()) return;
   var lines = heroLines((heroPoem && heroPoem.paragraphs) || []);
   if (!lines.length) lines = [hero.excerpt || hero.title];
-  // 超大标题字号按最长一行的字数铺满版心（styles.css .hero__title）。
+  // 超大标题字号按最长一行的字数铺满版心（kyne.css / glass.css .hero__title）。
   var heroChars = Math.max.apply(null, lines.map(function (line) { return Array.from(line).length; }).concat(4));
   var cipai = (heroPoem && heroPoem.rhythmic) || hero.title;
   var kindLabel = hero.id.charAt(0) === 'c' ? '词' : '诗';
@@ -214,7 +214,7 @@ export async function renderHome(param, ctx) {
     + '<section class="section section--list">'
     + '<div class="section-head"><h2 class="section-head__title">精选诗词</h2>'
     + '<span class="section-head__tag latin">curated</span></div>'
-    + list.map(poemRow).join('')
+    + '<div class="row-panel">' + list.map(poemRow).join('') + '</div>'
     + '<a class="section__more" href="' + navHref('list') + '" data-nav="list">浏览全部诗集</a>'
     + '</section>';
 }
@@ -239,7 +239,7 @@ export async function renderList(param, ctx) {
     '<section class="section section--top">'
     + pageHead('诗集', manifest.total)
     + searchBoxHTML()
-    + '<div id="list-rows">' + slice.map(poemRow).join('') + '</div>'
+    + '<div id="list-rows" class="row-panel">' + slice.map(poemRow).join('') + '</div>'
     + pagerHTML('list', dp, totalPages)
     + '</section>';
 
@@ -349,7 +349,7 @@ export async function renderPoem(id, ctx) {
     + '<span class="author-cta__name">' + esc(poem.author) + styleSmall + '</span>'
     + '<span class="author-cta__arrow" aria-hidden="true">→</span></a>'
     + (others.length
-      ? '<div class="author-cta__works">' + others.map(function (w) {
+      ? '<div class="author-cta__works row-panel">' + others.map(function (w) {
         return listRow('poem/' + w.id, w.title, esc(w.kind));
       }).join('') + '</div>'
       : '')
@@ -399,13 +399,14 @@ export async function renderAuthor(slug, ctx) {
       { label: '朝代', value: esc(a.dynasty) },
       { label: '籍贯', value: a.origin ? esc(a.origin) : '' },
       { label: '生卒', value: a.life ? '<span class="latin">' + esc(a.life) + '</span>' : '' },
-      { label: '作品', value: (a.works && a.works.length) ? esc(a.works.length) + ' 首' : '' },
+      { label: '作品', value: (a.works && a.works.length) ? '<span class="latin">' + esc(a.works.length) + '</span> 首' : '' },
     ])
     + '</section>'
     + '<section class="author-bio"><div class="prose">' + bio + '</div></section>'
     + '<section class="section author-works">'
     + '<div class="section-head"><h2 class="section-head__title">代表作品</h2>'
-    + '<span class="section-head__tag latin">works</span></div>' + works
+    + '<span class="section-head__tag latin">works</span></div>'
+    + '<div class="row-panel">' + works + '</div>'
     + '</section>';
 }
 
@@ -431,7 +432,7 @@ export async function renderAuthors(param, ctx) {
       tag: 'poets',
       controls: 'authors-rows',
     })
-    + '<div id="authors-rows">' + slice.map(authorRow).join('') + '</div>'
+    + '<div id="authors-rows" class="row-panel">' + slice.map(authorRow).join('') + '</div>'
     + pagerHTML('authors', page, totalPages)
     + '</section>';
 
