@@ -8,17 +8,13 @@
      node tools/data/build-featured.mjs
    单篇手写注释不重跑也能在详情页生效,只是暂不进入首页推荐池。 */
 import { readFile, readdir, writeFile } from 'node:fs/promises';
-import { join, dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { ANN_DIR, DATA } from '../lib/paths.mjs';
+import { ANN_FILE_RE, pad4, parseId, poemShardFile } from '../lib/ids.mjs';
 
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const DATA = resolve(SCRIPT_DIR, '..', '..', 'data');
-const ANN_DIR = join(DATA, 'annotations');
 const OUT = join(DATA, 'featured.json');
 
-const ANN_FILE_RE = /^[tc]\d+-\d+\.json$/; // 排除 README 与 iCloud 冲突副本
 const ne = (x) => Array.isArray(x) && x.length > 0;
-const pad4 = (n) => String(n).padStart(4, '0');
 
 /* 1) 合格 id 集:非 AI 且赏析非空 且 (注释或译文非空);
       另收全部非 AI 注释 id(名句检索正文用,与推荐池口径无关) */
@@ -55,10 +51,6 @@ console.log(`featured.json:池 ${rows.length} 首(唐诗 ${shi} + 宋词 ${rows.
       按语料序 (chunk, i) 排列(t/c 共用 chunk 编号);同 (作者, 正文) 只留语料序第一个 id
       (全唐诗把部分乐府诗同时收在分类卷与诗人卷下)。validate.mjs 按同一口径复核。 */
 const LINES_OUT = join(DATA, 'lines.json');
-const parseId = (id) => {
-  const m = /^[tc](\d+)-(\d+)$/.exec(id);
-  return m ? { chunk: +m[1], i: +m[2] } : null;
-};
 const lineIds = [...annotated].map((id) => ({ id, loc: parseId(id) }))
   .sort((a, b) => a.loc.chunk - b.loc.chunk || a.loc.i - b.loc.i);
 const shards = new Map();
@@ -67,11 +59,11 @@ const lineRows = [];
 let deduped = 0;
 let unresolved = 0;
 for (const { id, loc } of lineIds) {
-  const file = `${pad4(loc.chunk)}-${Math.floor(loc.i / 100)}.json`;
+  const { file, index } = poemShardFile(loc, manifest.subChunkSize);
   if (!shards.has(file)) {
     shards.set(file, JSON.parse(await readFile(join(DATA, 'poems', file), 'utf8').catch(() => '[]')));
   }
-  const poem = shards.get(file)[loc.i % 100];
+  const poem = shards.get(file)[index];
   if (!poem || poem.id !== id || !Array.isArray(poem.paragraphs)) {
     unresolved++;
     continue;

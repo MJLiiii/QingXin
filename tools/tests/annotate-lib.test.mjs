@@ -11,6 +11,8 @@ import {
   parseNotes,
   parseTranslation,
   splitParas,
+  cacheKeyForAuthor,
+  eligibleAuthor,
 } from '../annotations/annotate-lib.mjs';
 
 test('normText strips variant parentheticals, punctuation, ▲ and full-width spaces', () => {
@@ -436,4 +438,24 @@ test('matchToCorpus returns no matches for empty, tiny or unknown-author records
   /* one character more clears the floor and matches exactly */
   const okIdx = makeIdx([{ id: 's2', title: '残句', author: '李白', kind: '诗', paragraphs: ['床前明月'] }]);
   assert.equal(matchToCorpus({ title: '残句', author: '李白', blocks: ['床前明月'] }, okIdx).matches[0].score, 1);
+});
+
+test('author cache keys are stable resume keys; eligibility skips anonymous and messy names', () => {
+  // 磁盘上 5,000+ 个 catalog-author-<key>.json 断点文件按它命名：这些用例是「改了就会重爬」的护栏。
+  assert.equal(cacheKeyForAuthor('李白'), '李白');
+  assert.equal(cacheKeyForAuthor(' 李白 '), '李白');
+  assert.equal(cacheKeyForAuthor('吴氏3'), '吴氏');
+  assert.equal(cacheKeyForAuthor('佚名'), '无名氏');
+  assert.equal(cacheKeyForAuthor('王氏（女）'), '王氏_女_');
+  assert.equal(cacheKeyForAuthor('李白、杜甫'), '李白_杜甫');
+  assert.equal(cacheKeyForAuthor('a/b\\c:d'), 'a_b_c_d');
+
+  assert.equal(eligibleAuthor({ name: '李白' }), true);
+  assert.equal(eligibleAuthor({ name: '南唐嗣主李璟' }), true);
+  assert.equal(eligibleAuthor({ name: '无名氏' }), false);
+  assert.equal(eligibleAuthor({ name: '佚名' }), false);
+  assert.equal(eligibleAuthor({ name: '不详' }), false);
+  assert.equal(eligibleAuthor({ name: '李白、杜甫' }), false);
+  assert.equal(eligibleAuthor({ name: '王氏（女）' }), false);
+  assert.equal(eligibleAuthor({ name: '吴氏3' }), false); // 原名带数字即跳过（normAuthor 去尾数字只用于键）
 });

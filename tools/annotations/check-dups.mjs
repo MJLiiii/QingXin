@@ -8,22 +8,14 @@
      node annotations/check-dups.mjs [--quiet]
        --quiet 只列出分叉组与汇总，不列一致组。
    退出码：0 = 无分叉；1 = 存在内容分叉的组。不写任何文件。 */
-import { readFile, readdir } from 'node:fs/promises';
-import { join, dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { ANN_DIR, DATA, WEB_CACHE, readJson } from '../lib/paths.mjs';
+import { ANN_FILE_RE } from '../lib/ids.mjs';
 
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(SCRIPT_DIR, '..', '..');
-const DATA = join(ROOT, 'data');
-const ANN_DIR = join(DATA, 'annotations');
-const RESOLVED_PATH = join(SCRIPT_DIR, '..', '.cache', 'gushiwen-web', 'resolved.json');
+const RESOLVED_PATH = join(WEB_CACHE, 'resolved.json');
 
 const QUIET = process.argv.includes('--quiet');
-const ANN_FILE_RE = /^[tc]\d+-\d+\.json$/; // 排除 README 与 iCloud 冲突副本
-
-async function readJson(fp, dflt) {
-  try { return JSON.parse(await readFile(fp, 'utf8')); } catch { return dflt; }
-}
 
 const resolved = await readJson(RESOLVED_PATH, {});
 if (!Object.keys(resolved).length) {

@@ -160,9 +160,10 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   only the theme) — keep its key and fields in sync with `reader.js`.
 - `data.js` — `fetchJSON()` (memoized via a `Map`; errors carry `status`; `data/…` paths resolve against
   the site root via `import.meta.url`, not the page),
-  `parseId()`/`loadPoem()`,
+  `parseId()`/`loadPoem()` (`SUB_CHUNK` = poems per sub-file, must equal `manifest.subChunkSize`),
   `loadAnnotation()`/`loadAuthor()` (slug→bucket hash) — both return `null` only on 404 and rethrow
-  other failures.
+  other failures. `parseId()`, `authorBucket()` and `SUB_CHUNK` are re-exported by `tools/lib/ids.mjs` so the
+  tool scripts share the browser's formulas; `tools/tests/ids.test.mjs` pins them.
 - `search-core.js` + `search.js` + `search-worker.js` — shared ranked exact/fuzzy matching for
   poems and authors, with punctuation and Traditional→Simplified query normalization via the local
   OpenCC browser module. Poem search also scans `data/lines.json`: exact substring for queries of 2+

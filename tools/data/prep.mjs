@@ -29,6 +29,7 @@ import {
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import * as OpenCC from 'opencc-js';
+import { authorBucket, pad3, pad4 } from '../lib/ids.mjs';
 
 // ---------- 路径与参数 ----------
 const __dirname = dirname(fileURLToPath(import.meta.url)); // .../QingXin/tools/data
@@ -49,7 +50,7 @@ if (args.includes('--include-song-shi')) {
 const PAGE_SIZE = 500;   // 索引分页
 const CHUNK_SIZE = 1000; // id 分块（id 仍为 t<块>-<0..999>，保持稳定，勿改）
 const SUBCHUNK_SIZE = 100; // 落盘子文件粒度：每块拆为 poems/<块>-<0..9>.json，按需只取 100 首
-                           // 前端 loadPoem 用相同的 100 反解，改此值须同步 assets/js 里的除数
+                           // 前端 loadPoem 用 assets/js/data.js 的 SUB_CHUNK 反解，改此值须同步它（tools/tests/ids.test.mjs 钉住）
 
 if (!existsSync(SRC)) {
   console.error(`✗ 源目录不存在：${SRC}\n  请先：git clone --depth 1 https://github.com/chinese-poetry/chinese-poetry ${SRC}`);
@@ -66,7 +67,6 @@ const conv = (s) => (typeof s === 'string' ? clean(t2s(s)) : s);
 // ---------- 工具函数 ----------
 const loadJSON = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const numOf = (f) => { const m = f.match(/(\d+)/); return m ? parseInt(m[1], 10) : 0; };
-const pad4 = (n) => String(n).padStart(4, '0');
 
 function safeSlug(name) {
   return String(name || '佚名').replace(/[\/\\?%*:|"<>\s]/g, '_').trim() || '佚名';
@@ -281,14 +281,7 @@ for (const a of loadJSON(join(tangDir, 'authors.tang.json'))) {
 }
 
 // 作者按 256 桶打包为 authors/bucket-<000..255>.json（对象 {slug: 记录}），削减小文件数。
-// authorBucket 须与 assets/js/data.js / bundle-authors.mjs 完全一致（改动三处需同步）。
-const AUTHOR_BUCKETS = 256;
-const authorBucket = (slug) => {
-  let h = 0;
-  for (let i = 0; i < slug.length; i++) h = (h * 31 + slug.charCodeAt(i)) >>> 0;
-  return h % AUTHOR_BUCKETS;
-};
-const pad3 = (n) => ('00' + n).slice(-3);
+// authorBucket 由 tools/lib/ids.mjs 从 assets/js/data.js 复用（前端 loadAuthor 用同一份），勿再抄一份。
 
 const authorsIndex = [];
 const authorBucketsOut = new Map(); // bucket -> {slug: 记录}
