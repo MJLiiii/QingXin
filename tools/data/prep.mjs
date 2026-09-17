@@ -8,12 +8,18 @@
      node data/prep.mjs --src ../../chinese-poetry-src
 
    产出（相对仓库根 QingXin/）：
-     data/manifest.json          总数 / 分页信息 / 朝代分面
-     data/index/page-XXXX.json   浏览索引（500 条/页）
-     data/poems/XXXX-S.json      原文详情子块（100 首/文件，只读；每 1000 首 id 块拆 10 个子文件）
-     data/authors/<slug>.json    作者简介（一人一文件）
-     data/featured.json          首页精选（保留原站 5 首）
-     data/annotations/<id>.json  注释叠加层（含《水调歌头》种子）
+     data/manifest.json           总数 / 分页 / 分块信息 / 朝代分面
+     data/index/page-XXXX.json    浏览索引（500 条/页）
+     data/poems/XXXX-S.json       原文详情子块（100 首/文件，只读；每 1000 首 id 块拆 10 个子文件）
+     data/authors/bucket-XXX.json 作者记录，按 slug 哈希分 256 桶（对象 {slug: 记录}）
+     data/search.json             全局搜索索引 [id, title, author]
+     data/authors-index.json      全部作者（按作品数降序）
+     data/annotations/c59-66.json 《水调歌头》种子注释（目录本身保留，README.md 仅缺失时生成）
+
+   重置：开跑先删 data/{index,poems,authors}/ 与 manifest.json / search.json / authors-index.json，
+   以及 build-featured.mjs 派生的 featured.json / lines.json（id 按位置生成，旧派生文件会静默错配）；
+   保留 data/annotations/（含 README.md）与 data/about.json。featured.json / lines.json 不由本脚本重建——
+   跑完后必须再运行 node data/build-featured.mjs，否则首页无法加载、npm run check 报 error。
    =========================================================== */
 
 import {
@@ -35,7 +41,10 @@ const argVal = (n, d) => {
 // 默认源：仓库同级目录 ../chinese-poetry-src（相对 QingXin 即 ../..）
 const SRC = resolve(argVal('--src', resolve(REPO, '..', 'chinese-poetry-src')));
 const OUT = resolve(REPO, 'data');
-const INCLUDE_SONG_SHI = args.includes('--include-song-shi'); // 宋诗 25 万，暂不启用
+if (args.includes('--include-song-shi')) {
+  console.error('✗ --include-song-shi 尚未实现（宋诗 ~255k 未接入）');
+  process.exit(1);
+}
 
 const PAGE_SIZE = 500;   // 索引分页
 const CHUNK_SIZE = 1000; // id 分块（id 仍为 t<块>-<0..999>，保持稳定，勿改）
@@ -79,22 +88,11 @@ function synthTitle(rhythmic, paras) {
   return rhythmic || head || '无题';
 }
 
-// 原文按空串分节；无空串则整首一节
-function groupStanzas(paras) {
-  const stanzas = [];
-  let cur = [];
-  for (const line of paras || []) {
-    if (String(line).trim() === '') { if (cur.length) { stanzas.push(cur); cur = []; } }
-    else cur.push(line);
-  }
-  if (cur.length) stanzas.push(cur);
-  return stanzas.length ? stanzas : [paras || []];
-}
-
 // ---------- 输出目录重置 ----------
-// 仅清理“可再生”产物，保留 annotations/（用户手写的注释叠加层不能丢）
+// 仅清理“可再生”产物，保留 annotations/（用户手写的注释叠加层不能丢）与 about.json。
+// featured.json / lines.json 是 build-featured.mjs 的派生物：这里只删不建（旧文件会带着旧位置 id 静默错配）。
 for (const d of ['index', 'poems', 'authors']) rmSync(join(OUT, d), { recursive: true, force: true });
-for (const f of ['manifest.json', 'featured.json', 'search.json', 'authors-index.json']) rmSync(join(OUT, f), { force: true });
+for (const f of ['manifest.json', 'search.json', 'authors-index.json', 'featured.json', 'lines.json']) rmSync(join(OUT, f), { force: true });
 for (const d of ['index', 'poems', 'authors', 'annotations']) mkdirSync(join(OUT, d), { recursive: true });
 
 // ---------- 累加器 ----------
@@ -390,3 +388,4 @@ if (!existsSync(readmePath)) {
 
 console.log(`\n✓ 完成：${total} 首 · ${chunkNum} 原文块 · ${pages} 索引页 · ${authors.size} 作者`);
 console.log(`  输出目录：${OUT}`);
+console.log('  featured.json / lines.json 已删除且不会在此重建：请运行 node data/build-featured.mjs（否则首页无法加载、npm run check 报 error）');

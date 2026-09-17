@@ -79,8 +79,12 @@ node annotations/annotate-import.mjs
 cd tools
 npm run serve
 npm test
+npm run check
+npm run validate
+npm run featured
 npm run prep -- --src ../../chinese-poetry-src
 npm run annotate:import -- --dry-run
+npm run annotate:scrape -- id c59-66 --dry-run
 ```
 
 说明：`tools/annotations/annotate-import.mjs` 会联网下载数据并缓存到 `tools/.cache/`。缓存目录、`tools/node_modules/` 以及 iCloud 产生的冲突副本都已在 `.gitignore` 中排除。
@@ -106,7 +110,8 @@ QingXin/
 │       ├── glass-templates.js # 页面 HTML 片段构建
 │       ├── templates.js      # 通用 HTML 小工具（路由链接、命中高亮、注释词定位等）
 │       ├── search*.js        # 标题 / 作者 / 名句检索（含 Web Worker）
-│       └── data.js、utils.js # 数据加载与工具函数
+│       ├── data.js、utils.js # 数据加载与工具函数
+│       └── vendor/           # 本地 OpenCC 繁→简模块（搜索词归一化）
 ├── data/
 │   ├── manifest.json         # 数据总量、分页、分块信息
 │   ├── search.json           # 全局搜索索引：[id, title, author]
@@ -116,8 +121,8 @@ QingXin/
 │   ├── about.json            # 关于页文案
 │   ├── index/page-*.json     # 诗集浏览索引，500 条/文件
 │   ├── poems/*.json          # 诗词原文详情，100 首/文件
-│   ├── authors/*.json        # 作者简介和代表作
-│   └── annotations/          # 注释、译文、赏析、创作背景叠加层
+│   ├── authors/bucket-*.json # 作者简介和代表作，按 slug 哈希分 256 桶
+│   └── annotations/          # 注释、译文、赏析、创作背景叠加层（格式见其中的 README.md）
 └── tools/
     ├── server/
     │   └── serve.mjs         # 本地静态服务器
@@ -126,8 +131,14 @@ QingXin/
     │   ├── build-featured.mjs # 生成首页精选池与名句检索语料
     │   └── validate.mjs      # 只读数据一致性校验
     ├── annotations/
-    │   ├── annotate-import.mjs
-    │   └── annotate-lib.mjs
+    │   ├── annotate-import.mjs   # 从 chinese-gushiwen 数据集导入
+    │   ├── annotate-scrape.mjs   # 从古诗文网抓取（backfill / expand / id / authors）
+    │   ├── crawl-all-authors.mjs # 逐作者全量抓取驱动（可并发、可断点续爬）
+    │   ├── check-dups.mjs        # 只读：列出共用同一网页的兄弟 id 组
+    │   ├── gushiwen-client.mjs   # 礼貌的 HTTP 客户端（节流、重试、磁盘缓存）
+    │   ├── gushiwen-parse.mjs    # 纯 HTML 解析
+    │   └── annotate-lib.mjs      # 归一化、相似度、语料匹配、字段转换
+    ├── lib/                  # 脚本共用：路径、id/分桶/分片公式、参数解析
     ├── tests/                # node:test 单元测试
     ├── check.mjs             # npm run check：语法检查 + 单元测试 + 数据校验
     └── package.json          # 工具脚本入口与依赖
@@ -140,7 +151,8 @@ QingXin/
 - `data/` 放站点运行所需的静态内容数据，包含可重建数据和手工注释叠加层。
 - `tools/server/` 放本地静态服务器。
 - `tools/data/` 放主数据生成脚本。
-- `tools/annotations/` 放注释导入、匹配和归一化脚本。
+- `tools/annotations/` 放注释导入、抓取、匹配和归一化脚本。
+- `tools/lib/` 放脚本共用的小模块（路径、id 公式、参数解析）；id / 分桶公式直接复用前端的 `assets/js/data.js`。
 
 ## 数据模型
 
@@ -200,7 +212,7 @@ data/poems/0059-0.json[66]
 
 新增注释后，如希望这首诗进入首页精选池和名句检索，在 `tools/` 下运行 `node data/build-featured.mjs`。
 
-如果某个注释文件来自批量导入，文件中可能带有 `"source": "gushiwen"`。手工改好后建议删除这个字段，避免以后使用 `--force` 重新导入时覆盖。
+自动生成的注释文件带 `source` 字段，优先级为：手写（无 `source`）> `gushiwen-web`（古诗文网抓取）> `gushiwen`（数据集导入）> `ai`。脚本只会覆盖优先级不高于自己的文件，手写文件永不被触碰；手工改好一个自动生成的文件后请删除它的 `source` 字段。详见 `data/annotations/README.md`。
 
 ## 重建诗词数据
 
@@ -227,7 +239,7 @@ node data/prep.mjs --src ../../chinese-poetry-src
 - `data/poems/`
 - `data/authors/`
 
-脚本会保留 `data/annotations/` 目录，因此手工补充的注释不会被清空。内置种子文件 `c59-66.json` 可能会被重写。重建后再运行 `node data/build-featured.mjs` 更新精选池与名句检索语料。
+脚本会保留 `data/annotations/` 目录（因此手工补充的注释不会被清空；内置种子文件 `c59-66.json` 可能会被重写）和 `data/about.json`。它还会删除 `data/featured.json` 与 `data/lines.json`——二者由 `build-featured.mjs` 派生，不会被 prep 重建——因此重建后**必须**运行 `node data/build-featured.mjs`，否则首页无法加载、`npm run check` 会报 error。
 
 ## 批量导入注释
 
@@ -246,6 +258,20 @@ node annotations/annotate-import.mjs
 - 手写注释不会被自动覆盖。
 - 数据集中没有创作背景时，`background` 会保持为空数组。
 
+## 网页抓取注释
+
+绝大多数注释（4,079 / 4,120 首）来自 `tools/annotations/annotate-scrape.mjs` 对古诗文网（gushiwen.cn）的抓取，标记为 `"source": "gushiwen-web"`，含创作背景：
+
+```bash
+cd tools
+node annotations/annotate-scrape.mjs id c59-66 --dry-run      # 单首试运行
+node annotations/annotate-scrape.mjs authors 李白 --limit 20   # 按作者抓取
+node annotations/crawl-all-authors.mjs --pause 1 --workers 3   # 逐作者全量驱动，可断点续爬
+node annotations/check-dups.mjs --quiet                        # 手改前先查共用同一网页的兄弟 id
+```
+
+抓取有 2.5 秒/请求的节流并把页面缓存到 `tools/.cache/`，可随时中断重跑。各模式、参数与「赏析投毒」检测见 `AGENTS.md`。
+
 ## 部署
 
 项目可直接作为静态站点部署。使用 GitHub Pages 时推荐配置：
@@ -259,6 +285,7 @@ node annotations/annotate-import.mjs
 ## 数据来源与致谢
 
 - 诗词原文来自 [chinese-poetry/chinese-poetry](https://github.com/chinese-poetry/chinese-poetry)。
+- 注释、译文、赏析与创作背景大多整理自 [古诗文网](https://www.gushiwen.cn/)（gushiwen.cn）。
 - 部分译文、注释和赏析可由 [aopao/chinese-gushiwen](https://github.com/aopao/chinese-gushiwen) 导入。
 - 繁简转换使用 [opencc-js](https://github.com/nk2028/opencc-js)。
 

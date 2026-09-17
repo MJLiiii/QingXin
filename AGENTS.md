@@ -42,15 +42,19 @@ There is no build or bundling step. Things you actually run:
   the poem-page parts and 今日一诗 pick in `pages.test.mjs`, the route keys in `router.test.mjs`), then
   runs `node data/validate.mjs`, a read-only data-consistency audit (manifest counts vs search/index
   rows, id→shard round-trip for every poem, author slug→bucket hits, annotation shape + `source` rules,
+  `featured.json` rows vs search/index (missing or empty = error, the home page fetches it directly),
   `lines.json` rows vs annotations and poem text; exits 1 on any error, only warns about annotated poems
-  not yet in `lines.json`). `npm run validate` / `npm run featured` run the validator / `build-featured.mjs` alone.
+  not yet in `lines.json` or a missing `lines.json`). `npm run validate` / `npm run featured` run the validator / `build-featured.mjs` alone.
 
 - **Regenerate the data** (only when refreshing/rebuilding `data/**`):
   ```bash
   git clone --depth 1 https://github.com/chinese-poetry/chinese-poetry ../chinese-poetry-src
-  cd tools && npm install && node data/prep.mjs --src ../../chinese-poetry-src
+  cd tools && npm install && node data/prep.mjs --src ../../chinese-poetry-src && node data/build-featured.mjs
   ```
-  `--include-song-shi` is a stub flag to also import 宋诗 (~255k, off by default).
+  `prep.mjs` deletes `featured.json` and `lines.json` (they are derived by `build-featured.mjs` and would
+  otherwise keep stale position-based ids) and does **not** rebuild them, so `build-featured.mjs` must follow —
+  until it does the home page 404s and `npm run check` errors. `--include-song-shi` is not implemented:
+  passing it exits 1 (宋诗 ~255k was never wired up).
 
 - **Fetch annotations** (optional, only when expanding 注释/译文/赏析/创作背景 coverage):
   `cd tools && node annotations/annotate-scrape.mjs <backfill|expand|id|authors …>` scrapes 古诗文网;
@@ -284,8 +288,10 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
   pinned by `shell.test.mjs`) — verify those in a browser.
 - **`tools/data/prep.mjs`**: converts 全唐诗 繁→简 via `opencc-js` (宋词 is already simplified); strips
   lone UTF-16 surrogates; synthesizes ci titles/ids. On re-run it **preserves
-  `data/annotations/`** (your hand-written overlays), only regenerating index/poems/authors +
-  top-level JSON + the seed `c59-66.json`. `data/annotations/README.md` is hand-maintained docs —
+  `data/annotations/`** (your hand-written overlays) and `data/about.json`; it regenerates `index/`, `poems/`,
+  `authors/`, `manifest.json`, `search.json`, `authors-index.json` and the seed `c59-66.json`; it deletes but does
+  **not** regenerate `featured.json` and `lines.json` (run `node tools/data/build-featured.mjs` next).
+  `data/annotations/README.md` is hand-maintained docs —
   prep writes its built-in starter copy only when the file is missing, so edit the README itself.
 - **To annotate a poem:** create `data/annotations/<id>.json` (id is in the URL `#/poem/<id>`);
   fill `notes:[{term,def}]`, `translation:[…]`, `appreciation:[…]`, `background:[…]`,

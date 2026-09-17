@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /* 只读数据一致性校验。
-   覆盖 manifest/search/index/poems/authors/annotations 的运行时约束，
-   不写入任何文件，适合放进 npm run check。 */
+   覆盖 manifest/search/index/poems/authors/annotations/featured/lines 的运行时约束，
+   不写入任何文件，适合放进 npm run check。
+   严重度按影响分级：featured.json 缺失或为空 = error（首页 renderHome 直接 fetch 它，缺了页面就报错）；
+   lines.json 缺失 = warning（诗集搜索只是退化为标题/作者匹配）。二者都由 build-featured.mjs 生成。 */
 import { readFile, readdir } from 'node:fs/promises';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -112,6 +114,35 @@ for (const row of search) {
   if (!poem || poem.id !== id) addError(`${id} 无法按分片公式反解到同 id 原文`);
 }
 
+/* data/featured.json（首页推荐池）：行结构须与 data/index 行一致（前端诗卡 / hero 零适配），
+   id 必须在语料中。缺失 / 非数组 / 空数组都是 error：pickFeatured 对 [] 取不到 hero，首页一样白屏。 */
+let featured = null;
+try {
+  featured = await readJson(join(DATA, 'featured.json'));
+} catch (e) {
+  addError(e.code === 'ENOENT'
+    ? '缺少 data/featured.json（首页会报错），请运行 node tools/data/build-featured.mjs'
+    : `无法解析 data/featured.json: ${e.message}`);
+}
+if (featured !== null && !isArray(featured)) {
+  addError('data/featured.json 必须是数组');
+  featured = null;
+}
+if (featured && featured.length === 0) {
+  addError('data/featured.json 为空数组（首页取不到今日一诗），请运行 node tools/data/build-featured.mjs');
+}
+const featuredById = new Map();
+for (const row of featured || []) {
+  if (!row || typeof row !== 'object' || typeof row.id !== 'string') {
+    addError('featured.json 存在非 {id,…} 行');
+    continue;
+  }
+  if (featuredById.has(row.id)) addError(`featured.json 重复 id: ${row.id}`);
+  featuredById.set(row.id, row);
+  if (!searchIds.has(row.id)) addError(`featured.json ${row.id} 不在 search.json 中`);
+}
+const indexById = new Map(); // 只留 featured 命中的索引行，供下面逐键比对
+
 let indexRows = 0;
 for (let p = 0; p < manifest.pages; p++) {
   const file = `page-${pad4(p)}.json`;
@@ -133,9 +164,25 @@ for (let p = 0; p < manifest.pages; p++) {
       continue;
     }
     if (!searchIds.has(row.id)) addError(`data/index/${file} 引用 search 中不存在的 id: ${row.id}`);
+    if (featuredById.has(row.id)) indexById.set(row.id, row);
   }
 }
 if (indexRows !== manifest.total) addError(`index 总行数 ${indexRows} != manifest.total ${manifest.total}`);
+
+for (const [id, row] of featuredById) {
+  const idx = indexById.get(id);
+  if (!idx) {
+    addError(`featured.json ${id} 不在 data/index 中`);
+    continue;
+  }
+  const keys = new Set([...Object.keys(row), ...Object.keys(idx)]);
+  for (const k of keys) {
+    if (row[k] !== idx[k]) {
+      addError(`featured.json ${id} 的 ${k} 与 data/index 行不一致`);
+      break;
+    }
+  }
+}
 
 const authorIndex = await readJson(join(DATA, 'authors-index.json'));
 if (!Array.isArray(authorIndex)) addError('authors-index.json 必须是数组');
@@ -244,7 +291,7 @@ if (lines) {
   }
 }
 
-console.log(`validate: poems=${searchIds.size}, indexRows=${indexRows}, authors=${authorIndex.length}, annotations=${annFiles.length}, lines=${lines ? lines.length : 0}`);
+console.log(`validate: poems=${searchIds.size}, indexRows=${indexRows}, authors=${authorIndex.length}, annotations=${annFiles.length}, featured=${featuredById.size}, lines=${lines ? lines.length : 0}`);
 for (const w of warnings) console.warn(`warning: ${w}`);
 if (errors.length) {
   for (const e of errors.slice(0, 50)) console.error(`error: ${e}`);
