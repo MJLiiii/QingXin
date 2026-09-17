@@ -17,8 +17,9 @@ var entrySeq = 0;
 var currentEntry = null;    // 当前历史项 id（history.state.qx）
 var scrollById = new Map(); // 历史项 id → 离开时的滚动位置
 
-function parseHash() {
-  var raw = window.location.hash.replace(/^#\/?/, '');
+// 解析 hash 路由。可注入 hash 与日期以便测试（tools/tests/router.test.mjs）；不传则读当前地址栏 / 当天。
+export function parseHash(hash, now) {
+  var raw = String(hash === undefined ? window.location.hash : hash).replace(/^#\/?/, '');
   var at = raw.indexOf('?');
   var parts = (at >= 0 ? raw.slice(0, at) : raw).split('/').map(function (s) {
     try { return decodeURIComponent(s); } catch (e) { return s; }
@@ -32,7 +33,7 @@ function parseHash() {
   var keyParam = name === 'list' || name === 'authors' ? String(parseInt(param || '0', 10) || 0)
     : name === 'poem' || name === 'author' ? (param || '') : '';
   var key = name + '/' + keyParam + (query.q ? '?q=' + query.q : '')
-    + (name === 'home' ? '@' + localDateKey() : '');
+    + (name === 'home' ? '@' + localDateKey(now) : '');
   return { name: name, param: param, rest: parts.slice(2), query: query, key: key };
 }
 

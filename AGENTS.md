@@ -38,7 +38,8 @@ There is no build or bundling step. Things you actually run:
   runs the unit tests (`node --test tests/`: search ranking + line search in `search-core.test.mjs`, shared
   HTML helpers + utils in `templates.test.mjs`, page fragments in `glass-templates.test.mjs`, the `sw.js` SHELL
   list, cache-name scheme and redirect-stub parity in `shell.test.mjs`, the two 夜读 token blocks in
-  `glass-css.test.mjs`, the annotation matcher/parsers in `annotate-lib.test.mjs` + `gushiwen-parse.test.mjs`), then
+  `glass-css.test.mjs`, the annotation matcher/parsers in `annotate-lib.test.mjs` + `gushiwen-parse.test.mjs`,
+  the poem-page parts and 今日一诗 pick in `pages.test.mjs`, the route keys in `router.test.mjs`), then
   runs `node data/validate.mjs`, a read-only data-consistency audit (manifest counts vs search/index
   rows, id→shard round-trip for every poem, author slug→bucket hits, annotation shape + `source` rules,
   `lines.json` rows vs annotations and poem text; exits 1 on any error, only warns about annotated poems
@@ -89,7 +90,8 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
 `glass-pages.js`'s map, then `initGlassUI()`):
 - `router.js` — hash router: `#/home | #/list/:page | #/poem/:id | #/author/:slug | #/authors/:page
   | #/about`, plus an optional `?q=` live-search query → the renderer map passed to `startRouter(renderers)`
-  (unknown routes fall back to home). Navigation uses real
+  (unknown routes fall back to home). `parseHash(hash, now)` is exported (no arguments = the current hash and
+  today) so `tools/tests/router.test.mjs` can pin the render-cache keys. Navigation uses real
   `<a href="#/…" data-nav="…">` links (hrefs from `hashPath()`/`hrefFor()` in `utils.js`); one delegated
   click handler intercepts plain left clicks and lets modifier/middle clicks through (new tab). The same
   handler dispatches
@@ -170,8 +172,10 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   `emptyState`, `glossTerm`/`glossLines`, `errorSection` (the router's render-failure fallback),
   `searchBoxHTML`); `utils.js` — `esc()`,
   `hashPath()`/`hrefFor()`,
-  `groupStanzas()`, `idle()`, `localDateKey()`, `seededRandom()`. These and `glass-templates.js` are
-  imported by the Node unit tests, so they must not touch `window`/`document`/`localStorage` at import time.
+  `groupStanzas()`, `idle()`, `localDateKey()`, `seededRandom()`. These, `glass-templates.js`, `pages.js` and
+  `router.js` (and therefore everything they import: `data.js`, `search.js`, `search-core.js`, `reader.js`) are
+  imported by the Node unit tests, so they must not touch `window`/`document`/`localStorage` at import time —
+  browser globals may only be read inside functions.
 
 **`sw.js` service worker** lives at the site root and `index.html` registers it as `sw.js` (relative, so it
 works under the `/QingXin/` Pages subpath; the scope covers the whole site).
