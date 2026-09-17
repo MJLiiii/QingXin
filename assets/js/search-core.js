@@ -11,6 +11,8 @@ var LINE_FUZZY_SCORE = 105;
 var LINE_FUZZY_MIN_LENGTH = 5;
 var TWO_CHARACTER_LINE_CAP = 40;
 var EXCERPT_LIMIT = 40;
+// 单次搜索返回的最多条数（诗集 / 诗人搜索共用；调用方不传 limit 时的默认值）。
+export var SEARCH_LIMIT = 120;
 // A full-width space normalizes to '', so joined excerpt lines keep the
 // normalized offsets of their source lines.
 var EXCERPT_JOINER = '\u3000';
@@ -512,7 +514,7 @@ export function preparePoemIndex(index) {
 export function searchPoemIndex(index, query, limit, options) {
   if (!Array.isArray(index)) throw new TypeError('search index must be an array');
   var normalizedQuery = normalizeSearchText(query);
-  var cap = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 120;
+  var cap = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : SEARCH_LIMIT;
   if (!normalizedQuery) return { hits: [], matches: [], total: 0 };
   var queryLength = characterLength(normalizedQuery);
   var bodies = options && Array.isArray(options.lines) && queryLength >= 2
@@ -541,7 +543,7 @@ export function searchPoemIndex(index, query, limit, options) {
 export function searchAuthorIndex(index, query, limit) {
   if (!Array.isArray(index)) throw new TypeError('author index must be an array');
   var normalizedQuery = normalizeSearchText(query);
-  var cap = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 120;
+  var cap = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : SEARCH_LIMIT;
   if (!normalizedQuery) return { hits: [], matches: [], total: 0 };
   var collector = createCollector(cap);
   for (var i = 0; i < index.length; i++) {

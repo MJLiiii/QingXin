@@ -35,7 +35,7 @@ test('the preface is gloss line 0, body glosses keep their note index, and rows 
   assert.match(parts.original, /data-gloss="0">丙辰<\/span>中秋/);
   assert.match(parts.original, /千里共<span class="gloss"[^>]*data-gloss="1">婵娟<\/span>/);
   assert.doesNotMatch(parts.original, /data-gloss="2"/);
-  const rows = notesHTML(ann, parts.notes, false);
+  const rows = notesHTML(parts.notes);
   assert.equal(count(rows, /class="notes__row"/g), parts.notes.length);
   assert.match(rows, /notes__term">丙辰<\/div><div class="notes__def">年份</);
 });
@@ -45,16 +45,16 @@ test('empty note entries count as no notes and render the placeholder', () => {
   assert.equal(parts.hasNotes, false);
   assert.deepEqual(parts.notes, []);
   assert.doesNotMatch(parts.original, /data-gloss/);
-  assert.equal(notesHTML({}, parts.notes, false), '<div class="notes"><p class="prose--faint">尚未收录，敬请期待。</p></div>');
+  assert.equal(notesHTML(parts.notes), '<div class="notes"><p class="prose--faint">尚未收录，敬请期待。</p></div>');
 });
 
-// 原文整串 golden —— 归 D1（poemParts 直接输出 .original__line）维护：改输出时同 commit 更新。
-test('original text groups stanzas on blank lines and escapes text', () => {
+// 原文整串 golden：每句一个 .original__line 块（折行时悬挂缩进），空行分节，文本已转义。
+test('original text wraps each line in a block, groups stanzas on blank lines and escapes text', () => {
   const parts = poemParts({ paragraphs: ['床前明月光，', '疑是地上霜。', '', '举头望<明月>，', '低头思故乡。'] }, {});
   assert.equal(parts.original,
     '<div class="original"><div class="original__body">'
-    + '<p class="original__stanza">床前明月光，<br>疑是地上霜。</p>'
-    + '<p class="original__stanza">举头望&lt;明月&gt;，<br>低头思故乡。</p>'
+    + '<p class="original__stanza"><span class="original__line">床前明月光，</span><span class="original__line">疑是地上霜。</span></p>'
+    + '<p class="original__stanza"><span class="original__line">举头望&lt;明月&gt;，</span><span class="original__line">低头思故乡。</span></p>'
     + '</div></div>');
   assert.deepEqual(parts.paragraphs, ['床前明月光，', '疑是地上霜。', '', '举头望<明月>，', '低头思故乡。']);
 });
@@ -63,7 +63,7 @@ test('the AI notice appears only for ai-sourced annotations', () => {
   assert.match(aiNotice({ source: 'ai' }), /AI 生成/);
   assert.equal(aiNotice({ source: 'gushiwen-web' }), '');
   assert.equal(aiNotice({}), '');
-  assert.match(notesHTML({ source: 'ai' }, [{ term: 'a', def: 'b' }], true), /^<div class="notes"><p class="prose--faint">/);
+  assert.match(notesHTML([{ term: 'a', def: 'b' }]), /^<div class="notes"><div class="notes__row">/);
 });
 
 test('the daily pick is stable within a day, the shuffle is not, and the hero has an excerpt', () => {

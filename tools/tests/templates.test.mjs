@@ -96,6 +96,11 @@ test('search highlights mark exact matches in the matched field only', () => {
 
   const variant = { field: 'line', type: 'fuzzy', distance: 1, start: -1, length: 0, line: '床前看月光，疑是地上霜。' };
   assert.equal(highlighted(variant.line, '床前明月光', variant, 'line'), '床前看月光，疑是地上霜。');
+
+  // OpenCC 词组转换让逐字偏移映射失效时 search-core 给 start:-1 的 substring 命中：按查询词本身高亮。
+  const phrase = { field: 'line', type: 'substring', distance: 0, start: -1, length: 0, line: '整顿乾坤济时了，' };
+  assert.equal(highlighted(phrase.line, '整顿乾坤', phrase, 'line'), '<mark class="search-match">整顿乾坤</mark>济时了，');
+  assert.equal(highlighted('别的句子', '整顿乾坤', phrase, 'line'), '别的句子');
 });
 
 test('stanza grouping keeps paragraph indices', () => {

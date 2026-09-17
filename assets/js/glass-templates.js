@@ -91,7 +91,7 @@ export function poetTile(a, query, match) {
     query = '';
     match = null;
   }
-  match = match || a._search || {};
+  match = match || {};
   return link('author/' + a.slug, 'ptile',
     seal(a.name, a.dynasty)
     + '<span class="ptile__text">'

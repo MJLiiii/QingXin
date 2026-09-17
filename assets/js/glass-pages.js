@@ -1,6 +1,6 @@
-/* 各页面的渲染：数据与交互辅助在 pages.js / reader.js，这里决定玻璃界面的布局——
+/* 各页面的渲染：数据与交互辅助（含原文逐句块）在 pages.js / reader.js，这里决定玻璃界面的布局——
    首页今日一诗 + 搜索、诗集 / 诗人卡片网格、诗文页左栏钉住 + 右栏分段标签、作者页资料卡。 */
-import { fetchJSON, loadAuthor, loadPoem } from './data.js';
+import { LIST_PAGE_SIZE, fetchJSON, loadAuthor, loadPoem } from './data.js';
 import { initPin, rememberTab } from './glass-ui.js';
 import {
   GLASS, ICONS, errorCard, fmt, findForm, hitCard, metaChips, pageTitle, pagerDock, pickTab,
@@ -10,11 +10,11 @@ import {
   aiNotice, loadPoemData, notesHTML, pickFeatured, poemParts, wireLiveSearch, wirePager, wireSearch,
 } from './pages.js';
 import { readPrefs, setCurrentPoem, syncControls } from './reader.js';
-import { searchAuthorIndex } from './search-core.js';
+import { SEARCH_LIMIT, searchAuthorIndex } from './search-core.js';
 import { emptyState, heroLines, navHref, searchBoxHTML } from './templates.js';
 import { esc, localDateKey, pad4 } from './utils.js';
 
-var DISPLAY = 25;
+var DISPLAY = LIST_PAGE_SIZE; // 诗集 / 诗人每页条数（诗集与 data.js preloadListPage 共用）
 var HINTS = ['明月', '春风', '李白', '江南'];
 
 // 统计类数据只是点缀：加载失败时不拖垮页面，但这次渲染不缓存，返回时重试。
@@ -29,15 +29,6 @@ function soft(promise, ctx) {
 function onRoute(name) {
   var re = new RegExp('^#/?' + name + '(?:[/?]|$)');
   return function () { return re.test(window.location.hash); };
-}
-
-// 原文逐句成块：一句折行时在标点后断开并悬挂缩进，看得出是同一句（竖排时由 CSS 取消缩进）。
-function lineBlocks(original) {
-  return original.replace(/(<p class="original__stanza">)([\s\S]*?)(<\/p>)/g, function (m, open, body, close) {
-    return open + body.split('<br>').map(function (line) {
-      return '<span class="original__line">' + line + '</span>';
-    }).join('') + close;
-  });
 }
 
 function latinNum(n) {
@@ -69,7 +60,7 @@ export async function renderHome(param, ctx) {
   // 大字字号按最长一行的字数铺满卡片（glass.css .hero-card__lines）。
   var heroChars = Math.max.apply(null, lines.map(function (line) { return Array.from(line).length; }).concat(4));
   var cipai = (heroPoem && heroPoem.rhythmic) || hero.title;
-  var kindLabel = hero.id.charAt(0) === 'c' ? '词' : '诗';
+  var kindLabel = hero.kind === 'ci' ? '词' : '诗';
 
   var heroCard = '<article class="gcard hero-card" aria-labelledby="home-hero-title">'
     + '<div class="hero-card__top">'
@@ -151,7 +142,6 @@ export async function renderAuthors(param, ctx) {
       id: 'author-search',
       placeholder: '搜索诗人姓名或近似关键词…',
       aria: '搜索诗人',
-      tag: 'poets',
       controls: 'authors-rows',
     })
     + '<div id="authors-rows" class="card-grid card-grid--poets">' + slice.map(poetTile).join('') + '</div>'
@@ -168,7 +158,7 @@ export async function renderAuthors(param, ctx) {
     },
     restore: function () { return slice.map(poetTile).join(''); },
     match: async function (q) {
-      var result = searchAuthorIndex(idx, q, 120);
+      var result = searchAuthorIndex(idx, q, SEARCH_LIMIT);
       var hits = result.hits || [];
       var matches = result.matches || [];
       return {
@@ -229,7 +219,7 @@ export async function renderPoem(id, ctx) {
     + '<div class="tools-dock">' + GLASS + parts.tools + '</div>'
     + '<section class="gcard original-card" aria-labelledby="poem-orig-h" style="--line-chars:' + lineChars + '">'
     + '<h2 class="card-label" id="poem-orig-h">原文</h2>'
-    + lineBlocks(parts.original)
+    + parts.original
     + '</section>'
     + '</div>';
 
@@ -238,7 +228,7 @@ export async function renderPoem(id, ctx) {
   var appreciation = ann.appreciation || [];
   var background = ann.background || [];
   var sections = [
-    { key: 'notes', label: '注释', html: notesHTML(ann, parts.notes, false), empty: !parts.hasNotes },
+    { key: 'notes', label: '注释', html: notesHTML(parts.notes), empty: !parts.hasNotes },
     { key: 'translation', label: '译文', html: proseBody(trans, !!ann.prefaceTranslation), empty: !trans.length },
     { key: 'appreciation', label: '赏析', html: proseBody(appreciation), empty: !appreciation.length },
     { key: 'background', label: '<span class="tabs__trim">创作</span>背景', html: proseBody(background), empty: !background.length },

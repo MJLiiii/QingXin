@@ -1,5 +1,5 @@
 import { fetchJSON } from './data.js';
-import { searchPoemIndex } from './search-core.js';
+import { SEARCH_LIMIT, searchPoemIndex } from './search-core.js';
 
 var worker = null;
 var workerFailed = false;
@@ -47,8 +47,6 @@ function withMatchMetadata(result) {
     return [row[0], row[1], row[2], {
       field: match.field || '',
       type: match.type || '',
-      matchType: match.type || '',
-      score: match.score || 0,
       distance: match.distance || 0,
       start: Number.isInteger(match.start) ? match.start : -1,
       length: Number.isInteger(match.length) ? match.length : 0,
@@ -80,7 +78,7 @@ async function searchOnMainThread(q, limit) {
 }
 
 export async function searchPoems(q, limit) {
-  limit = limit || 120;
+  limit = limit || SEARCH_LIMIT;
   var w = ensureWorker();
   if (!w) return searchOnMainThread(q, limit);
   var id = ++seq;

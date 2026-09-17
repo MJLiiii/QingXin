@@ -4,9 +4,10 @@ import { warmSearchIndex } from './search.js';
 import { errorSection } from './templates.js';
 import { hrefFor, idle, localDateKey } from './utils.js';
 
-var PAGES = ['home', 'list', 'poem', 'author', 'authors', 'about'];
 // 页面 → 高亮的导航项：诗文页归到「诗集」，页眉导航与底部标签栏始终有一项选中。
+// 键就是全部页面名（index.html 的 #page-<name> 容器）——PAGES 由它派生，须先声明。
 var NAV_OF = { home: 'home', list: 'list', poem: 'list', authors: 'authors', author: 'authors', about: 'about' };
+var PAGES = Object.keys(NAV_OF);
 var DEFAULT_TITLE = '情心 · 慢读古典';
 
 var renderers = {};         // 页面 → 渲染函数，由 startRouter(pages) 传入（glass-pages.js）
@@ -112,7 +113,7 @@ function schedulePreload(route) {
   });
 }
 
-export async function render(opts) {
+async function render(opts) {
   opts = opts || {};
   var token = ++seq;
   var route = parseHash();

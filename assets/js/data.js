@@ -6,6 +6,8 @@ var ROOT = new URL('../../', import.meta.url);
 // 每个原文子文件的诗数：与 manifest.subChunkSize / tools/data/prep.mjs 的 SUBCHUNK_SIZE 一致
 //（这里不读 manifest，省一次请求）；tools/lib/ids.mjs 复用并由 tools/tests/ids.test.mjs 钉住。
 export var SUB_CHUNK = 100;
+// 诗集每页条数（glass-pages.js 的 DISPLAY 与下面的预取共用）；manifest.pageSize 必须能被它整除。
+export var LIST_PAGE_SIZE = 25;
 
 export async function fetchJSON(path) {
   if (cache.has(path)) return cache.get(path);
@@ -67,7 +69,7 @@ export async function loadAuthor(slug) {
 
 export async function preloadListPage(displayPage) {
   var manifest = await fetchJSON('data/manifest.json');
-  var perFile = manifest.pageSize / 25;
+  var perFile = manifest.pageSize / LIST_PAGE_SIZE;
   var file = Math.floor(Math.max(0, displayPage || 0) / perFile);
   return preloadJSON('data/index/page-' + pad4(file) + '.json');
 }

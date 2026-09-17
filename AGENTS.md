@@ -117,20 +117,22 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   stale responses ignored, pager hidden while active, query written to `?q=` from the debounce (never per
   keystroke or during IME composition) and restored via `start(q)`, with loading/result status — and
   `wireSearch(host, entries, onQuery, { entry, hit })`, the 诗集 title/author/line search on top of it (诗人
-  runs a name-only search through `wireLiveSearch` directly; both cap results at 120); `pickFeatured()` — 今日一诗 is
+  runs a name-only search through `wireLiveSearch` directly; both cap results at `SEARCH_LIMIT`, 120, exported by
+  `search-core.js`); `pickFeatured()` — 今日一诗 is
   `data/featured.json` shuffled with `seededRandom('qingxin:' + localDateKey())` (stable for the local day;
   换一首 shuffles with `Math.random`); `loadPoemData()`; `poemParts()` (the reading toolbar 复制/分享/竖排/
   A−/A+ — 竖排 omitted above 60 lines — and the 原文 with note terms linked inside 词序 + 原文 via
-  `glossLines()`); `notesHTML()`; `aiNotice()`.
+  `glossLines()`, each line wrapped in a block `.original__line`); `notesHTML(notes)`; `aiNotice()`.
 - `glass-pages.js` — the six renderers, all `(param, ctx)` (`renderHome/renderList/renderPoem/renderAuthor/
   renderAuthors/renderAbout`), building HTML strings and injecting them into `#page-<name>`. 诗集 paginates
-  25/page (`DISPLAY`) over the 500-row index files; 诗人 lists all poets from `authors-index.json`.
+  `LIST_PAGE_SIZE` (25, exported by `data.js` and shared with `preloadListPage()`; `manifest.pageSize` must be
+  divisible by it) over the 500-row index files; 诗人 lists all poets from `authors-index.json`.
   Home is just two centred, stacked cards — the 今日一诗 hero (only `featured.json` + that poem are
   loaded) and the 寻章摘句 search form (→ `#/list?q=`, plus hint links); 诗集/诗人 are card grids with the same
   search/pager wiring; the poem page is a two-column layout (`.poem-aside[data-pin]` with title, fact chips,
   the toolbar in a glass `.tools-dock` and the 原文 card; `.poem-main` with the AI note, segmented tabs and the
-  author card; poems over 60 lines get `.poem-layout--long` and no `data-pin`; each 原文 line is wrapped in a
-  block `.original__line` (hanging indent when it wraps) and the card gets `--line-chars`, the longest line's
+  author card; poems over 60 lines get `.poem-layout--long` and no `data-pin`; each 原文 line arrives from
+  `poemParts()` wrapped in a block `.original__line` (hanging indent when it wraps) and the card gets `--line-chars`, the longest line's
   length, which sizes the stanza text to fit the card); the author page is a pinned
   profile card + bio + works grid; about is a card grid. `glass-templates.js` holds its pure HTML fragments
   (cards, `seal()` glyph avatars — first code point of the name, never the data's `seal` field, which is a
@@ -192,7 +194,7 @@ HTTP-cache copy of a module can never be written back next to newer ones. It pre
 the HTTP cache so a new worker never mixes old and new modules; one missing entry fails the whole install.
 **Adding/renaming a frontend module or shell means updating its `SHELL` list** (`tools/tests/shell.test.mjs`
 asserts SHELL equals the four shell pages + `assets/css/*.css` + every `assets/js/**/*.js`)**; changing any cached format
-means bumping `CACHE_NAME`** (currently `qingxin-v10`; old caches are purged on activate). Also bump it when a
+means bumping `CACHE_NAME`** (currently `qingxin-v11`; old caches are purged on activate). Also bump it when a
 module drops an export another module used to import, so the new set is precached in one step.
 `index.html` reloads the page once when an old worker hands over (it checks for `qingxin-v1…v9` caches,
 whose modules don't match this shell — e.g. a v9 `router.js` still imports the removed Kyne renderers from
