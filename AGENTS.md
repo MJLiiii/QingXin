@@ -36,7 +36,9 @@ There is no build or bundling step. Things you actually run:
   `node --check`s every `assets/js/**/*.js`, `sw.js` and `tools/**/*.mjs` (new or deleted files are picked up
   automatically; `node_modules/`, `.cache/` and iCloud conflict copies with a space+digit in the name are skipped),
   runs the unit tests (`node --test tests/`: search ranking + line search in `search-core.test.mjs`, shared
-  HTML helpers + utils in `templates.test.mjs`, page fragments in `glass-templates.test.mjs`), then
+  HTML helpers + utils in `templates.test.mjs`, page fragments in `glass-templates.test.mjs`, the `sw.js` SHELL
+  list, cache-name scheme and redirect-stub parity in `shell.test.mjs`, the two 夜读 token blocks in
+  `glass-css.test.mjs`, the annotation matcher/parsers in `annotate-lib.test.mjs` + `gushiwen-parse.test.mjs`), then
   runs `node data/validate.mjs`, a read-only data-consistency audit (manifest counts vs search/index
   rows, id→shard round-trip for every poem, author slug→bucket hits, annotation shape + `source` rules,
   `lines.json` rows vs annotations and poem text; exits 1 on any error, only warns about annotated poems
@@ -179,7 +181,8 @@ locally). The background refresh is `fetch(req, { cache: 'no-cache' })` (a condi
 HTTP-cache copy of a module can never be written back next to newer ones. It pre-caches the app shell
 (root, the `kyne/` + `liquidglass/` redirect stubs, `glass.css`, every `assets/js/*.js`) with `cache: 'reload'`, bypassing
 the HTTP cache so a new worker never mixes old and new modules; one missing entry fails the whole install.
-**Adding/renaming a frontend module or shell means updating its `SHELL` list; changing any cached format
+**Adding/renaming a frontend module or shell means updating its `SHELL` list** (`tools/tests/shell.test.mjs`
+asserts SHELL equals the four shell pages + `assets/css/*.css` + every `assets/js/**/*.js`)**; changing any cached format
 means bumping `CACHE_NAME`** (currently `qingxin-v10`; old caches are purged on activate). Also bump it when a
 module drops an export another module used to import, so the new set is precached in one step.
 `index.html` reloads the page once when an old worker hands over (it checks for `qingxin-v1…v9` caches,
@@ -188,7 +191,8 @@ whose modules don't match this shell — e.g. a v9 `router.js` still imports the
 current. `startRouter()` called without a renderer map (only the removed Kyne `app.js` does that — in
 `kyne/` and in pre-v7 root pages) redirects to the site root, resolved from `import.meta.url`. Drop the
 reload block, that router fallback and the stubs' `'../?'` branch (with the root's `?` strip) once those
-workers have aged out.
+workers have aged out — `shell.test.mjs` pins the `'../?'` branch and the `?` strip as a pair, so update that test
+in the same commit.
 
 **Detail-page invariant:** all five sections (原文/注释/译文/赏析/创作背景) always
 render. Only 原文 + author bio come from source data; the other four come from the annotation
@@ -211,7 +215,8 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
   `.theme-btn`) each with `.glass` span layers, the six `#page-*` containers, `#boot`, a compact footer card
   (no nav), the phone `.tabbar` and the service-worker block. Links that should get `aria-current` must be
   `.site-nav__link[data-nav]` (used by both the header nav and the tab bar; only one of the two is displayed
-  at any width). If you edit the stubs, keep `kyne/index.html` and `liquidglass/index.html` identical.
+  at any width). If you edit the stubs, keep `kyne/index.html` and `liquidglass/index.html` identical
+(`shell.test.mjs` asserts they are byte-equal).
 - **Liquid-glass design system** lives in `assets/css/glass.css` `:root` — app-style liquid glass (Apple
   Liquid Glass + the [svg-glass-navbar-effect](https://svg-glass-navbar-effect.webflow.io/) Webflow template),
   light by default. **Layers:** a fixed `.ambient` backdrop (three blurred radial blobs `--blob-violet/cyan/
@@ -251,7 +256,8 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
   **夜读 (dark theme)** only redefines tokens, in two identical blocks —
   `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {…} }` and
   `:root[data-theme="dark"] {…}` — so never hard-code a color: add a token to `:root` and to both dark
-  blocks. Reading text sizes are `calc(<px> * var(--reading-scale))` (including the mobile media
+  blocks (`tools/tests/glass-css.test.mjs` asserts the two blocks declare the same tokens with the same values).
+  Reading text sizes are `calc(<px> * var(--reading-scale))` (including the mobile media
   queries). Vertical 原文 is `:root[data-vertical="1"] .original__body` — the scroll container itself is
   `vertical-rl`, so it opens on the first column (left-aligned, `margin: 0`), and a left-edge shadow
   hints at columns still hidden inside the card.
@@ -270,7 +276,8 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
 - **`glass-templates.js` markup is frozen by `tools/tests/glass-templates.test.mjs`** (and the
   `templates.js` helpers by `templates.test.mjs`) — restyle from CSS or add a new builder instead. Decorative
   pseudo-content is written as `content: "x" / ""` so screen readers skip it. Page structure belongs in
-  `glass-pages.js` and `index.html`, which have no markup tests — verify those in a browser.
+  `glass-pages.js` and `index.html`, which have no markup tests (only `index.html`'s `?` strip and the stubs are
+  pinned by `shell.test.mjs`) — verify those in a browser.
 - **`tools/data/prep.mjs`**: converts 全唐诗 繁→简 via `opencc-js` (宋词 is already simplified); strips
   lone UTF-16 surrogates; synthesizes ci titles/ids. On re-run it **preserves
   `data/annotations/`** (your hand-written overlays), only regenerating index/poems/authors +

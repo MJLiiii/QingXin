@@ -129,6 +129,7 @@ QingXin/
     │   ├── annotate-import.mjs
     │   └── annotate-lib.mjs
     ├── tests/                # node:test 单元测试
+    ├── check.mjs             # npm run check：语法检查 + 单元测试 + 数据校验
     └── package.json          # 工具脚本入口与依赖
 ```
 
