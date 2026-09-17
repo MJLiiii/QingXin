@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents (Claude Code and others) when working with code in this repository.
 
 ## What this is
 
@@ -39,12 +39,14 @@ There is no build or bundling step. Things you actually run:
   HTML helpers + utils in `templates.test.mjs`, page fragments in `glass-templates.test.mjs`, the `sw.js` SHELL
   list, cache-name scheme and redirect-stub parity in `shell.test.mjs`, the two 夜读 token blocks in
   `glass-css.test.mjs`, the annotation matcher/parsers in `annotate-lib.test.mjs` + `gushiwen-parse.test.mjs`,
-  the poem-page parts and 今日一诗 pick in `pages.test.mjs`, the route keys in `router.test.mjs`), then
+  the poem-page parts and 今日一诗 pick in `pages.test.mjs`, the route keys in `router.test.mjs`, the id/bucket/shard
+  formulas against `data/manifest.json` plus the argv/readJson helpers in `ids.test.mjs`), then
   runs `node data/validate.mjs`, a read-only data-consistency audit (manifest counts vs search/index
   rows, id→shard round-trip for every poem, author slug→bucket hits, annotation shape + `source` rules,
   `featured.json` rows vs search/index (missing or empty = error, the home page fetches it directly),
-  `lines.json` rows vs annotations and poem text; exits 1 on any error, only warns about annotated poems
-  not yet in `lines.json` or a missing `lines.json`). `npm run validate` / `npm run featured` run the validator / `build-featured.mjs` alone.
+  `lines.json` rows vs annotations and poem text, `manifest.subChunkSize`/`pageSize` vs the `data.js` constants;
+  exits 1 on any error; warnings only for annotated poems not yet in `lines.json`, a missing `lines.json`, and the
+  poem-shard coverage estimate). `npm run validate` / `npm run featured` run the validator / `build-featured.mjs` alone.
 
 - **Regenerate the data** (only when refreshing/rebuilding `data/**`):
   ```bash

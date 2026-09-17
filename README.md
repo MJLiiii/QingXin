@@ -84,7 +84,7 @@ npm run validate
 npm run featured
 npm run prep -- --src ../../chinese-poetry-src
 npm run annotate:import -- --dry-run
-npm run annotate:scrape -- id c59-66 --dry-run
+npm run annotate:scrape -- id t1-100 --dry-run
 ```
 
 说明：`tools/annotations/annotate-import.mjs` 会联网下载数据并缓存到 `tools/.cache/`。缓存目录、`tools/node_modules/` 以及 iCloud 产生的冲突副本都已在 `.gitignore` 中排除。
@@ -264,7 +264,7 @@ node annotations/annotate-import.mjs
 
 ```bash
 cd tools
-node annotations/annotate-scrape.mjs id c59-66 --dry-run      # 单首试运行
+node annotations/annotate-scrape.mjs id t1-100 --dry-run      # 单首试运行（c59-66 是手写种子，脚本永不触碰）
 node annotations/annotate-scrape.mjs authors 李白 --limit 20   # 按作者抓取
 node annotations/crawl-all-authors.mjs --pause 1 --workers 3   # 逐作者全量驱动，可断点续爬
 node annotations/check-dups.mjs --quiet                        # 手改前先查共用同一网页的兄弟 id

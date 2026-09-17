@@ -1,9 +1,7 @@
 /* 诗词 id / 作者 slug 的编码约定：与前端共用同一份实现（assets/js/data.js、utils.js 在 Node 下可 import，
    import 期不碰 window）。分片公式 poemShardFile 是 data.js loadPoem 的工具侧对应（前端不能 import tools/），
    tools/tests/ids.test.mjs 把两者钉在一起。 */
-import { SUB_CHUNK } from '../../assets/js/data.js';
-
-export { parseId, authorBucket, SUB_CHUNK } from '../../assets/js/data.js';
+export { parseId, authorBucket, SUB_CHUNK, LIST_PAGE_SIZE } from '../../assets/js/data.js';
 export { pad3, pad4 } from '../../assets/js/utils.js';
 import { pad4 } from '../../assets/js/utils.js';
 

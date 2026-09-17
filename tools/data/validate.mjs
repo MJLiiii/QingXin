@@ -7,7 +7,7 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DATA } from '../lib/paths.mjs';
-import { ANN_FILE_RE, authorBucket, pad3, pad4, parseId, poemShardFile } from '../lib/ids.mjs';
+import { ANN_FILE_RE, LIST_PAGE_SIZE, SUB_CHUNK, authorBucket, pad3, pad4, parseId, poemShardFile } from '../lib/ids.mjs';
 
 const errors = [];
 const warnings = [];
@@ -59,6 +59,13 @@ const manifest = await readJson(join(DATA, 'manifest.json'));
 for (const key of ['total', 'pageSize', 'pages', 'chunkSize', 'subChunkSize', 'chunks']) {
   if (!Number.isInteger(manifest[key]) || manifest[key] <= 0) addError(`manifest.${key} 必须是正整数`);
 }
+if (errors.length) { // manifest 坏了，后面的分片公式无从谈起：先把它自己的诊断打出来
+  for (const e of errors) console.error(`error: ${e}`);
+  process.exit(1);
+}
+// 前端不读 manifest：data.js 的两个常量必须与它一致（否则 loadPoem 反解错子文件、预取错索引页）。
+if (manifest.subChunkSize !== SUB_CHUNK) addError(`manifest.subChunkSize ${manifest.subChunkSize} != assets/js/data.js SUB_CHUNK ${SUB_CHUNK}`);
+if (manifest.pageSize % LIST_PAGE_SIZE !== 0) addError(`manifest.pageSize ${manifest.pageSize} 不能被 LIST_PAGE_SIZE ${LIST_PAGE_SIZE} 整除`);
 
 const search = await readJson(join(DATA, 'search.json'));
 if (!Array.isArray(search)) addError('search.json 必须是数组');
@@ -100,14 +107,16 @@ for (const row of search) {
 /* data/featured.json（首页推荐池）：行结构须与 data/index 行一致（前端诗卡 / hero 零适配），
    id 必须在语料中。缺失 / 非数组 / 空数组都是 error：pickFeatured 对 [] 取不到 hero，首页一样白屏。 */
 let featured = null;
+let featuredRead = false;
 try {
   featured = await readJson(join(DATA, 'featured.json'));
+  featuredRead = true;
 } catch (e) {
   addError(e.code === 'ENOENT'
     ? '缺少 data/featured.json（首页会报错），请运行 node tools/data/build-featured.mjs'
     : `无法解析 data/featured.json: ${e.message}`);
 }
-if (featured !== null && !isArray(featured)) {
+if (featuredRead && !isArray(featured)) { // 含字面量 null
   addError('data/featured.json 必须是数组');
   featured = null;
 }

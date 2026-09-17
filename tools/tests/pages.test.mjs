@@ -25,18 +25,21 @@ test('vertical reading is offered up to 60 lines and dropped above', () => {
 test('the preface is gloss line 0, body glosses keep their note index, and rows match', () => {
   const ann = {
     preface: '丙辰中秋，欢饮达旦。',
-    notes: [{ term: '丙辰', def: '年份' }, { term: '婵娟', def: '明月' }, { term: '无此词', def: '不出现' }],
+    // 第 0 条在原文里不存在：其后两条的 data-gloss 必须仍是它们在 notes 里的下标（1、2），不能顺位补上。
+    notes: [{ term: '无此词', def: '不出现' }, { term: '丙辰', def: '年份' }, { term: '婵娟', def: '明月' }],
   };
   const poem = { paragraphs: ['明月几时有，把酒问青天。', '但愿人长久，千里共婵娟。'] };
   const parts = poemParts(poem, ann);
   assert.equal(parts.hasNotes, true);
   assert.equal(parts.notes, ann.notes);
   assert.match(parts.original, /^<div class="original"><div class="original__preface"><span class="badge">词序<\/span><br>/);
-  assert.match(parts.original, /data-gloss="0">丙辰<\/span>中秋/);
-  assert.match(parts.original, /千里共<span class="gloss"[^>]*data-gloss="1">婵娟<\/span>/);
-  assert.doesNotMatch(parts.original, /data-gloss="2"/);
+  assert.match(parts.original, /data-gloss="1">丙辰<\/span>中秋/);
+  assert.match(parts.original, /千里共<span class="gloss"[^>]*data-gloss="2">婵娟<\/span>/);
+  assert.doesNotMatch(parts.original, /data-gloss="0"/);
+  // 第 k 个 .gloss 对应第 k 个 .notes__row（reader.js 按下标取）：行序必须与 notes 一致，不能只留命中的。
   const rows = notesHTML(parts.notes);
-  assert.equal(count(rows, /class="notes__row"/g), parts.notes.length);
+  const terms = [...rows.matchAll(/notes__term">([^<]+)</g)].map((m) => m[1]);
+  assert.deepEqual(terms, ['无此词', '丙辰', '婵娟']);
   assert.match(rows, /notes__term">丙辰<\/div><div class="notes__def">年份</);
 });
 

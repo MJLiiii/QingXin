@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ANN_FILE_RE, SUB_CHUNK, authorBucket, pad3, pad4, parseId, poemShardFile } from '../lib/ids.mjs';
+import { ANN_FILE_RE, LIST_PAGE_SIZE, SUB_CHUNK, authorBucket, pad3, pad4, parseId, poemShardFile } from '../lib/ids.mjs';
 import { flag, opt, positionals } from '../lib/argv.mjs';
 import { ANN_DIR, DATA, ROOT, TOOLS, readJson } from '../lib/paths.mjs';
 import * as data from '../../assets/js/data.js';
@@ -22,10 +22,14 @@ test('ids and buckets come from the browser module and match the documented sche
   assert.equal(pad4(59), '0059');
 });
 
-test('the shard formula agrees with data.js and is driven by the manifest sub-chunk size', () => {
-  assert.equal(SUB_CHUNK, 100);
-  assert.deepEqual(poemShardFile(parseId('c59-66'), SUB_CHUNK), { file: '0059-0.json', index: 66 });
-  assert.deepEqual(poemShardFile(parseId('t12-999'), SUB_CHUNK), { file: '0012-9.json', index: 99 });
+test('the browser constants match data/manifest.json and the shard formula follows the manifest', async () => {
+  // 前端不读 manifest（省一次请求），所以这里把 data.js 的常量和真实 manifest 钉在一起；validate.mjs 也检查同一条。
+  const manifest = await readJson(join(DATA, 'manifest.json'));
+  assert.equal(SUB_CHUNK, manifest.subChunkSize);
+  assert.equal(data.LIST_PAGE_SIZE, LIST_PAGE_SIZE);
+  assert.equal(manifest.pageSize % LIST_PAGE_SIZE, 0);
+  assert.deepEqual(poemShardFile(parseId('c59-66'), manifest.subChunkSize), { file: '0059-0.json', index: 66 });
+  assert.deepEqual(poemShardFile(parseId('t12-999'), manifest.subChunkSize), { file: '0012-9.json', index: 99 });
   assert.deepEqual(poemShardFile({ chunk: 3, i: 250 }, 50), { file: '0003-5.json', index: 0 });
   assert.throws(() => poemShardFile({ chunk: 0, i: 0 }), TypeError);
 });

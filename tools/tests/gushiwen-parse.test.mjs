@@ -212,7 +212,7 @@ const DETAIL = `
 <div id="shangxi45" class="sons">
   <div class="contyishang">
     <h2><span>赏析</span></h2>
-    <p>这首诗写诗人在登高望远中表现出来的不凡的胸襟抱负。</p>
+    <p>这首合成的赏析只用来测试段落切分与参考资料截断，与任何真实文本无关。</p>
     <p>参考资料：</p><p>1、某某《唐诗鉴赏辞典》</p>
   </div>
 </div>
@@ -271,7 +271,7 @@ test('parseDetailPage keeps a short inline 赏析 whole, without heading or 参�
     n: null,
     idjm: null,
     ajaxKind: null,
-    paras: ['这首诗写诗人在登高望远中表现出来的不凡的胸襟抱负。'],
+    paras: ['这首合成的赏析只用来测试段落切分与参考资料截断，与任何真实文本无关。'],
   }]);
 });
 

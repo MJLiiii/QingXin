@@ -2236,9 +2236,10 @@ body {
 @media (prefers-reduced-transparency: reduce) {
   .ambient,
   .glass__effect { display: none; }
-  /* 内容卡片改实底：整体换 token（:root:root 的特异度 (0,2,0) 压过夜读块的 :root:not(…) / :root[data-theme]），
-     用 background 简写叠渐变的四张卡（今日一诗、原文、资料卡、关于页首卡）也一并变实底。只在本块内覆盖，不进 :root。 */
-  :root:root {
+  /* 内容卡片本体改实底：整体换 token。夜读块的 :root:not(…) / :root[data-theme] 是 (0,2,0)，这里用 :root:root:root
+     (0,3,0) 压过它们，不依赖源序；用 background 简写叠渐变的四张卡（今日一诗、原文、资料卡、关于页首卡）也一并变实底。
+     悬停色 --card-bg-hover 与原先的兜底一样不改。只在本块内覆盖，不进 :root。 */
+  :root:root:root {
     --card-bg: var(--surface);
     --card-strong: var(--surface);
     --card-glow: transparent;
