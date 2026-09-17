@@ -917,6 +917,13 @@ body {
   gap: 8px 16px;
 }
 
+.hero-card__chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .hero-card__date {
   font-size: 14px;
   font-weight: 500;

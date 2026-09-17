@@ -1,8 +1,8 @@
 /* pages.js 的纯函数部件：诗文页原文 / 工具栏 / 注释行（第 k 个 .gloss 对应第 k 个 .notes__row，
-   reader.js 按下标取释义，错位即静默错释义）、今日一诗选取、AI 免责文案。 */
+   reader.js 按下标取释义，错位即静默错释义）、今日一诗选取（含天气子池）、AI 免责文案。 */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { aiNotice, notesHTML, pickFeatured, poemParts } from '../../assets/js/pages.js';
+import { WEATHER_MIN_POOL, aiNotice, notesHTML, pickFeatured, poemParts, weatherPool } from '../../assets/js/pages.js';
 
 const count = (html, re) => (html.match(re) || []).length;
 const lines = (n) => Array.from({ length: n }, (_, i) => `第${i + 1}句。`);
@@ -85,4 +85,33 @@ test('the daily pick is stable within a day, the shuffle is not, and the hero ha
   const none = pickFeatured(bare, true);
   assert.equal(none.hero, none.pick[0]);
   assert.deepEqual(pickFeatured([], true), { pick: [], hero: undefined });
+});
+
+test('a weather salt gives a different but equally stable daily pick', () => {
+  const entries = Array.from({ length: 40 }, (_, i) => ({ id: `t0-${i}`, title: `题${i}`, excerpt: `句${i}` }));
+  const plain = pickFeatured(entries, true);
+  const rain = pickFeatured(entries, true, 'rain');
+  assert.deepEqual(pickFeatured(entries, true, 'rain'), rain);
+  assert.deepEqual(pickFeatured(entries, true, ''), plain);
+  assert.notDeepEqual(rain.pick.map((e) => e.id), plain.pick.map((e) => e.id));
+  assert.notDeepEqual(pickFeatured(entries, true, 'snow').pick.map((e) => e.id), rain.pick.map((e) => e.id));
+});
+
+test('the weather pool is the first tag with enough featured poems, else null', () => {
+  const entries = Array.from({ length: 30 }, (_, i) => ({ id: `t0-${i}` }));
+  const ids = (from, n) => Array.from({ length: n }, (_, i) => `t0-${from + i}`);
+  const index = {
+    tags: {
+      heat: ids(0, WEATHER_MIN_POOL - 1), // 太少
+      wind: [...ids(0, WEATHER_MIN_POOL - 1), 'c9-9'], // 凑够了个数，但有一首不在推荐池里
+      clear: ids(10, WEATHER_MIN_POOL),
+      moon: ids(0, 20),
+    },
+  };
+  const got = weatherPool(entries, index, ['heat', 'wind', 'fog', 'clear', 'moon']);
+  assert.equal(got.tag, 'clear');
+  assert.deepEqual(got.pool.map((e) => e.id), ids(10, WEATHER_MIN_POOL));
+  assert.equal(weatherPool(entries, index, ['heat', 'wind']), null);
+  assert.equal(weatherPool(entries, null, ['moon']), null);
+  assert.equal(weatherPool(entries, {}, ['moon']), null);
 });

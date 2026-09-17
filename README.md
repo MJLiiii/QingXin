@@ -2,7 +2,7 @@
 
 > 慢读古典的诗词阅读站，采用应用式液态玻璃（Liquid Glass）界面。以静态 JSON 数据驱动，提供诗词原文、注释、译文、赏析、创作背景和诗人信息浏览。
 
-情心是一个纯静态、无后端的古诗词阅读项目。前端使用原生 HTML、CSS、JavaScript 编写，不依赖框架或打包工具；运行时所有内容都由浏览器从 `data/` 目录下的 JSON 文件中 `fetch` 加载，诗词正文不写死在 HTML 里。
+情心是一个纯静态、无后端的古诗词阅读项目。前端使用原生 HTML、CSS、JavaScript 编写，不依赖框架或打包工具；运行时所有内容都由浏览器从 `data/` 目录下的 JSON 文件中 `fetch` 加载，诗词正文不写死在 HTML 里。唯一的外部请求是首页查询当地天气（见下文）。
 
 线上地址：<https://mjliiii.github.io/QingXin/>
 
@@ -13,7 +13,7 @@
 ## 功能特性
 
 - 收录约 78,660 首作品，包括全唐诗 57,607 首和宋词 21,053 首。
-- 首页「今日一诗」按本地日期每天固定一首，点击“换一首”随机抽取。
+- 首页「今日一诗」按访客所在地的天气应景推荐：下雨推写雨的诗，晴夜推写月的诗，旁边标出当地天气；同一天同一种天气固定同一首。位置由 [GeoJS](https://www.geojs.io/) 按 IP 粗略估算（取整到约 10 公里），天气来自 [Open-Meteo](https://open-meteo.com/)，结果只缓存在浏览器本地。拿不到天气时（离线、请求失败或超过 1.5 秒），按本地日期每天固定一首。点击“换一首”随机抽取。
 - 诗集浏览支持分页，以及标题 / 作者 / 名句搜索：繁简、标点归一和轻微错字容错；名句检索覆盖有注释的名篇，并容忍一字异文（如全唐诗《静夜思》作“床前看月光”）。
 - 搜索词写入地址栏：从结果进入诗词再返回，搜索词、结果和滚动位置都会保留；链接可在新标签页打开。
 - 诗人页支持按作品数浏览全部作者、近似姓名搜索，并可进入作者详情页。
@@ -60,7 +60,7 @@ npm install
 # 语法检查 + 单元测试 + 数据一致性校验
 npm run check
 
-# 注释覆盖变化后，重建首页精选池与名句检索语料
+# 注释覆盖或天气词表变化后，重建首页精选池、天气子池与名句检索语料
 node data/build-featured.mjs
 
 # 重建 data/** 数据
@@ -106,6 +106,7 @@ QingXin/
 │       ├── glass-pages.js    # 各页面渲染
 │       ├── glass-ui.js       # 界面交互：分段标签、首页搜索、钉住的阅读栏
 │       ├── pages.js          # 搜索 / 分页 / 今日一诗 / 诗文数据等辅助函数
+│       ├── weather.js        # 首页的当地天气（GeoJS 定位 + Open-Meteo）与天气标签
 │       ├── reader.js         # 阅读偏好、原文工具栏与注释浮层
 │       ├── glass-templates.js # 页面 HTML 片段构建
 │       ├── templates.js      # 通用 HTML 小工具（路由链接、命中高亮、注释词定位等）
@@ -117,6 +118,7 @@ QingXin/
 │   ├── search.json           # 全局搜索索引：[id, title, author]
 │   ├── lines.json            # 名句检索语料：有注释诗词的正文
 │   ├── featured.json         # 首页精选池
+│   ├── weather.json          # 首页天气子池：各天气标签下的精选诗 id
 │   ├── authors-index.json    # 作者索引，按作品数排序
 │   ├── about.json            # 关于页文案
 │   ├── index/page-*.json     # 诗集浏览索引，500 条/文件
@@ -128,7 +130,7 @@ QingXin/
     │   └── serve.mjs         # 本地静态服务器
     ├── data/
     │   ├── prep.mjs          # 从 chinese-poetry 生成 data/**
-    │   ├── build-featured.mjs # 生成首页精选池与名句检索语料
+    │   ├── build-featured.mjs # 生成首页精选池、天气子池与名句检索语料
     │   └── validate.mjs      # 只读数据一致性校验
     ├── annotations/
     │   ├── annotate-import.mjs   # 从 chinese-gushiwen 数据集导入
@@ -138,7 +140,7 @@ QingXin/
     │   ├── gushiwen-client.mjs   # 礼貌的 HTTP 客户端（节流、重试、磁盘缓存）
     │   ├── gushiwen-parse.mjs    # 纯 HTML 解析
     │   └── annotate-lib.mjs      # 归一化、相似度、语料匹配、字段转换
-    ├── lib/                  # 脚本共用：路径、id/分桶/分片公式、参数解析
+    ├── lib/                  # 脚本共用：路径、id/分桶/分片公式、参数解析、天气词表
     ├── tests/                # node:test 单元测试
     ├── check.mjs             # npm run check：语法检查 + 单元测试 + 数据校验
     └── package.json          # 工具脚本入口与依赖
@@ -152,7 +154,7 @@ QingXin/
 - `tools/server/` 放本地静态服务器。
 - `tools/data/` 放主数据生成脚本。
 - `tools/annotations/` 放注释导入、抓取、匹配和归一化脚本。
-- `tools/lib/` 放脚本共用的小模块（路径、id 公式、参数解析）；id / 分桶公式直接复用前端的 `assets/js/data.js`。
+- `tools/lib/` 放脚本共用的小模块（路径、id 公式、参数解析、天气词表）；id / 分桶公式直接复用前端的 `assets/js/data.js`，天气标签名复用 `assets/js/weather.js`。
 
 ## 数据模型
 
@@ -210,7 +212,7 @@ data/poems/0059-0.json[66]
 
 保存后刷新页面即可生效，不需要重跑数据脚本。字段可留空，前端会显示“尚未收录，敬请期待。”占位。注释词条 `term` 若与原文或词序逐字一致（可带“（拼音）”括注），原文中会自动出现可点按的释义链接。更详细的格式说明见 `data/annotations/README.md`。
 
-新增注释后，如希望这首诗进入首页精选池和名句检索，在 `tools/` 下运行 `node data/build-featured.mjs`。
+新增注释后，如希望这首诗进入首页精选池、天气子池和名句检索，在 `tools/` 下运行 `node data/build-featured.mjs`。天气标签按 `tools/lib/weather-tags.mjs` 里的词表打分：强意象词（夜雨、飞雪、明月……）一处即可，单字（雨、雪、月……）要出现三次；比喻、地名等用法（风流、雨露、鬓如雪、光阴……）先排除；短标题（如《江雪》）按三倍计。改了词表同样要重跑。
 
 自动生成的注释文件带 `source` 字段，优先级为：手写（无 `source`）> `gushiwen-web`（古诗文网抓取）> `gushiwen`（数据集导入）> `ai`。脚本只会覆盖优先级不高于自己的文件，手写文件永不被触碰；手工改好一个自动生成的文件后请删除它的 `source` 字段。详见 `data/annotations/README.md`。
 
@@ -239,7 +241,7 @@ node data/prep.mjs --src ../../chinese-poetry-src
 - `data/poems/`
 - `data/authors/`
 
-脚本会保留 `data/annotations/` 目录（因此手工补充的注释不会被清空；内置种子文件 `c59-66.json` 可能会被重写）和 `data/about.json`。它还会删除 `data/featured.json` 与 `data/lines.json`——二者由 `build-featured.mjs` 派生，不会被 prep 重建——因此重建后**必须**运行 `node data/build-featured.mjs`，否则首页无法加载、`npm run check` 会报 error。
+脚本会保留 `data/annotations/` 目录（因此手工补充的注释不会被清空；内置种子文件 `c59-66.json` 可能会被重写）和 `data/about.json`。它还会删除 `data/featured.json`、`data/lines.json` 与 `data/weather.json`——三者由 `build-featured.mjs` 派生，不会被 prep 重建——因此重建后**必须**运行 `node data/build-featured.mjs`，否则首页无法加载、`npm run check` 会报 error。
 
 ## 批量导入注释
 

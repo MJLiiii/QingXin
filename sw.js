@@ -3,11 +3,12 @@
    故二次访问秒开，而代码/注释更新至多滞后一次刷新（不会卡在旧版本）；后台更新带 cache:'no-cache'，
    不会把浏览器 HTTP 缓存里的旧文件写回来。
    预缓存仅应用外壳与前端模块；大文件（search.json、lines.json 等）按访问懒缓存。
+   首页的天气请求（GeoJS、Open-Meteo，见 assets/js/weather.js）是跨域的，不经本 worker，也不进缓存。
    预缓存绕过 HTTP 缓存（cache: 'reload'），避免新旧模块混装。
    改动缓存格式时 bump CACHE_NAME，旧缓存在 activate 清除。
    Worker 放在站点根目录，由 index.html 以相对路径注册，作用域覆盖整站（GitHub Pages 子路径 /QingXin/ 亦可）；
    旧地址 kyne/、liquidglass/ 只剩跳转页，也预缓存，离线时旧链接照样能跳到根目录。 */
-const CACHE_NAME = 'qingxin-v11';
+const CACHE_NAME = 'qingxin-v12';
 const SHELL = [
   './',
   './index.html',
@@ -28,6 +29,7 @@ const SHELL = [
   './assets/js/vendor/opencc-t2cn.js',
   './assets/js/templates.js',
   './assets/js/utils.js',
+  './assets/js/weather.js',
 ];
 
 self.addEventListener('install', (event) => {

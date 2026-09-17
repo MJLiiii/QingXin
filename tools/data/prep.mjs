@@ -17,8 +17,8 @@
      data/annotations/c59-66.json 《水调歌头》种子注释（目录本身保留，README.md 仅缺失时生成）
 
    重置：开跑先删 data/{index,poems,authors}/ 与 manifest.json / search.json / authors-index.json，
-   以及 build-featured.mjs 派生的 featured.json / lines.json（id 按位置生成，旧派生文件会静默错配）；
-   保留 data/annotations/（含 README.md）与 data/about.json。featured.json / lines.json 不由本脚本重建——
+   以及 build-featured.mjs 派生的 featured.json / lines.json / weather.json（id 按位置生成，旧派生文件会静默错配）；
+   保留 data/annotations/（含 README.md）与 data/about.json。featured.json / lines.json / weather.json 不由本脚本重建——
    跑完后必须再运行 node data/build-featured.mjs，否则首页无法加载、npm run check 报 error。
    =========================================================== */
 
@@ -90,9 +90,9 @@ function synthTitle(rhythmic, paras) {
 
 // ---------- 输出目录重置 ----------
 // 仅清理“可再生”产物，保留 annotations/（用户手写的注释叠加层不能丢）与 about.json。
-// featured.json / lines.json 是 build-featured.mjs 的派生物：这里只删不建（旧文件会带着旧位置 id 静默错配）。
+// featured.json / lines.json / weather.json 是 build-featured.mjs 的派生物：这里只删不建（旧文件会带着旧位置 id 静默错配）。
 for (const d of ['index', 'poems', 'authors']) rmSync(join(OUT, d), { recursive: true, force: true });
-for (const f of ['manifest.json', 'search.json', 'authors-index.json', 'featured.json', 'lines.json']) rmSync(join(OUT, f), { force: true });
+for (const f of ['manifest.json', 'search.json', 'authors-index.json', 'featured.json', 'lines.json', 'weather.json']) rmSync(join(OUT, f), { force: true });
 for (const d of ['index', 'poems', 'authors', 'annotations']) mkdirSync(join(OUT, d), { recursive: true });
 
 // ---------- 累加器 ----------
@@ -384,4 +384,4 @@ if (!existsSync(readmePath)) {
 
 console.log(`\n✓ 完成：${total} 首 · ${chunkNum} 原文块 · ${pages} 索引页 · ${authors.size} 作者`);
 console.log(`  输出目录：${OUT}`);
-console.log('  featured.json / lines.json 已删除且不会在此重建：请运行 node data/build-featured.mjs（否则首页无法加载、npm run check 报 error）');
+console.log('  featured.json / lines.json / weather.json 已删除且不会在此重建：请运行 node data/build-featured.mjs（否则首页无法加载、npm run check 报 error）');

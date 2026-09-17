@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 /* 只读数据一致性校验。
-   覆盖 manifest/search/index/poems/authors/annotations/featured/lines 的运行时约束，
+   覆盖 manifest/search/index/poems/authors/annotations/featured/lines/weather 的运行时约束，
    不写入任何文件，适合放进 npm run check。
    严重度按影响分级：featured.json 缺失或为空 = error（首页 renderHome 直接 fetch 它，缺了页面就报错）；
-   lines.json 缺失 = warning（诗集搜索只是退化为标题/作者匹配）。二者都由 build-featured.mjs 生成。 */
+   lines.json 缺失 = warning（诗集搜索只是退化为标题/作者匹配）；weather.json 缺失 = warning（首页回落到按日期选诗）。
+   三者都由 build-featured.mjs 生成。 */
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DATA } from '../lib/paths.mjs';
 import { ANN_FILE_RE, LIST_PAGE_SIZE, SUB_CHUNK, authorBucket, pad3, pad4, parseId, poemShardFile } from '../lib/ids.mjs';
+import { WEATHER_TAGS, tagPoem, titleText } from '../lib/weather-tags.mjs';
 
 const errors = [];
 const warnings = [];
@@ -284,7 +286,60 @@ if (lines) {
   }
 }
 
-console.log(`validate: poems=${searchIds.size}, indexRows=${indexRows}, authors=${authorIndex.length}, annotations=${annFiles.length}, featured=${featuredById.size}, lines=${lines ? lines.length : 0}`);
+/* data/weather.json(首页按天气选诗的子池,build-featured.mjs 生成):{tags: {标签: [id, …]}}。
+   缺失只报 warning(首页回落到按日期选诗);结构、标签名、id 不在推荐池里是 error;
+   与当前词表重算结果不一致(改了 tools/lib/weather-tags.mjs 没重跑)报 warning。 */
+let weather = null;
+try {
+  weather = await readJson(join(DATA, 'weather.json'));
+} catch (e) {
+  if (e.code === 'ENOENT') {
+    addWarning('缺少 data/weather.json(首页不会按天气选诗),请运行 node tools/data/build-featured.mjs');
+  } else {
+    addError(`无法解析 data/weather.json: ${e.message}`);
+  }
+}
+let weatherIds = 0;
+if (weather !== null) {
+  const byTag = weather && weather.tags;
+  if (!byTag || typeof byTag !== 'object' || isArray(byTag)) {
+    addError('data/weather.json 必须是 {tags: {标签: [id, …]}}');
+  } else {
+    const known = new Set(WEATHER_TAGS);
+    for (const tag of Object.keys(byTag)) {
+      if (!known.has(tag)) addError(`weather.json 未知标签: ${tag}`);
+    }
+    const expected = Object.fromEntries(WEATHER_TAGS.map((tag) => [tag, []]));
+    for (const id of featuredById.keys()) {
+      const poem = corpusPoem(id);
+      if (!poem) continue; // 不在语料中的 featured 行上面已报 error
+      const row = featuredById.get(id);
+      const text = bodyText(poem);
+      for (const tag of tagPoem(titleText(row.title, row.rhythmic, text), text)) expected[tag].push(id);
+    }
+    const stale = [];
+    for (const tag of WEATHER_TAGS) {
+      const ids = byTag[tag];
+      if (!isArray(ids)) {
+        addError(`weather.json 缺少标签 ${tag} 或其值不是数组`);
+        continue;
+      }
+      const seen = new Set();
+      for (const id of ids) {
+        if (seen.has(id)) addError(`weather.json ${tag} 重复 id: ${id}`);
+        seen.add(id);
+        if (!featuredById.has(id)) addError(`weather.json ${tag} 的 ${id} 不在 featured.json 中`);
+      }
+      weatherIds += ids.length;
+      if (ids.join() !== expected[tag].join()) stale.push(tag);
+    }
+    if (stale.length) {
+      addWarning(`weather.json 的 ${stale.join('、')} 与当前词表重算结果不一致,请重跑 node tools/data/build-featured.mjs`);
+    }
+  }
+}
+
+console.log(`validate: poems=${searchIds.size}, indexRows=${indexRows}, authors=${authorIndex.length}, annotations=${annFiles.length}, featured=${featuredById.size}, lines=${lines ? lines.length : 0}, weather=${weatherIds}`);
 for (const w of warnings) console.warn(`warning: ${w}`);
 if (errors.length) {
   for (const e of errors.slice(0, 50)) console.error(`error: ${e}`);
