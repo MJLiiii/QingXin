@@ -2,15 +2,18 @@
    口径:注释文件中 赏析非空 且 (注释或译文非空) 的非 AI 诗(保证 hero 点进去内容最全)。
    产物为这些诗的完整索引行 {id,title,author,dynasty,kind,excerpt},与 data/index/
    行结构一致,前端诗卡 / 首页 hero 零适配,按索引序排列(diff 稳定)。
-   同时生成 data/lines.json —— 名句检索正文 [[id, text], …](全部非 AI 注释诗,见下文 3)。
+   同时生成 data/lines.json —— 名句检索正文 [[id, text], …](全部非 AI 注释诗,见下文 3),
+   与 data/weather.json —— 推荐池的天气子池 {tags: {rain: [id, …], …}}(见下文 4,词表在 tools/lib/weather-tags.mjs)。
 
    注释覆盖变化(新爬/手写新增)后重跑:
      node tools/data/build-featured.mjs
-   单篇手写注释不重跑也能在详情页生效,只是暂不进入首页推荐池。 */
+   单篇手写注释不重跑也能在详情页生效,只是暂不进入首页推荐池。
+   改了天气词表也要重跑(三个文件一起生成)。 */
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ANN_DIR, DATA } from '../lib/paths.mjs';
 import { ANN_FILE_RE, pad4, parseId, poemShardFile } from '../lib/ids.mjs';
+import { WEATHER_TAGS, tagPoem, titleText } from '../lib/weather-tags.mjs';
 
 const OUT = join(DATA, 'featured.json');
 
@@ -54,6 +57,7 @@ const LINES_OUT = join(DATA, 'lines.json');
 const lineIds = [...annotated].map((id) => ({ id, loc: parseId(id) }))
   .sort((a, b) => a.loc.chunk - b.loc.chunk || a.loc.i - b.loc.i);
 const shards = new Map();
+const textById = new Map(); // 去重前的正文:天气标签要给每首推荐诗打,不管它在 lines.json 里是否被合并
 const seenBodies = new Set();
 const lineRows = [];
 let deduped = 0;
@@ -69,6 +73,7 @@ for (const { id, loc } of lineIds) {
     continue;
   }
   const text = poem.paragraphs.filter((p) => typeof p === 'string' && p !== '').join('\n');
+  textById.set(id, text);
   const key = `${poem.author}\u0000${text}`;
   if (seenBodies.has(key)) {
     deduped++;
@@ -81,3 +86,17 @@ const linesJson = JSON.stringify(lineRows) + '\n';
 await writeFile(LINES_OUT, linesJson, 'utf8');
 console.log(`lines.json:${lineRows.length} 行(非 AI 注释 ${annotated.size},同作者同正文去重 ${deduped}` +
   `${unresolved ? `,${unresolved} 个 id 不在语料中!` : ''}),${Buffer.byteLength(linesJson)} 字节`);
+
+/* 4) data/weather.json —— 首页按天气选诗的子池:每个标签下的推荐诗 id,按推荐池顺序排列(diff 稳定)。
+      前端按当地天气取第一个足够大的子池(assets/js/pages.js weatherPool),不够则回落到整池。 */
+const WEATHER_OUT = join(DATA, 'weather.json');
+const tags = Object.fromEntries(WEATHER_TAGS.map((tag) => [tag, []]));
+let noText = 0;
+for (const row of rows) {
+  if (!textById.has(row.id)) noText++;
+  const text = textById.get(row.id) || '';
+  for (const tag of tagPoem(titleText(row.title, row.rhythmic, text), text)) tags[tag].push(row.id);
+}
+await writeFile(WEATHER_OUT, JSON.stringify({ tags }) + '\n', 'utf8');
+console.log(`weather.json:${WEATHER_TAGS.map((tag) => `${tag} ${tags[tag].length}`).join(',')}` +
+  `${noText ? `(${noText} 首推荐诗没有正文,只按标题打了标签!)` : ''}`);

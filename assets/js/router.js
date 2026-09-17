@@ -107,6 +107,7 @@ function schedulePreload(route) {
       preloadListPage(parseInt(route.param || '0', 10) || 0);
     } else if (route.name === 'authors' || route.name === 'home') {
       preloadJSON('data/authors-index.json');
+      if (route.name === 'home') preloadJSON('data/weather.json');
     } else if (route.name === 'poem' || route.name === 'author') {
       preloadJSON('data/manifest.json');
     }

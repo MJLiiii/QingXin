@@ -1,5 +1,5 @@
 /* 各页面的渲染：数据与交互辅助（含原文逐句块）在 pages.js / reader.js，这里决定玻璃界面的布局——
-   首页今日一诗 + 搜索、诗集 / 诗人卡片网格、诗文页左栏钉住 + 右栏分段标签、作者页资料卡。 */
+   首页今日一诗（按当地天气选，见 weather.js）+ 搜索、诗集 / 诗人卡片网格、诗文页左栏钉住 + 右栏分段标签、作者页资料卡。 */
 import { LIST_PAGE_SIZE, fetchJSON, loadAuthor, loadPoem } from './data.js';
 import { initPin, rememberTab } from './glass-ui.js';
 import {
@@ -7,12 +7,13 @@ import {
   poemCard, poemTabs, poetTile, proseBody, seal, sealOf, workCard,
 } from './glass-templates.js';
 import {
-  aiNotice, loadPoemData, notesHTML, pickFeatured, poemParts, wireLiveSearch, wirePager, wireSearch,
+  aiNotice, loadPoemData, notesHTML, pickFeatured, poemParts, weatherPool, wireLiveSearch, wirePager, wireSearch,
 } from './pages.js';
 import { readPrefs, setCurrentPoem, syncControls } from './reader.js';
 import { SEARCH_LIMIT, searchAuthorIndex } from './search-core.js';
 import { emptyState, heroLines, navHref, searchBoxHTML } from './templates.js';
 import { esc, localDateKey, pad4 } from './utils.js';
+import { currentWeather, weatherHTML } from './weather.js';
 
 var DISPLAY = LIST_PAGE_SIZE; // 诗集 / 诗人每页条数（诗集与 data.js preloadListPage 共用）
 var HINTS = ['明月', '春风', '李白', '江南'];
@@ -49,9 +50,13 @@ function cardHead(id, title, extra) {
 }
 
 export async function renderHome(param, ctx) {
-  var entries = await fetchJSON('data/featured.json');
   var daily = !ctx.shuffle;
-  var hero = pickFeatured(entries, daily).hero;
+  var loaded = await Promise.all([fetchJSON('data/featured.json'), daily ? currentWeather() : null]);
+  var entries = loaded[0];
+  var wx = loaded[1];
+  // 拿到天气就从应景的子池里选；子池取不到（weather.json 缺失、标签太冷门）则照旧按日期选，也不显示天气。
+  var sub = wx && weatherPool(entries, await fetchJSON('data/weather.json').catch(function () { return null; }), wx.tags);
+  var hero = (sub ? pickFeatured(sub.pool, true, sub.tag) : pickFeatured(entries, daily)).hero;
   var heroPoem = await loadPoem(hero.id);
   if (!ctx.isCurrent()) return;
 
@@ -64,7 +69,9 @@ export async function renderHome(param, ctx) {
 
   var heroCard = '<article class="gcard hero-card" aria-labelledby="home-hero-title">'
     + '<div class="hero-card__top">'
-    + '<span class="chip chip--accent">' + (daily ? '今日一' : '随机一') + kindLabel + '</span>'
+    + '<span class="hero-card__chips"><span class="chip chip--accent">' + (daily ? '今日一' : '随机一') + kindLabel + '</span>'
+    + (sub ? '<span class="chip">' + weatherHTML(wx) + '</span>' : '')
+    + '</span>'
     + (daily ? '<span class="hero-card__date latin">' + localDateKey().replace(/-/g, '.') + '</span>' : '')
     + '</div>'
     + '<h1 class="hero-card__lines" id="home-hero-title" style="--hero-chars:' + heroChars + '">'

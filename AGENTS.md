@@ -39,21 +39,23 @@ There is no build or bundling step. Things you actually run:
   HTML helpers + utils in `templates.test.mjs`, page fragments in `glass-templates.test.mjs`, the `sw.js` SHELL
   list, cache-name scheme and redirect-stub parity in `shell.test.mjs`, the two 夜读 token blocks in
   `glass-css.test.mjs`, the annotation matcher/parsers in `annotate-lib.test.mjs` + `gushiwen-parse.test.mjs`,
-  the poem-page parts and 今日一诗 pick in `pages.test.mjs`, the route keys in `router.test.mjs`, the id/bucket/shard
+  the poem-page parts, 今日一诗 pick and weather pool in `pages.test.mjs`, the route keys in `router.test.mjs`, the
+  weather-code mapping in `weather.test.mjs`, the weather lexicon in `weather-tags.test.mjs`, the id/bucket/shard
   formulas against `data/manifest.json` plus the argv/readJson helpers in `ids.test.mjs`), then
   runs `node data/validate.mjs`, a read-only data-consistency audit (manifest counts vs search/index
   rows, id→shard round-trip for every poem, author slug→bucket hits, annotation shape + `source` rules,
   `featured.json` rows vs search/index (missing or empty = error, the home page fetches it directly),
-  `lines.json` rows vs annotations and poem text, `manifest.subChunkSize`/`pageSize` vs the `data.js` constants;
-  exits 1 on any error; warnings only for annotated poems not yet in `lines.json`, a missing `lines.json`, and the
-  poem-shard coverage estimate). `npm run validate` / `npm run featured` run the validator / `build-featured.mjs` alone.
+  `lines.json` rows vs annotations and poem text, `weather.json` shape/tags/ids vs `featured.json`,
+  `manifest.subChunkSize`/`pageSize` vs the `data.js` constants;
+  exits 1 on any error; warnings only for annotated poems not yet in `lines.json`, a missing `lines.json` or
+  `weather.json`, a `weather.json` that no longer matches the lexicon, and the poem-shard coverage estimate). `npm run validate` / `npm run featured` run the validator / `build-featured.mjs` alone.
 
 - **Regenerate the data** (only when refreshing/rebuilding `data/**`):
   ```bash
   git clone --depth 1 https://github.com/chinese-poetry/chinese-poetry ../chinese-poetry-src
   cd tools && npm install && node data/prep.mjs --src ../../chinese-poetry-src && node data/build-featured.mjs
   ```
-  `prep.mjs` deletes `featured.json` and `lines.json` (they are derived by `build-featured.mjs` and would
+  `prep.mjs` deletes `featured.json`, `lines.json` and `weather.json` (they are derived by `build-featured.mjs` and would
   otherwise keep stale position-based ids) and does **not** rebuild them, so `build-featured.mjs` must follow —
   until it does the home page 404s and `npm run check` errors. `--include-song-shi` is not implemented:
   passing it exits 1 (宋诗 ~255k was never wired up).
@@ -84,8 +86,10 @@ There is no build or bundling step. Things you actually run:
    (all poets sorted by output, for the 诗人 browse page), `data/about.json` (关于 page copy),
    `data/featured.json` (home-page pool: index rows of the ~3,200 poems whose annotation has
    赏析 + 注释/译文) and `data/lines.json` (`[[id, text]]` body text of every non-AI annotated poem,
-   identical (author, text) siblings collapsed — the corpus for 名句 line search). Both derived files
-   come from `node tools/data/build-featured.mjs`; rerun it after coverage changes.
+   identical (author, text) siblings collapsed — the corpus for 名句 line search) and `data/weather.json`
+   (`{tags: {rain|snow|fog|wind|cloud|clear|moon|cold|heat: [featured id, …]}}`, the weather sub-pools of the
+   home page, tagged by the keyword lexicon in `tools/lib/weather-tags.mjs`). All three derived files
+   come from `node tools/data/build-featured.mjs`; rerun it after coverage or lexicon changes.
 
 **Poem IDs encode storage location:** `t<chunk>-<i>` (唐) / `c<chunk>-<i>` (宋词), where `i` is the
 0–999 position within the id-block, resolves to `data/poems/<chunk>-<⌊i/100⌋>.json[i%100]` — no
@@ -122,15 +126,17 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   runs a name-only search through `wireLiveSearch` directly; both cap results at `SEARCH_LIMIT`, 120, exported by
   `search-core.js`); `pickFeatured()` — 今日一诗 is
   `data/featured.json` shuffled with `seededRandom('qingxin:' + localDateKey())` (stable for the local day;
-  换一首 shuffles with `Math.random`); `loadPoemData()`; `poemParts()` (the reading toolbar 复制/分享/竖排/
+  换一首 shuffles with `Math.random`; an optional third `salt` — the weather tag — joins the seed);
+  `weatherPool(entries, weatherIndex, tags)` (the first tag with ≥ `WEATHER_MIN_POOL` featured poems, else null);
+  `loadPoemData()`; `poemParts()` (the reading toolbar 复制/分享/竖排/
   A−/A+ — 竖排 omitted above 60 lines — and the 原文 with note terms linked inside 词序 + 原文 via
   `glossLines()`, each line wrapped in a block `.original__line`); `notesHTML(notes)`; `aiNotice()`.
 - `glass-pages.js` — the six renderers, all `(param, ctx)` (`renderHome/renderList/renderPoem/renderAuthor/
   renderAuthors/renderAbout`), building HTML strings and injecting them into `#page-<name>`. 诗集 paginates
   `LIST_PAGE_SIZE` (25, exported by `data.js` and shared with `preloadListPage()`; `manifest.pageSize` must be
   divisible by it) over the 500-row index files; 诗人 lists all poets from `authors-index.json`.
-  Home is just two centred, stacked cards — the 今日一诗 hero (only `featured.json` + that poem are
-  loaded) and the 寻章摘句 search form (→ `#/list?q=`, plus hint links); 诗集/诗人 are card grids with the same
+  Home is just two centred, stacked cards — the 今日一诗 hero (`featured.json`, `weather.json` when the
+  weather is known, and that poem are loaded; see `weather.js` below) and the 寻章摘句 search form (→ `#/list?q=`, plus hint links); 诗集/诗人 are card grids with the same
   search/pager wiring; the poem page is a two-column layout (`.poem-aside[data-pin]` with title, fact chips,
   the toolbar in a glass `.tools-dock` and the 原文 card; `.poem-main` with the AI note, segmented tabs and the
   author card; poems over 60 lines get `.poem-layout--long` and no `data-pin`; each 原文 line arrives from
@@ -177,11 +183,20 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   `lines.json` fails to load, search degrades to title/author. The 诗集 scan runs inside a module Web
   Worker (keeping the multi-MB index off the main thread) and transparently uses the same core on the
   main thread if Workers fail.
+- `weather.js` — the home page's local weather, the only cross-origin requests the app makes (the worker
+  ignores them). `currentWeather(budgetMs)` locates the visitor by IP with GeoJS (`get.geojs.io`, rounded
+  to 0.1°, cached 24 h in `localStorage['qingxin:geo']`) and reads the current conditions from Open-Meteo
+  (`api.open-meteo.com`, cached in `localStorage['qingxin:wx']`: < 1 h used as is, 1–3 h used while it
+  refreshes in the background, otherwise waited on for at most `budgetMs`, 1.5 s). Any failure resolves to
+  null and `renderHome` falls back to the plain date pick with no weather chip (so does 换一首). `weatherTag()`
+  maps the WMO code to `{tags, label, temp}` — tags are ordered preference, e.g. `['wind', 'cold', 'moon']` —
+  and `WEATHER_TAGS` is the one list of tag names (`tools/lib/weather-tags.mjs` re-exports it). To preview a
+  weather, write a fresh `qingxin:wx` entry (`{"tags":["snow"],"label":"小雪","temp":-2,"at":Date.now()}`) and reload.
 - `templates.js` — low-level HTML helpers (`navHref`, `displaySize`, `heroLines`, `highlighted`,
   `emptyState`, `glossTerm`/`glossLines`, `errorSection` (the router's render-failure fallback),
   `searchBoxHTML`); `utils.js` — `esc()`,
   `hashPath()`/`hrefFor()`,
-  `groupStanzas()`, `idle()`, `localDateKey()`, `seededRandom()`. These, `glass-templates.js`, `pages.js` and
+  `groupStanzas()`, `idle()`, `localDateKey()`, `seededRandom()`. These, `glass-templates.js`, `pages.js`, `weather.js` and
   `router.js` (and therefore everything they import: `data.js`, `search.js`, `search-core.js`, `reader.js`) are
   imported by the Node unit tests, so they must not touch `window`/`document`/`localStorage` at import time —
   browser globals may only be read inside functions.
@@ -196,7 +211,7 @@ HTTP-cache copy of a module can never be written back next to newer ones. It pre
 the HTTP cache so a new worker never mixes old and new modules; one missing entry fails the whole install.
 **Adding/renaming a frontend module or shell means updating its `SHELL` list** (`tools/tests/shell.test.mjs`
 asserts SHELL equals the four shell pages + `assets/css/*.css` + every `assets/js/**/*.js`)**; changing any cached format
-means bumping `CACHE_NAME`** (currently `qingxin-v11`; old caches are purged on activate). Also bump it when a
+means bumping `CACHE_NAME`** (currently `qingxin-v12`; old caches are purged on activate). Also bump it when a
 module drops an export another module used to import, so the new set is precached in one step.
 `index.html` reloads the page once when an old worker hands over (it checks for `qingxin-v1…v9` caches,
 whose modules don't match this shell — e.g. a v9 `router.js` still imports the removed Kyne renderers from
@@ -296,7 +311,7 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
   lone UTF-16 surrogates; synthesizes ci titles/ids. On re-run it **preserves
   `data/annotations/`** (your hand-written overlays) and `data/about.json`; it regenerates `index/`, `poems/`,
   `authors/`, `manifest.json`, `search.json`, `authors-index.json` and the seed `c59-66.json`; it deletes but does
-  **not** regenerate `featured.json` and `lines.json` (run `node tools/data/build-featured.mjs` next).
+  **not** regenerate `featured.json`, `lines.json` and `weather.json` (run `node tools/data/build-featured.mjs` next).
   `data/annotations/README.md` is hand-maintained docs —
   prep writes its built-in starter copy only when the file is missing, so edit the README itself.
 - **To annotate a poem:** create `data/annotations/<id>.json` (id is in the URL `#/poem/<id>`);

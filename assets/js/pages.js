@@ -149,9 +149,9 @@ export function aiNotice(ann) {
 }
 
 // 「今日一诗」：以本地日期为种子，当天刷新不变；「换一首」才真正随机。
-// 返回洗牌后的精选条目与首页主推（第一首有摘句的）。
-export function pickFeatured(entries, daily) {
-  var random = daily ? seededRandom('qingxin:' + localDateKey()) : Math.random;
+// salt（天气标签）并入种子：同一天同一种天气选同一首。返回洗牌后的精选条目与首页主推（第一首有摘句的）。
+export function pickFeatured(entries, daily, salt) {
+  var random = daily ? seededRandom('qingxin:' + localDateKey() + (salt ? ':' + salt : '')) : Math.random;
   var pick = entries.slice();
   for (var k = pick.length - 1; k > 0; k--) {
     var j = Math.floor(random() * (k + 1));
@@ -167,6 +167,23 @@ export function pickFeatured(entries, daily) {
     }
   }
   return { pick: pick, hero: hero || pick[0] };
+}
+
+// 天气子池：按 tags 的先后取第一个在推荐池里不少于 WEATHER_MIN_POOL 首的标签（index 即 data/weather.json）；
+// 都不够时为 null，首页回落到整池。
+export var WEATHER_MIN_POOL = 10;
+
+export function weatherPool(entries, index, tags) {
+  var byTag = index && index.tags;
+  if (!byTag) return null;
+  for (var k = 0; k < tags.length; k++) {
+    var ids = byTag[tags[k]];
+    if (!Array.isArray(ids) || ids.length < WEATHER_MIN_POOL) continue;
+    var wanted = new Set(ids);
+    var pool = entries.filter(function (e) { return wanted.has(e.id); });
+    if (pool.length >= WEATHER_MIN_POOL) return { tag: tags[k], pool: pool };
+  }
+  return null;
 }
 
 // 诗文页数据：诗（找不到为 null）、注解（无则 {}）、作者。
