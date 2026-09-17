@@ -1,33 +1,33 @@
 /* ===========================================================
    情心 · 古诗文网站 —— Liquid Glass 界面
    应用式悬浮布局：玻璃胶囊控件浮在内容之上（页眉三胶囊、手机底部标签栏、
-   分段标签、工具 / 分页胶囊），彩色流光背景，今日一诗 + 搜索的首页与卡片网格。
-   标记由 glass-pages.js / glass-templates.js 生成；浅色默认 + 夜读同构；#996AFF 紫色点缀
+   分段标签、工具 / 分页胶囊），素色流光背景，今日一诗 + 搜索的首页与卡片网格。
+   标记由 glass-pages.js / glass-templates.js 生成；浅色默认 + 夜读同构；宣纸 · 松烟墨配色
    =========================================================== */
 
 :root {
-  --paper: #F4F4F6;   /* 页面底色（经 body 传到画布） */
+  --paper: #F4F2ED;   /* 宣纸底色（经 body 传到画布） */
   --surface: #FFFFFF; /* 不透明浮层：玻璃的兜底色（无 backdrop-filter / 降低透明度） */
-  --ink: #1C1C1E;     /* 墨色：标题与强调 */
-  --ink-rgb: 28, 28, 30; /* = --ink 的 RGB 分量，供半透明墨色 rgba(var(--ink-rgb), α) 复用 */
-  --body: #3A3A3C;    /* 正文墨 */
-  --muted: #636368;   /* 淡墨：只用在卡片 / 胶囊 / 玻璃上（最坏底色约 4.7:1） */
-  --muted-ambient: #4A4A4F; /* 直接压在流光背景上的小字（三团光叠加处仍约 4.8:1） */
-  --muted-3: #454548; /* 注释墨 */
+  --ink: #1F1D1A;     /* 墨色：标题与强调 */
+  --ink-rgb: 31, 29, 26; /* = --ink 的 RGB 分量，供半透明墨色 rgba(var(--ink-rgb), α) 复用 */
+  --body: #3B3833;    /* 正文墨 */
+  --muted: #66625B;   /* 淡墨：只用在卡片 / 胶囊 / 玻璃上（最坏底色约 5.3:1） */
+  --muted-ambient: #4B4842; /* 直接压在流光背景上的小字（三团光叠加处仍约 5.7:1） */
+  --muted-3: #46433E; /* 注释墨 */
   --line: rgba(var(--ink-rgb), 0.1);           /* 1px 结构细线 */
   --mark-bg: rgba(var(--accent-rgb), 0.14);    /* 搜索命中、注释词悬停 */
   --selection: rgba(var(--accent-rgb), 0.2);
 
-  /* 紫色点缀：只做小面积提示，状态永远另有下划线 / 填充 / 虚线等非颜色线索 */
-  --accent: #6A3FD6;       /* 非文字界面：焦点环、描边、下划线 */
-  --accent-rgb: 106, 63, 214;
-  --accent-text: #6A3FD6;  /* 作文字用的紫色（卡片上 ≥5:1；不直接压在背景上） */
+  /* 松烟墨点缀：只做小面积提示，状态永远另有下划线 / 填充 / 虚线等非颜色线索 */
+  --accent: #57534E;       /* 非文字界面：焦点环、描边、下划线 */
+  --accent-rgb: 87, 83, 78;
+  --accent-text: #57534E;  /* 作文字用的点缀色（卡片上 ≥5:1；不直接压在背景上） */
   --accent-halo: rgba(var(--accent-rgb), 0.18);
 
-  /* 流光背景：三团柔光（紫 / 青 / 桃），只动 transform */
-  --blob-violet: rgba(153, 106, 255, 0.3);
-  --blob-cyan: rgba(56, 189, 248, 0.26);
-  --blob-peach: rgba(255, 160, 110, 0.3);
+  /* 流光背景：三团柔光（米黄 / 石灰 / 麻色），只动 transform */
+  --blob-1: rgba(196, 180, 150, 0.34);
+  --blob-2: rgba(160, 165, 160, 0.26);
+  --blob-3: rgba(214, 196, 168, 0.3);
 
   /* 玻璃（悬浮控件 / 注释浮层） */
   --glass-tint: rgba(255, 255, 255, 0.66);
@@ -52,9 +52,9 @@
   --card-border: rgba(var(--ink-rgb), 0.07);
   --card-border-hover: rgba(var(--ink-rgb), 0.2);
   --card-shine: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px -12px rgba(60, 40, 120, 0.16);
-  --card-glow: rgba(153, 106, 255, 0.16);
-  --card-glow-2: rgba(56, 189, 248, 0.12);
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px -12px rgba(60, 50, 35, 0.16);
+  --card-glow: rgba(196, 180, 150, 0.16);
+  --card-glow-2: rgba(160, 165, 160, 0.12);
   --row-hover-bg: rgba(var(--ink-rgb), 0.04);
   --chip-bg: rgba(255, 255, 255, 0.72);
   --chip-border: rgba(var(--ink-rgb), 0.12);
@@ -62,17 +62,17 @@
   --input-bg: rgba(255, 255, 255, 0.72);
   --nav-hover-bg: rgba(var(--ink-rgb), 0.06);
 
-  /* 印章头像（唐紫 / 宋青） */
+  /* 印章头像（唐墨灰 / 宋茶褐） */
   --seal-bg: rgba(var(--ink-rgb), 0.06);
   --seal-fg: var(--ink);
-  --tang-bg: rgba(106, 63, 214, 0.12);
-  --tang-fg: #4E2BB0;
-  --song-bg: rgba(14, 143, 199, 0.12);
-  --song-fg: #0A5E86;
+  --tang-bg: rgba(87, 83, 78, 0.1);
+  --tang-fg: #45413C;
+  --song-bg: rgba(150, 120, 80, 0.12);
+  --song-fg: #6B5335;
 
-  /* 按钮：主按钮（填充）/ 次按钮（紫色描边） */
-  --btn-bg: #1C1C1E;
-  --btn-bg-hover: #3A3A3C;
+  /* 按钮：主按钮（填充）/ 次按钮（点缀色描边） */
+  --btn-bg: #1F1D1A;
+  --btn-bg-hover: #3B3833;
   --btn-fg: #FFFFFF;
   --btn2-bg: rgba(255, 255, 255, 0.72);
   --btn2-bg-hover: #FFFFFF;
@@ -125,24 +125,24 @@
 /* 夜读：只重定义 token。默认跟随系统；页眉「夜读」写入 data-theme 后以其为准。 */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #0A0A0A;
-    --surface: #161618;
-    --ink: #F2F2F2;
-    --ink-rgb: 242, 242, 242;
-    --body: #C7C7CC;
-    --muted: #A1A1A6;
-    --muted-ambient: #C0C0C4;
-    --muted-3: #C0C0C4;
+    --paper: #0E0D0C;
+    --surface: #171614;
+    --ink: #F2F0EC;
+    --ink-rgb: 242, 240, 236;
+    --body: #C9C5BE;
+    --muted: #A39E96;
+    --muted-ambient: #C2BDB5;
+    --muted-3: #C2BDB5;
     --line: rgba(var(--ink-rgb), 0.12);
     --mark-bg: rgba(var(--accent-rgb), 0.26);
     --selection: rgba(var(--accent-rgb), 0.4);
-    --accent: #996AFF;
-    --accent-rgb: 153, 106, 255;
-    --accent-text: #AB87FF;
+    --accent: #A8A29A;
+    --accent-rgb: 168, 162, 154;
+    --accent-text: #BDB6AC;
     --accent-halo: rgba(var(--accent-rgb), 0.28);
-    --blob-violet: rgba(124, 77, 255, 0.26);
-    --blob-cyan: rgba(34, 160, 210, 0.22);
-    --blob-peach: rgba(255, 130, 90, 0.16);
+    --blob-1: rgba(150, 135, 110, 0.18);
+    --blob-2: rgba(120, 125, 120, 0.16);
+    --blob-3: rgba(160, 140, 110, 0.14);
     --glass-tint: rgba(10, 10, 10, 0.68);
     --glass-tint-strong: rgba(10, 10, 10, 0.8);
     --glass-tint-solid: rgba(10, 10, 10, 0.94);
@@ -161,8 +161,8 @@
     --card-border-hover: rgba(255, 255, 255, 0.32);
     --card-shine: inset 0 1px 0 rgba(255, 255, 255, 0.06);
     --card-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
-    --card-glow: rgba(124, 77, 255, 0.2);
-    --card-glow-2: rgba(34, 160, 210, 0.12);
+    --card-glow: rgba(150, 135, 110, 0.16);
+    --card-glow-2: rgba(120, 125, 120, 0.1);
     --row-hover-bg: rgba(255, 255, 255, 0.06);
     --chip-bg: rgba(18, 18, 22, 0.55);
     --chip-border: rgba(255, 255, 255, 0.16);
@@ -170,10 +170,10 @@
     --input-bg: rgba(18, 18, 22, 0.55);
     --nav-hover-bg: rgba(255, 255, 255, 0.08);
     --seal-bg: rgba(255, 255, 255, 0.08);
-    --tang-bg: rgba(153, 106, 255, 0.2);
-    --tang-fg: #CDB8FF;
-    --song-bg: rgba(56, 189, 248, 0.16);
-    --song-fg: #A5E1FB;
+    --tang-bg: rgba(189, 182, 172, 0.14);
+    --tang-fg: #DDD7CE;
+    --song-bg: rgba(190, 160, 115, 0.16);
+    --song-fg: #E3CFAE;
     --btn-bg: #FFFFFF;
     --btn-bg-hover: #D9D9DE;
     --btn-fg: #0A0A0A;
@@ -184,24 +184,24 @@
 }
 
 :root[data-theme="dark"] {
-  --paper: #0A0A0A;
-  --surface: #161618;
-  --ink: #F2F2F2;
-  --ink-rgb: 242, 242, 242;
-  --body: #C7C7CC;
-  --muted: #A1A1A6;
-  --muted-ambient: #C0C0C4;
-  --muted-3: #C0C0C4;
+  --paper: #0E0D0C;
+  --surface: #171614;
+  --ink: #F2F0EC;
+  --ink-rgb: 242, 240, 236;
+  --body: #C9C5BE;
+  --muted: #A39E96;
+  --muted-ambient: #C2BDB5;
+  --muted-3: #C2BDB5;
   --line: rgba(var(--ink-rgb), 0.12);
   --mark-bg: rgba(var(--accent-rgb), 0.26);
   --selection: rgba(var(--accent-rgb), 0.4);
-  --accent: #996AFF;
-  --accent-rgb: 153, 106, 255;
-  --accent-text: #AB87FF;
+  --accent: #A8A29A;
+  --accent-rgb: 168, 162, 154;
+  --accent-text: #BDB6AC;
   --accent-halo: rgba(var(--accent-rgb), 0.28);
-  --blob-violet: rgba(124, 77, 255, 0.26);
-  --blob-cyan: rgba(34, 160, 210, 0.22);
-  --blob-peach: rgba(255, 130, 90, 0.16);
+  --blob-1: rgba(150, 135, 110, 0.18);
+  --blob-2: rgba(120, 125, 120, 0.16);
+  --blob-3: rgba(160, 140, 110, 0.14);
   --glass-tint: rgba(10, 10, 10, 0.68);
   --glass-tint-strong: rgba(10, 10, 10, 0.8);
   --glass-tint-solid: rgba(10, 10, 10, 0.94);
@@ -220,8 +220,8 @@
   --card-border-hover: rgba(255, 255, 255, 0.32);
   --card-shine: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   --card-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
-  --card-glow: rgba(124, 77, 255, 0.2);
-  --card-glow-2: rgba(34, 160, 210, 0.12);
+  --card-glow: rgba(150, 135, 110, 0.16);
+  --card-glow-2: rgba(120, 125, 120, 0.1);
   --row-hover-bg: rgba(255, 255, 255, 0.06);
   --chip-bg: rgba(18, 18, 22, 0.55);
   --chip-border: rgba(255, 255, 255, 0.16);
@@ -229,10 +229,10 @@
   --input-bg: rgba(18, 18, 22, 0.55);
   --nav-hover-bg: rgba(255, 255, 255, 0.08);
   --seal-bg: rgba(255, 255, 255, 0.08);
-  --tang-bg: rgba(153, 106, 255, 0.2);
-  --tang-fg: #CDB8FF;
-  --song-bg: rgba(56, 189, 248, 0.16);
-  --song-fg: #A5E1FB;
+  --tang-bg: rgba(189, 182, 172, 0.14);
+  --tang-fg: #DDD7CE;
+  --song-bg: rgba(190, 160, 115, 0.16);
+  --song-fg: #E3CFAE;
   --btn-bg: #FFFFFF;
   --btn-bg-hover: #D9D9DE;
   --btn-fg: #0A0A0A;
@@ -335,26 +335,26 @@ body {
   animation: 40s ease-in-out infinite alternate both;
 }
 
-.ambient__blob--violet {
+.ambient__blob--1 {
   top: -34vmax;
   left: -22vmax;
-  background: radial-gradient(closest-side, var(--blob-violet), transparent);
+  background: radial-gradient(closest-side, var(--blob-1), transparent);
   animation-name: qx-drift-a;
   animation-duration: 38s;
 }
 
-.ambient__blob--cyan {
+.ambient__blob--2 {
   top: -6vmax;
   right: -36vmax;
-  background: radial-gradient(closest-side, var(--blob-cyan), transparent);
+  background: radial-gradient(closest-side, var(--blob-2), transparent);
   animation-name: qx-drift-b;
   animation-duration: 46s;
 }
 
-.ambient__blob--peach {
+.ambient__blob--3 {
   bottom: -40vmax;
   left: 12vw;
-  background: radial-gradient(closest-side, var(--blob-peach), transparent);
+  background: radial-gradient(closest-side, var(--blob-3), transparent);
   animation-name: qx-drift-c;
   animation-duration: 54s;
 }
@@ -412,7 +412,7 @@ body {
 
 /* ---------- 按钮 / 胶囊标签 ---------- */
 
-/* 胶囊按钮：主按钮（填充）/ 次按钮（紫色描边）/ chip（中性描边） */
+/* 胶囊按钮：主按钮（填充）/ 次按钮（点缀色描边）/ chip（中性描边） */
 .btn,
 .reader-tools__btn,
 .pager__btn,
@@ -519,7 +519,7 @@ body {
   color: var(--ink);
 }
 
-/* 强调标签：紫字 + 圆点（只在卡片上用） */
+/* 强调标签：点缀色字 + 圆点（只在卡片上用） */
 .chip--accent {
   color: var(--accent-text);
   border-color: rgba(var(--accent-rgb), 0.35);
@@ -623,7 +623,7 @@ body {
   letter-spacing: 0.04em;
 }
 
-/* 分段导航：当前页 = 凸起的亮色胶囊 + 紫色下划线 */
+/* 分段导航：当前页 = 凸起的亮色胶囊 + 点缀色下划线 */
 .site-nav {
   grid-column: 2;
   gap: 2px;
@@ -731,7 +731,7 @@ body {
   font-weight: 600;
 }
 
-/* 当前项图标紫色实心（形状线索；紫色在亮胶囊上不够做文字，只给图标） */
+/* 当前项图标点缀色实心（形状线索；标签文字仍用墨色，点缀色只给图标） */
 .tabbar__item[aria-current="page"] .icon {
   color: var(--accent-text);
   fill: currentColor;
@@ -1376,7 +1376,7 @@ body {
   transition: opacity 0.2s var(--ease);
 }
 
-/* 命中片段：紫色浅底 + 紫色下划线（下划线是非颜色线索） */
+/* 命中片段：点缀色浅底 + 点缀色下划线（下划线是非颜色线索） */
 .search-match {
   padding: 0 1px;
   border-radius: 3px;
@@ -1789,7 +1789,7 @@ body {
   color: var(--muted);
 }
 
-/* 分段标签：吸顶的玻璃胶囊，选中项 = 凸起亮色胶囊 + 紫色下划线 */
+/* 分段标签：吸顶的玻璃胶囊，选中项 = 凸起亮色胶囊 + 点缀色下划线 */
 .tabs {
   position: sticky;
   top: var(--sticky-top);
