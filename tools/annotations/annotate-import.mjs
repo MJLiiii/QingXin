@@ -15,18 +15,12 @@
      source==="gushiwen-web" 与无 source 手写文件永远不会被本脚本覆盖。
    - 只写 data/annotations/，绝不改动 data/poems/** 原文。 */
 import { mkdir, readFile, writeFile, readdir, stat } from 'node:fs/promises';
-import { join, dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, resolve } from 'node:path';
 import {
   loadQingxinIndex, matchToCorpus, splitParas, parseNotes, parseTranslation,
 } from './annotate-lib.mjs';
+import { ANN_DIR, CACHE, DATA } from '../lib/paths.mjs';
 
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const TOOLS = resolve(SCRIPT_DIR, '..');
-const ROOT = resolve(SCRIPT_DIR, '..', '..');
-const DATA = join(ROOT, 'data');
-const ANN_DIR = join(DATA, 'annotations');
-const CACHE = join(TOOLS, '.cache');
 const GUWEN_CACHE = join(CACHE, 'gushiwen');
 const BASE_URL = 'https://raw.githubusercontent.com/aopao/chinese-gushiwen/master/guwen/';
 

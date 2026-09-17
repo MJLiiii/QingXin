@@ -1,5 +1,8 @@
 # 剩余 74,540 首诗词的注释补充:Claude 批量生成方案
 
+> 状态(2026-09):任务 1(`tools/annotations/annotate-llm.mjs`)未实施;任务 2 的三项已于 2026-07 落地。
+> 本文是 AGENTS.md 所述「`ai` 注释层已铺好但未启用」的设计记录,引用已按当前代码修正。
+
 ## Context
 
 全量爬取后注释覆盖 4,120 首;剩余 74,540 首(唐 54,662 + 宋词 19,878)在人工注释源上已无路可走
@@ -53,11 +56,12 @@ headers: `x-api-key` + `anthropic-version: 2023-06-01`)。
 
 ## 任务 2:三处小改动(与生成并行)
 
-1. **`assets/js/app.js` `renderPoem`**:注释 `source === "ai"` 时在注释区块前/后渲染一行
-   faint 小字「本篇注释・译文・赏析由 AI 生成,仅供参考。」(用现有 `--muted-2` 类风格,零新 CSS);
-2. **`tools/data/build-featured.mjs`**:合格条件加 `a.source !== "ai"`(首页池保持纯人工源,
+1. (已实现)**`assets/js/glass-pages.js` `renderPoem`**(文案在 `assets/js/pages.js` 的 `aiNotice()`):注释
+   `source === "ai"` 时在注解标签上方渲染一行 faint 小字「本篇注释、译文、赏析由 AI 生成,仅供参考。」
+   (`.ai-note` + 现有 `.prose--faint` / `--muted` 样式,零新 token);
+2. (已实现)**`tools/data/build-featured.mjs`**:合格条件加 `a.source !== "ai"`(首页池保持纯人工源,
    预期数量仍为 3,195);
-3. **`tools/annotations/annotate-scrape.mjs`**:expand/authors 的「跳过已存在文件」及 commit 写入
+3. (已实现)**`tools/annotations/annotate-scrape.mjs`**:expand/authors 的「跳过已存在文件」及 commit 写入
    判定中,`source:"ai"` 视同不存在(人工爬取内容永远可覆盖 AI 版;backfill 的 gushiwen* 匹配
    不含 ai,天然不受影响)。
 
@@ -67,7 +71,7 @@ headers: `x-api-key` + `anthropic-version: 2023-06-01`)。
    确认/调整 `--sonnet-top`(此处为检查点,不满意可全 Sonnet 或调提示词重试点);
 2. **全量运行**:`run` 模式跑完约 8 个批次(预计 1-2 天,视账户层级的批量队列限额;命中限额则
    脚本等待重试);每完成一批 `git add data/annotations && git commit` 一次(约 1 万文件/批);
-3. **收尾**:统计(总覆盖、模型分布、剔除率/重试率)→ CLAUDE.md 更新(annotations 约定新增
+3. **收尾**:统计(总覆盖、模型分布、剔除率/重试率)→ AGENTS.md 更新(annotations 约定新增
    AI 来源条目:precedence 人工>AI、首页池排除、免责声明;coverage 段更新为 ~78,660 全覆盖)
    → JSON 全量校验 → 本地/线上抽查 → push。
 

@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents (Claude Code and others) when working with code in this repository.
 
 ## What this is
 
@@ -30,21 +30,33 @@ There is no build or bundling step. Things you actually run:
   directory's `index.html`, which is how the old-path redirect stubs are reached).
   Do NOT use `python -m http.server` — it crashes under the preview launcher (`os.getcwd`).
 
-- **Check** (the closest thing to lint+tests — run after touching `assets/js/**`, `sw.js`, or `data/**`):
-  `cd tools && npm run check` — `node --check` syntax-checks every frontend/tool script, runs the unit
-  tests (`node --test tests/*.test.mjs`: search ranking + line search in `search-core.test.mjs`, shared
-  HTML helpers + utils in `templates.test.mjs`, page fragments in `glass-templates.test.mjs`), then
+- **Check** (the closest thing to lint+tests — run after touching `assets/js/**`, `sw.js`, `tools/**` or `data/**`):
+  `cd tools && npm run check` = `node check.mjs` (needs Node ≥ 22.7: the tests and tools import the
+  package.json-less `assets/js/*.js` modules and rely on module-syntax detection). It walks the tree and
+  `node --check`s every `assets/js/**/*.js`, `sw.js` and `tools/**/*.mjs` (new or deleted files are picked up
+  automatically; `node_modules/`, `.cache/` and iCloud conflict copies with a space+digit in the name are skipped),
+  runs the unit tests (`node --test tests/`: search ranking + line search in `search-core.test.mjs`, shared
+  HTML helpers + utils in `templates.test.mjs`, page fragments in `glass-templates.test.mjs`, the `sw.js` SHELL
+  list, cache-name scheme and redirect-stub parity in `shell.test.mjs`, the two 夜读 token blocks in
+  `glass-css.test.mjs`, the annotation matcher/parsers in `annotate-lib.test.mjs` + `gushiwen-parse.test.mjs`,
+  the poem-page parts and 今日一诗 pick in `pages.test.mjs`, the route keys in `router.test.mjs`, the id/bucket/shard
+  formulas against `data/manifest.json` plus the argv/readJson helpers in `ids.test.mjs`), then
   runs `node data/validate.mjs`, a read-only data-consistency audit (manifest counts vs search/index
   rows, id→shard round-trip for every poem, author slug→bucket hits, annotation shape + `source` rules,
-  `lines.json` rows vs annotations and poem text; exits 1 on any error, only warns about annotated poems
-  not yet in `lines.json`).
+  `featured.json` rows vs search/index (missing or empty = error, the home page fetches it directly),
+  `lines.json` rows vs annotations and poem text, `manifest.subChunkSize`/`pageSize` vs the `data.js` constants;
+  exits 1 on any error; warnings only for annotated poems not yet in `lines.json`, a missing `lines.json`, and the
+  poem-shard coverage estimate). `npm run validate` / `npm run featured` run the validator / `build-featured.mjs` alone.
 
 - **Regenerate the data** (only when refreshing/rebuilding `data/**`):
   ```bash
   git clone --depth 1 https://github.com/chinese-poetry/chinese-poetry ../chinese-poetry-src
-  cd tools && npm install && node data/prep.mjs --src ../../chinese-poetry-src
+  cd tools && npm install && node data/prep.mjs --src ../../chinese-poetry-src && node data/build-featured.mjs
   ```
-  `--include-song-shi` is a stub flag to also import 宋诗 (~255k, off by default).
+  `prep.mjs` deletes `featured.json` and `lines.json` (they are derived by `build-featured.mjs` and would
+  otherwise keep stale position-based ids) and does **not** rebuild them, so `build-featured.mjs` must follow —
+  until it does the home page 404s and `npm run check` errors. `--include-song-shi` is not implemented:
+  passing it exits 1 (宋诗 ~255k was never wired up).
 
 - **Fetch annotations** (optional, only when expanding 注释/译文/赏析/创作背景 coverage):
   `cd tools && node annotations/annotate-scrape.mjs <backfill|expand|id|authors …>` scrapes 古诗文网;
@@ -64,10 +76,10 @@ There is no build or bundling step. Things you actually run:
    global search) and `data/manifest.json` (counts/pagination).
 2. `data/poems/<chunk>-<sub>.json` — **read-only** full 原文 detail, **100 poems/file**
    (each 1000-poem id-block is split into ten 100-poem sub-files so one poem view fetches ~40KB,
-   not a ~470KB whole chunk). See `tools/data/reshard-poems.mjs`.
+   not a ~470KB whole chunk; `flushChunk()` in `tools/data/prep.mjs` writes them).
 3. `data/annotations/<id>.json` — **hand-editable** overlay carrying 注释/译文/赏析/创作背景.
    Plus `data/authors/bucket-<000..255>.json` (author records `{slug: {bio, up to 50 works, …}}`,
-   bundled into 256 hash-shards — `loadAuthor` resolves `slug`→bucket; see `tools/data/bundle-authors.mjs`),
+   bundled into 256 hash-shards by `prep.mjs` — `loadAuthor` resolves `slug`→bucket with the same `authorBucket()`),
    `data/authors-index.json`
    (all poets sorted by output, for the 诗人 browse page), `data/about.json` (关于 page copy),
    `data/featured.json` (home-page pool: index rows of the ~3,200 poems whose annotation has
@@ -84,7 +96,8 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
 `glass-pages.js`'s map, then `initGlassUI()`):
 - `router.js` — hash router: `#/home | #/list/:page | #/poem/:id | #/author/:slug | #/authors/:page
   | #/about`, plus an optional `?q=` live-search query → the renderer map passed to `startRouter(renderers)`
-  (unknown routes fall back to home). Navigation uses real
+  (unknown routes fall back to home). `parseHash(hash, now)` is exported (no arguments = the current hash and
+  today) so `tools/tests/router.test.mjs` can pin the render-cache keys. Navigation uses real
   `<a href="#/…" data-nav="…">` links (hrefs from `hashPath()`/`hrefFor()` in `utils.js`); one delegated
   click handler intercepts plain left clicks and lets modifier/middle clicks through (new tab). The same
   handler dispatches
@@ -106,20 +119,22 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   stale responses ignored, pager hidden while active, query written to `?q=` from the debounce (never per
   keystroke or during IME composition) and restored via `start(q)`, with loading/result status — and
   `wireSearch(host, entries, onQuery, { entry, hit })`, the 诗集 title/author/line search on top of it (诗人
-  runs a name-only search through `wireLiveSearch` directly; both cap results at 120); `pickFeatured()` — 今日一诗 is
+  runs a name-only search through `wireLiveSearch` directly; both cap results at `SEARCH_LIMIT`, 120, exported by
+  `search-core.js`); `pickFeatured()` — 今日一诗 is
   `data/featured.json` shuffled with `seededRandom('qingxin:' + localDateKey())` (stable for the local day;
   换一首 shuffles with `Math.random`); `loadPoemData()`; `poemParts()` (the reading toolbar 复制/分享/竖排/
   A−/A+ — 竖排 omitted above 60 lines — and the 原文 with note terms linked inside 词序 + 原文 via
-  `glossLines()`); `notesHTML()`; `aiNotice()`.
+  `glossLines()`, each line wrapped in a block `.original__line`); `notesHTML(notes)`; `aiNotice()`.
 - `glass-pages.js` — the six renderers, all `(param, ctx)` (`renderHome/renderList/renderPoem/renderAuthor/
   renderAuthors/renderAbout`), building HTML strings and injecting them into `#page-<name>`. 诗集 paginates
-  25/page (`DISPLAY`) over the 500-row index files; 诗人 lists all poets from `authors-index.json`.
+  `LIST_PAGE_SIZE` (25, exported by `data.js` and shared with `preloadListPage()`; `manifest.pageSize` must be
+  divisible by it) over the 500-row index files; 诗人 lists all poets from `authors-index.json`.
   Home is just two centred, stacked cards — the 今日一诗 hero (only `featured.json` + that poem are
   loaded) and the 寻章摘句 search form (→ `#/list?q=`, plus hint links); 诗集/诗人 are card grids with the same
   search/pager wiring; the poem page is a two-column layout (`.poem-aside[data-pin]` with title, fact chips,
   the toolbar in a glass `.tools-dock` and the 原文 card; `.poem-main` with the AI note, segmented tabs and the
-  author card; poems over 60 lines get `.poem-layout--long` and no `data-pin`; each 原文 line is wrapped in a
-  block `.original__line` (hanging indent when it wraps) and the card gets `--line-chars`, the longest line's
+  author card; poems over 60 lines get `.poem-layout--long` and no `data-pin`; each 原文 line arrives from
+  `poemParts()` wrapped in a block `.original__line` (hanging indent when it wraps) and the card gets `--line-chars`, the longest line's
   length, which sizes the stanza text to fit the card); the author page is a pinned
   profile card + bio + works grid; about is a card grid. `glass-templates.js` holds its pure HTML fragments
   (cards, `seal()` glyph avatars — first code point of the name, never the data's `seal` field, which is a
@@ -149,9 +164,10 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   only the theme) — keep its key and fields in sync with `reader.js`.
 - `data.js` — `fetchJSON()` (memoized via a `Map`; errors carry `status`; `data/…` paths resolve against
   the site root via `import.meta.url`, not the page),
-  `parseId()`/`loadPoem()`,
+  `parseId()`/`loadPoem()` (`SUB_CHUNK` = poems per sub-file, must equal `manifest.subChunkSize`),
   `loadAnnotation()`/`loadAuthor()` (slug→bucket hash) — both return `null` only on 404 and rethrow
-  other failures.
+  other failures. `parseId()`, `authorBucket()` and `SUB_CHUNK` are re-exported by `tools/lib/ids.mjs` so the
+  tool scripts share the browser's formulas; `tools/tests/ids.test.mjs` pins them.
 - `search-core.js` + `search.js` + `search-worker.js` — shared ranked exact/fuzzy matching for
   poems and authors, with punctuation and Traditional→Simplified query normalization via the local
   OpenCC browser module. Poem search also scans `data/lines.json`: exact substring for queries of 2+
@@ -165,8 +181,10 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   `emptyState`, `glossTerm`/`glossLines`, `errorSection` (the router's render-failure fallback),
   `searchBoxHTML`); `utils.js` — `esc()`,
   `hashPath()`/`hrefFor()`,
-  `groupStanzas()`, `idle()`, `localDateKey()`, `seededRandom()`. These and `glass-templates.js` are
-  imported by the Node unit tests, so they must not touch `window`/`document`/`localStorage` at import time.
+  `groupStanzas()`, `idle()`, `localDateKey()`, `seededRandom()`. These, `glass-templates.js`, `pages.js` and
+  `router.js` (and therefore everything they import: `data.js`, `search.js`, `search-core.js`, `reader.js`) are
+  imported by the Node unit tests, so they must not touch `window`/`document`/`localStorage` at import time —
+  browser globals may only be read inside functions.
 
 **`sw.js` service worker** lives at the site root and `index.html` registers it as `sw.js` (relative, so it
 works under the `/QingXin/` Pages subpath; the scope covers the whole site).
@@ -176,8 +194,9 @@ locally). The background refresh is `fetch(req, { cache: 'no-cache' })` (a condi
 HTTP-cache copy of a module can never be written back next to newer ones. It pre-caches the app shell
 (root, the `kyne/` + `liquidglass/` redirect stubs, `glass.css`, every `assets/js/*.js`) with `cache: 'reload'`, bypassing
 the HTTP cache so a new worker never mixes old and new modules; one missing entry fails the whole install.
-**Adding/renaming a frontend module or shell means updating its `SHELL` list; changing any cached format
-means bumping `CACHE_NAME`** (currently `qingxin-v10`; old caches are purged on activate). Also bump it when a
+**Adding/renaming a frontend module or shell means updating its `SHELL` list** (`tools/tests/shell.test.mjs`
+asserts SHELL equals the four shell pages + `assets/css/*.css` + every `assets/js/**/*.js`)**; changing any cached format
+means bumping `CACHE_NAME`** (currently `qingxin-v11`; old caches are purged on activate). Also bump it when a
 module drops an export another module used to import, so the new set is precached in one step.
 `index.html` reloads the page once when an old worker hands over (it checks for `qingxin-v1…v9` caches,
 whose modules don't match this shell — e.g. a v9 `router.js` still imports the removed Kyne renderers from
@@ -185,7 +204,8 @@ whose modules don't match this shell — e.g. a v9 `router.js` still imports the
 current. `startRouter()` called without a renderer map (only the removed Kyne `app.js` does that — in
 `kyne/` and in pre-v7 root pages) redirects to the site root, resolved from `import.meta.url`. Drop the
 reload block, that router fallback and the stubs' `'../?'` branch (with the root's `?` strip) once those
-workers have aged out.
+workers have aged out — `shell.test.mjs` pins the `'../?'` branch and the `?` strip as a pair, so update that test
+in the same commit.
 
 **Detail-page invariant:** all five sections (原文/注释/译文/赏析/创作背景) always
 render. Only 原文 + author bio come from source data; the other four come from the annotation
@@ -202,13 +222,15 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
   `.nojekyll`); `kyne/` and `liquidglass/` only hold the old-path redirect stubs; `assets/css/` and
   `assets/js/` hold browser-loaded front-end assets; `data/` holds committed static content; `tools/server/`,
   `tools/data/`, and `tools/annotations/` hold local preview, data generation, and annotation-import tooling
-  respectively.
+  respectively; `tools/lib/` holds the helpers those scripts share (paths, id/bucket/shard formulas re-exported from
+  `assets/js`, argv parsing) and `tools/tests/` the node:test suites; `tools/check.mjs` is `npm run check`.
 - **App shell** (`index.html`): the `<head>` prefs script, `viewport-fit=cover`, the `#qx-glass` SVG filter,
   the `.ambient` backdrop, a header of three `.capsule`s (brand, `.site-nav` with 首页/诗集/诗人/关于, icon
   `.theme-btn`) each with `.glass` span layers, the six `#page-*` containers, `#boot`, a compact footer card
   (no nav), the phone `.tabbar` and the service-worker block. Links that should get `aria-current` must be
   `.site-nav__link[data-nav]` (used by both the header nav and the tab bar; only one of the two is displayed
-  at any width). If you edit the stubs, keep `kyne/index.html` and `liquidglass/index.html` identical.
+  at any width). If you edit the stubs, keep `kyne/index.html` and `liquidglass/index.html` identical
+(`shell.test.mjs` asserts they are byte-equal).
 - **Liquid-glass design system** lives in `assets/css/glass.css` `:root` — app-style liquid glass (Apple
   Liquid Glass + the [svg-glass-navbar-effect](https://svg-glass-navbar-effect.webflow.io/) Webflow template),
   light by default. **Layers:** a fixed `.ambient` backdrop (three blurred radial blobs `--blob-violet/cyan/
@@ -248,7 +270,8 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
   **夜读 (dark theme)** only redefines tokens, in two identical blocks —
   `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {…} }` and
   `:root[data-theme="dark"] {…}` — so never hard-code a color: add a token to `:root` and to both dark
-  blocks. Reading text sizes are `calc(<px> * var(--reading-scale))` (including the mobile media
+  blocks (`tools/tests/glass-css.test.mjs` asserts the two blocks declare the same tokens with the same values).
+  Reading text sizes are `calc(<px> * var(--reading-scale))` (including the mobile media
   queries). Vertical 原文 is `:root[data-vertical="1"] .original__body` — the scroll container itself is
   `vertical-rl`, so it opens on the first column (left-aligned, `margin: 0`), and a left-edge shadow
   hints at columns still hidden inside the card.
@@ -267,11 +290,14 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
 - **`glass-templates.js` markup is frozen by `tools/tests/glass-templates.test.mjs`** (and the
   `templates.js` helpers by `templates.test.mjs`) — restyle from CSS or add a new builder instead. Decorative
   pseudo-content is written as `content: "x" / ""` so screen readers skip it. Page structure belongs in
-  `glass-pages.js` and `index.html`, which have no markup tests — verify those in a browser.
+  `glass-pages.js` and `index.html`, which have no markup tests (only `index.html`'s `?` strip and the stubs are
+  pinned by `shell.test.mjs`) — verify those in a browser.
 - **`tools/data/prep.mjs`**: converts 全唐诗 繁→简 via `opencc-js` (宋词 is already simplified); strips
   lone UTF-16 surrogates; synthesizes ci titles/ids. On re-run it **preserves
-  `data/annotations/`** (your hand-written overlays), only regenerating index/poems/authors +
-  top-level JSON + the seed `c59-66.json`. `data/annotations/README.md` is hand-maintained docs —
+  `data/annotations/`** (your hand-written overlays) and `data/about.json`; it regenerates `index/`, `poems/`,
+  `authors/`, `manifest.json`, `search.json`, `authors-index.json` and the seed `c59-66.json`; it deletes but does
+  **not** regenerate `featured.json` and `lines.json` (run `node tools/data/build-featured.mjs` next).
+  `data/annotations/README.md` is hand-maintained docs —
   prep writes its built-in starter copy only when the file is missing, so edit the README itself.
 - **To annotate a poem:** create `data/annotations/<id>.json` (id is in the URL `#/poem/<id>`);
   fill `notes:[{term,def}]`, `translation:[…]`, `appreciation:[…]`, `background:[…]`,

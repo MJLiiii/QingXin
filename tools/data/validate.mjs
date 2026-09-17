@@ -1,38 +1,23 @@
 #!/usr/bin/env node
 /* 只读数据一致性校验。
-   覆盖 manifest/search/index/poems/authors/annotations 的运行时约束，
-   不写入任何文件，适合放进 npm run check。 */
+   覆盖 manifest/search/index/poems/authors/annotations/featured/lines 的运行时约束，
+   不写入任何文件，适合放进 npm run check。
+   严重度按影响分级：featured.json 缺失或为空 = error（首页 renderHome 直接 fetch 它，缺了页面就报错）；
+   lines.json 缺失 = warning（诗集搜索只是退化为标题/作者匹配）。二者都由 build-featured.mjs 生成。 */
 import { readFile, readdir } from 'node:fs/promises';
-import { join, dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(SCRIPT_DIR, '..', '..');
-const DATA = join(ROOT, 'data');
-const ANN_FILE_RE = /^[tc]\d+-\d+\.json$/;
-const AUTHOR_BUCKETS = 256;
+import { join } from 'node:path';
+import { DATA } from '../lib/paths.mjs';
+import { ANN_FILE_RE, LIST_PAGE_SIZE, SUB_CHUNK, authorBucket, pad3, pad4, parseId, poemShardFile } from '../lib/ids.mjs';
 
 const errors = [];
 const warnings = [];
 
-const pad3 = (n) => String(n).padStart(3, '0');
-const pad4 = (n) => String(n).padStart(4, '0');
 const addError = (msg) => errors.push(msg);
 const addWarning = (msg) => warnings.push(msg);
 
+// 有意不用 tools/lib/paths.mjs 的 readJson：这里读不到就要抛，下面靠 e.code === 'ENOENT' 区分 warning / error。
 async function readJson(fp) {
   return JSON.parse(await readFile(fp, 'utf8'));
-}
-
-function parseId(id) {
-  const m = /^([tc])(\d+)-(\d+)$/.exec(id || '');
-  return m ? { prefix: m[1], chunk: +m[2], i: +m[3] } : null;
-}
-
-function authorBucket(slug) {
-  let h = 0;
-  for (let i = 0; i < slug.length; i++) h = (h * 31 + slug.charCodeAt(i)) >>> 0;
-  return h % AUTHOR_BUCKETS;
 }
 
 function isArray(v) {
@@ -74,6 +59,13 @@ const manifest = await readJson(join(DATA, 'manifest.json'));
 for (const key of ['total', 'pageSize', 'pages', 'chunkSize', 'subChunkSize', 'chunks']) {
   if (!Number.isInteger(manifest[key]) || manifest[key] <= 0) addError(`manifest.${key} 必须是正整数`);
 }
+if (errors.length) { // manifest 坏了，后面的分片公式无从谈起：先把它自己的诊断打出来
+  for (const e of errors) console.error(`error: ${e}`);
+  process.exit(1);
+}
+// 前端不读 manifest：data.js 的两个常量必须与它一致（否则 loadPoem 反解错子文件、预取错索引页）。
+if (manifest.subChunkSize !== SUB_CHUNK) addError(`manifest.subChunkSize ${manifest.subChunkSize} != assets/js/data.js SUB_CHUNK ${SUB_CHUNK}`);
+if (manifest.pageSize % LIST_PAGE_SIZE !== 0) addError(`manifest.pageSize ${manifest.pageSize} 不能被 LIST_PAGE_SIZE ${LIST_PAGE_SIZE} 整除`);
 
 const search = await readJson(join(DATA, 'search.json'));
 if (!Array.isArray(search)) addError('search.json 必须是数组');
@@ -98,8 +90,8 @@ for (const row of search) {
   searchIds.add(id);
   if (loc.chunk >= manifest.chunks) addError(`${id} chunk 超出 manifest.chunks`);
   if (loc.i >= manifest.chunkSize) addError(`${id} index 超出 manifest.chunkSize`);
-  const sub = Math.floor(loc.i / manifest.subChunkSize);
-  const file = `${pad4(loc.chunk)}-${sub}.json`;
+  // 分片公式由 manifest.subChunkSize 驱动：这是唯一一条「manifest 与磁盘布局一致」的检查，勿硬编码 100。
+  const { file, index } = poemShardFile(loc, manifest.subChunkSize);
   if (!poemCache.has(file)) {
     try {
       poemCache.set(file, await readJson(join(DATA, 'poems', file)));
@@ -108,9 +100,40 @@ for (const row of search) {
       continue;
     }
   }
-  const poem = poemCache.get(file)[loc.i % manifest.subChunkSize];
+  const poem = poemCache.get(file)[index];
   if (!poem || poem.id !== id) addError(`${id} 无法按分片公式反解到同 id 原文`);
 }
+
+/* data/featured.json（首页推荐池）：行结构须与 data/index 行一致（前端诗卡 / hero 零适配），
+   id 必须在语料中。缺失 / 非数组 / 空数组都是 error：pickFeatured 对 [] 取不到 hero，首页一样白屏。 */
+let featured = null;
+let featuredRead = false;
+try {
+  featured = await readJson(join(DATA, 'featured.json'));
+  featuredRead = true;
+} catch (e) {
+  addError(e.code === 'ENOENT'
+    ? '缺少 data/featured.json（首页会报错），请运行 node tools/data/build-featured.mjs'
+    : `无法解析 data/featured.json: ${e.message}`);
+}
+if (featuredRead && !isArray(featured)) { // 含字面量 null
+  addError('data/featured.json 必须是数组');
+  featured = null;
+}
+if (featured && featured.length === 0) {
+  addError('data/featured.json 为空数组（首页取不到今日一诗），请运行 node tools/data/build-featured.mjs');
+}
+const featuredById = new Map();
+for (const row of featured || []) {
+  if (!row || typeof row !== 'object' || typeof row.id !== 'string') {
+    addError('featured.json 存在非 {id,…} 行');
+    continue;
+  }
+  if (featuredById.has(row.id)) addError(`featured.json 重复 id: ${row.id}`);
+  featuredById.set(row.id, row);
+  if (!searchIds.has(row.id)) addError(`featured.json ${row.id} 不在 search.json 中`);
+}
+const indexById = new Map(); // 只留 featured 命中的索引行，供下面逐键比对
 
 let indexRows = 0;
 for (let p = 0; p < manifest.pages; p++) {
@@ -133,9 +156,25 @@ for (let p = 0; p < manifest.pages; p++) {
       continue;
     }
     if (!searchIds.has(row.id)) addError(`data/index/${file} 引用 search 中不存在的 id: ${row.id}`);
+    if (featuredById.has(row.id)) indexById.set(row.id, row);
   }
 }
 if (indexRows !== manifest.total) addError(`index 总行数 ${indexRows} != manifest.total ${manifest.total}`);
+
+for (const [id, row] of featuredById) {
+  const idx = indexById.get(id);
+  if (!idx) {
+    addError(`featured.json ${id} 不在 data/index 中`);
+    continue;
+  }
+  const keys = new Set([...Object.keys(row), ...Object.keys(idx)]);
+  for (const k of keys) {
+    if (row[k] !== idx[k]) {
+      addError(`featured.json ${id} 的 ${k} 与 data/index 行不一致`);
+      break;
+    }
+  }
+}
 
 const authorIndex = await readJson(join(DATA, 'authors-index.json'));
 if (!Array.isArray(authorIndex)) addError('authors-index.json 必须是数组');
@@ -187,8 +226,9 @@ const bodyKey = (poem) => `${poem.author}\u0000${bodyText(poem)}`;
 function corpusPoem(id) {
   const loc = parseId(id);
   if (!loc || !searchIds.has(id)) return null;
-  const shard = poemCache.get(`${pad4(loc.chunk)}-${Math.floor(loc.i / manifest.subChunkSize)}.json`);
-  const poem = shard && shard[loc.i % manifest.subChunkSize];
+  const { file, index } = poemShardFile(loc, manifest.subChunkSize);
+  const shard = poemCache.get(file);
+  const poem = shard && shard[index];
   return poem && poem.id === id && isArray(poem.paragraphs) ? poem : null;
 }
 
@@ -244,7 +284,7 @@ if (lines) {
   }
 }
 
-console.log(`validate: poems=${searchIds.size}, indexRows=${indexRows}, authors=${authorIndex.length}, annotations=${annFiles.length}, lines=${lines ? lines.length : 0}`);
+console.log(`validate: poems=${searchIds.size}, indexRows=${indexRows}, authors=${authorIndex.length}, annotations=${annFiles.length}, featured=${featuredById.size}, lines=${lines ? lines.length : 0}`);
 for (const w of warnings) console.warn(`warning: ${w}`);
 if (errors.length) {
   for (const e of errors.slice(0, 50)) console.error(`error: ${e}`);

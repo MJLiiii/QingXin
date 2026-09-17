@@ -22,11 +22,14 @@
    安全约定：无 source 字段的手写文件（如 c59-66《水调歌头》）任何模式、任何路径永不触碰。
    只写 data/annotations/，绝不改动 data/poems/** 原文。 */
 import { mkdir, readFile, writeFile, readdir, rename } from 'node:fs/promises';
-import { join, dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { ANN_DIR, CACHE, DATA, WEB_CACHE, readJson } from '../lib/paths.mjs';
+import { ANN_FILE_RE } from '../lib/ids.mjs';
+import * as cli from '../lib/argv.mjs';
 import {
   normText, normAuthor, dice, loadQingxinIndex,
   matchToCorpus, candidateBodies, parseNotes, parseTranslation,
+  cacheKeyForAuthor, eligibleAuthor,
 } from './annotate-lib.mjs';
 import { createClient, BlockedError } from './gushiwen-client.mjs';
 import {
@@ -36,13 +39,6 @@ import {
   validateScrapedAnnotation,
 } from './gushiwen-parse.mjs';
 
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const TOOLS = resolve(SCRIPT_DIR, '..');
-const ROOT = resolve(SCRIPT_DIR, '..', '..');
-const DATA = join(ROOT, 'data');
-const ANN_DIR = join(DATA, 'annotations');
-const CACHE = join(TOOLS, '.cache');
-const WEB_CACHE = join(CACHE, 'gushiwen-web');
 const PAGE_CACHE = join(WEB_CACHE, 'pages');
 const RESOLVED_PATH = join(WEB_CACHE, 'resolved.json');
 
@@ -57,17 +53,12 @@ const shiwensUrl = ({ tstr = '', astr = '', cstr = '', xstr = '', page = 1 }) =>
 const catalogUrl = (cstr, xstr, page) => shiwensUrl({ cstr, xstr, page });
 const authorUrl = (astr, page) => shiwensUrl({ astr, page });
 
-const ANN_FILE_RE = /^[tc]\d+-\d+\.json$/; // 排除 README 与 iCloud 冲突副本
-
 /* ---------- 参数 ---------- */
 
 const argv = process.argv.slice(2);
 const MODE = argv[0];
-const flag = (name) => argv.includes(name);
-const opt = (name, dflt) => {
-  const i = argv.indexOf(name);
-  return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : dflt;
-};
+const flag = (name) => cli.flag(argv, name);
+const opt = (name, dflt) => cli.opt(argv, name, dflt);
 const DRY = flag('--dry-run');
 const FORCE = flag('--force');
 const VERBOSE = flag('--verbose');
@@ -82,25 +73,10 @@ const REPORT_PATH = opt('--report', join(CACHE, 'annotate', 'scrape-report.json'
 
 /* 取值型开关（其后紧跟的非 -- token 是它的值，不是位置参数）。 */
 const VALUE_FLAGS = new Set(['--limit', '--pages', '--delay', '--dynasty', '--top', '--report']);
-/* 位置参数（authors 模式的作者名）：跳过 MODE、所有 --flag 及取值型开关吞掉的值。 */
-function positionals() {
-  const out = [];
-  for (let i = 1; i < argv.length; i++) {
-    const tok = argv[i];
-    if (tok.startsWith('--')) {
-      if (VALUE_FLAGS.has(tok) && argv[i + 1] && !argv[i + 1].startsWith('--')) i++;
-      continue;
-    }
-    out.push(tok);
-  }
-  return out;
-}
+/* 位置参数（authors 模式的作者名）：跳过 MODE（argv[0]）、所有 --flag 及取值型开关吞掉的值。 */
+const positionals = () => cli.positionals(argv, VALUE_FLAGS, 1);
 
-/* ---------- 断点资产 ---------- */
-
-async function readJson(fp, dflt) {
-  try { return JSON.parse(await readFile(fp, 'utf8')); } catch { return dflt; }
-}
+/* ---------- 断点资产（readJson 来自 tools/lib/paths.mjs：这里一律带默认值，缺失即从头来） ---------- */
 
 let resolved = {};      // poemId -> {hexid, score, method, at}
 /* 并发安全：先与磁盘版合并再经临时文件原子替换，多进程并跑时不会互相覆盖对方
@@ -410,10 +386,7 @@ async function* crawlPages(client, dyn) {
 
 /* ---------- authors ---------- */
 
-/* 作者名 → 断点文件名：归一化（去尾数字、佚名/无名折叠）后剔除文件系统敏感字符，
-   使显式传入的「李白」与 --top 取到的「李白」共用同一进度文件。 */
-const cacheKeyForAuthor = (name) =>
-  (normAuthor(name).replace(/[\/\\?%*:|"<>\s、，,\[\]（）()□]/g, '_') || 'author');
+/* 作者名 → 断点文件名：cacheKeyForAuthor 见 annotate-lib.mjs（crawl-all-authors.mjs 按同一键判断已爬完）。 */
 
 /* 逐页爬某作者的 astr 列表页（与 crawlPages 同构，但按作者而非朝代分页/断点）。
    列表页与目录页结构一致，故复用 parseCatalogPage；--pages 限制本次单作者翻页数。 */
@@ -524,8 +497,7 @@ async function authorTargets() {
     for (const a of idxAuthors) {
       if (added >= TOP) break;
       const na = normAuthor(a.name);
-      if (na === '无名氏' || na === '不详') continue;        // 匿名桶：量大值低，不占排名位
-      if (/[、，,\[\]（）()□\s0-9]/.test(a.name)) continue;   // 多作者/编号/杂名：astr 查询与文件名都不友好，不占排名位
+      if (!eligibleAuthor(a)) continue;                       // 匿名桶 / 杂名不占排名位（规则见 annotate-lib.mjs）
       added++;                                               // 计入排名位（不论是否已在名单，故与位置参数重叠时自然并合）
       if (!map.has(na)) map.set(na, a.name);
     }

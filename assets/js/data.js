@@ -3,6 +3,11 @@ import { pad3, pad4 } from './utils.js';
 var cache = new Map();
 // 数据路径相对站点根目录（本模块在 assets/js/ 下），与页面所在目录无关。
 var ROOT = new URL('../../', import.meta.url);
+// 每个原文子文件的诗数：与 manifest.subChunkSize / tools/data/prep.mjs 的 SUBCHUNK_SIZE 一致
+//（这里不读 manifest，省一次请求）；tools/lib/ids.mjs 复用并由 tools/tests/ids.test.mjs 钉住。
+export var SUB_CHUNK = 100;
+// 诗集每页条数（glass-pages.js 的 DISPLAY 与下面的预取共用）；manifest.pageSize 必须能被它整除。
+export var LIST_PAGE_SIZE = 25;
 
 export async function fetchJSON(path) {
   if (cache.has(path)) return cache.get(path);
@@ -30,9 +35,9 @@ export function parseId(id) {
 export async function loadPoem(id) {
   var loc = parseId(id);
   if (!loc) return null;
-  var sub = Math.floor(loc.i / 100);
+  var sub = Math.floor(loc.i / SUB_CHUNK);
   var slice = await fetchJSON('data/poems/' + pad4(loc.chunk) + '-' + sub + '.json');
-  return slice[loc.i % 100] || null;
+  return slice[loc.i % SUB_CHUNK] || null;
 }
 
 // 仅 404（确无该文件）返回 null；网络等其它失败照常抛出，由调用方决定如何降级。
@@ -64,7 +69,7 @@ export async function loadAuthor(slug) {
 
 export async function preloadListPage(displayPage) {
   var manifest = await fetchJSON('data/manifest.json');
-  var perFile = manifest.pageSize / 25;
+  var perFile = manifest.pageSize / LIST_PAGE_SIZE;
   var file = Math.floor(Math.max(0, displayPage || 0) / perFile);
   return preloadJSON('data/index/page-' + pad4(file) + '.json');
 }

@@ -1,6 +1,7 @@
-/* 页面共用的数据与交互辅助：搜索框联动、分页跳转、今日一诗选取、诗文页数据与原文部件。
-   各页面的布局在 glass-pages.js。 */
+/* 页面共用的数据与交互辅助：搜索框联动、分页跳转、今日一诗选取、诗文页数据与原文部件
+   （含原文逐句块 .original__line）。各页面的布局在 glass-pages.js。 */
 import { loadAnnotation, loadAuthor, loadPoem } from './data.js';
+import { SEARCH_LIMIT } from './search-core.js';
 import { searchPoems } from './search.js';
 import { esc, groupStanzas, localDateKey, seededRandom } from './utils.js';
 import { emptyState, glossLines } from './templates.js';
@@ -116,7 +117,7 @@ export function wireLiveSearch(o) {
 
 // rows：{ entry, hit } —— 整页条目与搜索命中的卡片模板。
 export function wireSearch(host, pageEntries, onQuery, rows) {
-  var limit = 120;
+  var limit = SEARCH_LIMIT;
   var entryRow = rows.entry;
   var hitRow = rows.hit;
   return wireLiveSearch({
@@ -185,8 +186,9 @@ export async function loadPoemData(id) {
   return { poem: poem, ann: loaded[1] || {}, author: author, degraded: degraded };
 }
 
-export function notesHTML(ann, notes, withAi) {
-  return '<div class="notes">' + (withAi ? aiNotice(ann) : '') + (notes.length
+// 注释条目：第 k 行对应原文第 k 个可点词（reader.js 按下标取释义）。AI 免责文案由 glass-pages.js 另行渲染。
+export function notesHTML(notes) {
+  return '<div class="notes">' + (notes.length
     ? notes.map(function (n) {
       return '<div class="notes__row"><div class="notes__term">' + esc(n.term)
         + '</div><div class="notes__def">' + esc(n.def) + '</div></div>';
@@ -217,9 +219,12 @@ export function poemParts(poem, ann) {
   if (ann.preface) {
     original += '<div class="original__preface"><span class="badge">词序</span><br>' + prefaceHTML + '</div>';
   }
+  // 原文逐句成块：一句折行时在标点后断开并悬挂缩进（glass.css .original__line；竖排时由 CSS 取消缩进）。词序不分块。
   original += '<div class="original__body' + (longPoem ? ' original__body--long' : '') + '">'
     + groupStanzas(paragraphs, function (line, i) { return glossed[i]; }).map(function (lines) {
-      return '<p class="original__stanza">' + lines.join('<br>') + '</p>';
+      return '<p class="original__stanza">' + lines.map(function (line) {
+        return '<span class="original__line">' + line + '</span>';
+      }).join('') + '</p>';
     }).join('')
     + '</div></div>';
 

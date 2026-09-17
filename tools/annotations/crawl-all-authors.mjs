@@ -23,50 +23,28 @@
    中途可随时 git add data/annotations && git commit 已写入的部分。 */
 import { readFileSync, existsSync, rmSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import { join, resolve, dirname } from 'node:path';
+import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { normAuthor } from './annotate-lib.mjs';
+import { cacheKeyForAuthor, eligibleAuthor } from './annotate-lib.mjs';
+import { CACHE, ROOT, WEB_CACHE } from '../lib/paths.mjs';
+import * as cli from '../lib/argv.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const TOOLS = resolve(SCRIPT_DIR, '..');
-const REPO = resolve(SCRIPT_DIR, '..', '..');
-const WEB_CACHE = join(TOOLS, '.cache', 'gushiwen-web');
-const STOP_FILE = join(TOOLS, '.cache', 'annotate', 'STOP');
-const REPORT = join(TOOLS, '.cache', 'annotate', 'scrape-report.json');
+const STOP_FILE = join(CACHE, 'annotate', 'STOP');
+const REPORT = join(CACHE, 'annotate', 'scrape-report.json');
 
 /* ---------- 参数 ---------- */
 const argv = process.argv.slice(2);
-const flag = (n) => argv.includes(n);
-const opt = (n, d) => {
-  const i = argv.indexOf(n);
-  return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : d;
-};
+const flag = (n) => cli.flag(argv, n);
+const opt = (n, d) => cli.opt(argv, n, d);
 const PAUSE_MIN = parseFloat(opt('--pause', '')) || 30;
 const WORKERS = Math.max(1, parseInt(opt('--workers', ''), 10) || 1);
 const LIMIT = opt('--limit', null);
 const DRY = flag('--dry-run');
 const VALUE_FLAGS = new Set(['--pause', '--workers', '--limit']);
-const onlyNames = [];
-for (let i = 0; i < argv.length; i++) {
-  const tok = argv[i];
-  if (tok.startsWith('--')) {
-    if (VALUE_FLAGS.has(tok) && argv[i + 1] && !argv[i + 1].startsWith('--')) i++;
-    continue;
-  }
-  onlyNames.push(tok);
-}
+const onlyNames = cli.positionals(argv, VALUE_FLAGS); // 本脚本没有模式名，从 argv[0] 起
 
-/* 与 annotate-scrape.mjs 的 cacheKeyForAuthor 保持一致（改动需同步） */
-const cacheKeyForAuthor = (name) =>
-  (normAuthor(name).replace(/[\/\\?%*:|"<>\s、，,\[\]（）()□]/g, '_') || 'author');
-
-/* 与 annotate-scrape.mjs authorTargets 的 --top 合格规则一致 */
-function eligible(a) {
-  const na = normAuthor(a.name);
-  if (na === '无名氏' || na === '不详') return false;
-  if (/[、，,\[\]（）()□\s0-9]/.test(a.name)) return false;
-  return true;
-}
+/* 断点键 cacheKeyForAuthor 与 --top 合格规则 eligibleAuthor 与 annotate-scrape.mjs 共用（annotate-lib.mjs）。 */
 
 function isDone(name) {
   try {
@@ -110,8 +88,8 @@ function runScrape(name, reportPath, prefix) {
 }
 
 /* ---------- 主流程 ---------- */
-const index = JSON.parse(readFileSync(join(REPO, 'data', 'authors-index.json'), 'utf8'));
-const targets = onlyNames.length ? onlyNames : index.filter(eligible).map((a) => a.name);
+const index = JSON.parse(readFileSync(join(ROOT, 'data', 'authors-index.json'), 'utf8'));
+const targets = onlyNames.length ? onlyNames : index.filter(eligibleAuthor).map((a) => a.name);
 
 console.log(`目标作者 ${targets.length} 位；并发 ${WORKERS} 路，每位之间暂停 ${PAUSE_MIN} 分钟${DRY ? '（dry-run）' : ''}${LIMIT ? `，每位上限 ${LIMIT} 条` : ''}。`);
 console.log(`优雅停止：touch ${STOP_FILE}\n`);
@@ -132,7 +110,7 @@ function checkStop() {
 async function worker(k) {
   if (k > 0) await sleep((k * 15) / 60); // 错峰启动，避免起步瞬间三路同时打点
   const tag = WORKERS > 1 ? ` (w${k + 1})` : '';
-  const reportPath = WORKERS > 1 ? join(TOOLS, '.cache', 'annotate', `scrape-report-w${k + 1}.json`) : REPORT;
+  const reportPath = WORKERS > 1 ? join(CACHE, 'annotate', `scrape-report-w${k + 1}.json`) : REPORT;
   while (true) {
     if (checkStop()) return;
     while (Date.now() < blockedUntil) {

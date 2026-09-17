@@ -1,4 +1,4 @@
-import { prepareLines, preparePoemIndex, searchPoemIndex } from './search-core.js';
+import { SEARCH_LIMIT, prepareLines, preparePoemIndex, searchPoemIndex } from './search-core.js';
 
 var dataPromise = null;
 
@@ -36,7 +36,7 @@ self.onmessage = async function (event) {
       return;
     }
     var q = String(data.q || '');
-    var limit = data.limit || 120;
+    var limit = data.limit || SEARCH_LIMIT;
     var result = searchPoemIndex(loaded.index, q, limit, { lines: loaded.lines });
     self.postMessage({ id: data.id, result: result });
   } catch (e) {

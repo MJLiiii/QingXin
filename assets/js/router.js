@@ -4,9 +4,10 @@ import { warmSearchIndex } from './search.js';
 import { errorSection } from './templates.js';
 import { hrefFor, idle, localDateKey } from './utils.js';
 
-var PAGES = ['home', 'list', 'poem', 'author', 'authors', 'about'];
 // 页面 → 高亮的导航项：诗文页归到「诗集」，页眉导航与底部标签栏始终有一项选中。
+// 键就是全部页面名（index.html 的 #page-<name> 容器）——PAGES 由它派生，须先声明。
 var NAV_OF = { home: 'home', list: 'list', poem: 'list', authors: 'authors', author: 'authors', about: 'about' };
+var PAGES = Object.keys(NAV_OF);
 var DEFAULT_TITLE = '情心 · 慢读古典';
 
 var renderers = {};         // 页面 → 渲染函数，由 startRouter(pages) 传入（glass-pages.js）
@@ -17,8 +18,9 @@ var entrySeq = 0;
 var currentEntry = null;    // 当前历史项 id（history.state.qx）
 var scrollById = new Map(); // 历史项 id → 离开时的滚动位置
 
-function parseHash() {
-  var raw = window.location.hash.replace(/^#\/?/, '');
+// 解析 hash 路由。可注入 hash 与日期以便测试（tools/tests/router.test.mjs）；不传则读当前地址栏 / 当天。
+export function parseHash(hash, now) {
+  var raw = String(hash === undefined ? window.location.hash : hash).replace(/^#\/?/, '');
   var at = raw.indexOf('?');
   var parts = (at >= 0 ? raw.slice(0, at) : raw).split('/').map(function (s) {
     try { return decodeURIComponent(s); } catch (e) { return s; }
@@ -32,7 +34,7 @@ function parseHash() {
   var keyParam = name === 'list' || name === 'authors' ? String(parseInt(param || '0', 10) || 0)
     : name === 'poem' || name === 'author' ? (param || '') : '';
   var key = name + '/' + keyParam + (query.q ? '?q=' + query.q : '')
-    + (name === 'home' ? '@' + localDateKey() : '');
+    + (name === 'home' ? '@' + localDateKey(now) : '');
   return { name: name, param: param, rest: parts.slice(2), query: query, key: key };
 }
 
@@ -111,7 +113,7 @@ function schedulePreload(route) {
   });
 }
 
-export async function render(opts) {
+async function render(opts) {
   opts = opts || {};
   var token = ++seq;
   var route = parseHash();

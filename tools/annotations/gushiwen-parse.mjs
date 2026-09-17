@@ -254,10 +254,6 @@ export function splitFanyiParas(paras) {
   return { translationText: translation.join('\n'), notesText: notes.join('\n') };
 }
 
-export function parseFanyiFragment(html) {
-  return splitFanyiParas(stripFooterLines(htmlToParas(html)));
-}
-
 /* 赏析/创作背景片段 → 段落数组 */
 export function parseShangxiFragment(html) {
   const paras = stripFooterLines(htmlToParas(html));

@@ -22,6 +22,21 @@ export function normAuthor(s) {
   return a;
 }
 
+/* 作者名 → 断点文件名（tools/.cache/gushiwen-web/catalog-author-<key>.json）：归一化（去尾数字、
+   佚名/无名折叠）后剔除文件系统敏感字符，使显式传入的「李白」与 --top 取到的「李白」共用同一进度文件。
+   ⚠ 磁盘上 5,000+ 个断点文件按它命名（annotate-scrape.mjs 写、crawl-all-authors.mjs 读）：
+   改动会让已爬完的作者全部重爬。 */
+export const cacheKeyForAuthor = (name) =>
+  (normAuthor(name).replace(/[\/\\?%*:|"<>\s、，,\[\]（）()□]/g, '_') || 'author');
+
+/* --top / 全量爬取的合格作者：跳过匿名桶（量大值低，不占排名位）与多作者/编号/杂名
+   （astr 查询与文件名都不友好）。 */
+export function eligibleAuthor(a) {
+  const na = normAuthor(a.name);
+  if (na === '无名氏' || na === '不详') return false;
+  return !/[、，,\[\]（）()□\s0-9]/.test(a.name);
+}
+
 /* 标题归一化：按 " / " 拆备选（琵琶行 / 琵琶引）、去括注、去尾部 ·其N，
    返回归一化后的备选数组 */
 export function normTitle(s) {
@@ -62,7 +77,7 @@ export function dice(a, b) {
 /* 载入情心诗库并建索引。
    重要：chunk 文件名按 manifest 计算（0000-0.json…），绝不 readdir——
    目录里可能有 iCloud 冲突副本（如 "0057 3.json"）。原文按 100 首/子文件存
-   （poems/<块>-<子>.json，见 tools/data/reshard-poems.mjs），故逐块读其各子文件，
+   （poems/<块>-<子>.json，由 tools/data/prep.mjs 的 flushChunk 写出），故逐块读其各子文件，
    子文件读尽即 ENOENT 停（末块不足 10 个子文件）。
    返回 { byKey, byAuthor, byId, total }：
    - byKey:    "作者|正文归一化前12字" -> entry[]（全唐诗重出诗会有多条）

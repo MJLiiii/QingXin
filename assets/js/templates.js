@@ -38,16 +38,14 @@ export function heroLines(paragraphs) {
   return lines.slice(0, 2);
 }
 
+// match 是 search-core.js 的 publicMatch（{ field, type, distance, start, length, line? }）。
 function isFuzzyMatch(match) {
-  return match && (match.fuzzy === true || Number(match.distance) > 0
-    || String(match.type || match.matchType || '').toLowerCase().indexOf('fuzzy') >= 0);
+  return !!match && (Number(match.distance) > 0 || String(match.type || '').toLowerCase().indexOf('fuzzy') >= 0);
 }
 
 function isMatchField(match, field) {
-  var actual = String((match && (match.field || match.matchField)) || '').toLowerCase();
-  if (!actual) return true;
-  if (actual === field) return true;
-  return field === 'name' && actual === 'author';
+  var actual = String((match && match.field) || '').toLowerCase();
+  return !actual || actual === field;
 }
 
 export function highlighted(text, query, match, field) {
@@ -64,7 +62,8 @@ export function highlighted(text, query, match, field) {
       + esc(value.slice(end));
   }
 
-  // 兼容旧索引：仅高亮展示文本中真实存在的连续片段。
+  // 没有可用偏移（start:-1）时按查询词本身高亮：OpenCC 按词组转换时 search-core 的逐字偏移映射会失效
+  // （displayRange 返回 -1，如「整顿乾坤」的命中），这是活路径，不是兼容旧格式；只高亮展示文本里真实存在的连续片段。
   var needle = String(query == null ? '' : query).trim();
   var at = needle ? value.indexOf(needle) : -1;
   if (at < 0) return esc(value);
@@ -145,7 +144,6 @@ export function searchBoxHTML(o) {
     + ' placeholder="' + esc(o.placeholder || '搜索标题、作者或名句…') + '"'
     + ' aria-label="' + esc(aria) + '" aria-controls="' + esc(controls) + '"'
     + ' aria-describedby="' + esc(statusId) + '">'
-    + '<span class="search__tag latin" aria-hidden="true">' + esc(o.tag || 'search') + '</span>'
     + '</div>'
     + '<div class="search__status" id="' + esc(statusId)
     + '" role="status" aria-live="polite" aria-atomic="true"></div>';

@@ -513,13 +513,6 @@ body {
   vertical-align: middle;
 }
 
-.chip.latin {
-  font-family: var(--latin);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .chip .latin {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -1353,9 +1346,6 @@ body {
   outline: none;
   box-shadow: none;
 }
-
-/* 英文装饰标签由放大镜代替 */
-.search__tag { display: none; }
 
 .search__status {
   min-height: 20px;
@@ -2246,17 +2236,19 @@ body {
 @media (prefers-reduced-transparency: reduce) {
   .ambient,
   .glass__effect { display: none; }
+  /* 内容卡片本体改实底：整体换 token。夜读块的 :root:not(…) / :root[data-theme] 是 (0,2,0)，这里用 :root:root:root
+     (0,3,0) 压过它们，不依赖源序；用 background 简写叠渐变的四张卡（今日一诗、原文、资料卡、关于页首卡）也一并变实底。
+     悬停色 --card-bg-hover 与原先的兜底一样不改。只在本块内覆盖，不进 :root。 */
+  :root:root:root {
+    --card-bg: var(--surface);
+    --card-strong: var(--surface);
+    --card-glow: transparent;
+    --card-glow-2: transparent;
+  }
   .glass__tint,
   .site-header[data-scrolled] .glass__tint,
   .gloss-pop,
-  .search,
-  .gcard,
-  .pcard,
-  .ptile,
-  .tab-panel,
-  .poem-list__empty,
-  .section--top > .prose,
-  .site-footer__inner {
+  .search {
     background: var(--surface);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -2447,10 +2439,10 @@ body {
   .reader-tools { justify-content: space-between; }
   .reader-tools__btn { padding: 0 13px; }
 
-  .original-card { padding: 20px 20px 24px; }
   .original-card {
     --stanza-min: 17px;
     --stanza-max: 21px;
+    padding: 20px 20px 24px;
   }
   .original__stanza { line-height: 2; }
   .original__stanza + .original__stanza { margin-block-start: 16px; }

@@ -26,16 +26,6 @@ export function hrefFor(path, query) {
   return '#/' + hashPath(path) + (pairs.length ? '?' + pairs.join('&') : '');
 }
 
-export function debounce(fn, ms) {
-  var t;
-  return function () {
-    var args = arguments;
-    var ctx = this;
-    clearTimeout(t);
-    t = setTimeout(function () { fn.apply(ctx, args); }, ms);
-  };
-}
-
 export function groupStanzas(paras, map) {
   var stanzas = [];
   var cur = [];
