@@ -77,7 +77,7 @@ export function dice(a, b) {
 /* 载入情心诗库并建索引。
    重要：chunk 文件名按 manifest 计算（0000-0.json…），绝不 readdir——
    目录里可能有 iCloud 冲突副本（如 "0057 3.json"）。原文按 100 首/子文件存
-   （poems/<块>-<子>.json，见 tools/data/reshard-poems.mjs），故逐块读其各子文件，
+   （poems/<块>-<子>.json，由 tools/data/prep.mjs 的 flushChunk 写出），故逐块读其各子文件，
    子文件读尽即 ENOENT 停（末块不足 10 个子文件）。
    返回 { byKey, byAuthor, byId, total }：
    - byKey:    "作者|正文归一化前12字" -> entry[]（全唐诗重出诗会有多条）

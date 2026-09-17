@@ -241,6 +241,9 @@ writeFileSync(join(OUT, 'manifest.json'), JSON.stringify({
 // ---------- 作者简介 ----------
 console.log('▸ 合并作者简介 …');
 
+// 源数据里的占位简介（["--"] / [""] 之类）归一为 []（原 bundle-authors.mjs 迁移时的清洗规则，随迁移脚本删除而移入）。
+const isStub = (bio) => !bio || !bio.length || bio.every((p) => !String(p).replace(/[-—\s]/g, ''));
+
 function toParagraphs(text, per = 3) {
   const sents = String(text).split(/(?<=。)/).map((s) => s.trim()).filter(Boolean);
   const out = [];
@@ -295,7 +298,7 @@ for (const [slug, info] of authors) {
     life: b.life || '',
     origin: b.origin || '',
     seal: (info.name || '')[0] || '',
-    bio: b.bio || [],
+    bio: isStub(b.bio) ? [] : b.bio,
     works: info.works,
   };
   const bk = authorBucket(slug);

@@ -74,10 +74,10 @@ There is no build or bundling step. Things you actually run:
    global search) and `data/manifest.json` (counts/pagination).
 2. `data/poems/<chunk>-<sub>.json` — **read-only** full 原文 detail, **100 poems/file**
    (each 1000-poem id-block is split into ten 100-poem sub-files so one poem view fetches ~40KB,
-   not a ~470KB whole chunk). See `tools/data/reshard-poems.mjs`.
+   not a ~470KB whole chunk; `flushChunk()` in `tools/data/prep.mjs` writes them).
 3. `data/annotations/<id>.json` — **hand-editable** overlay carrying 注释/译文/赏析/创作背景.
    Plus `data/authors/bucket-<000..255>.json` (author records `{slug: {bio, up to 50 works, …}}`,
-   bundled into 256 hash-shards — `loadAuthor` resolves `slug`→bucket; see `tools/data/bundle-authors.mjs`),
+   bundled into 256 hash-shards by `prep.mjs` — `loadAuthor` resolves `slug`→bucket with the same `authorBucket()`),
    `data/authors-index.json`
    (all poets sorted by output, for the 诗人 browse page), `data/about.json` (关于 page copy),
    `data/featured.json` (home-page pool: index rows of the ~3,200 poems whose annotation has
@@ -218,7 +218,8 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
   `.nojekyll`); `kyne/` and `liquidglass/` only hold the old-path redirect stubs; `assets/css/` and
   `assets/js/` hold browser-loaded front-end assets; `data/` holds committed static content; `tools/server/`,
   `tools/data/`, and `tools/annotations/` hold local preview, data generation, and annotation-import tooling
-  respectively.
+  respectively; `tools/lib/` holds the helpers those scripts share (paths, id/bucket/shard formulas re-exported from
+  `assets/js`, argv parsing) and `tools/tests/` the node:test suites; `tools/check.mjs` is `npm run check`.
 - **App shell** (`index.html`): the `<head>` prefs script, `viewport-fit=cover`, the `#qx-glass` SVG filter,
   the `.ambient` backdrop, a header of three `.capsule`s (brand, `.site-nav` with 首页/诗集/诗人/关于, icon
   `.theme-btn`) each with `.glass` span layers, the six `#page-*` containers, `#boot`, a compact footer card
