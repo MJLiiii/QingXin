@@ -260,9 +260,9 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
   `--ink` #1F1D1A (+`--ink-rgb`), `--body`, `--muted` #66625B (text on cards/chips/glass only, ≥5.2:1 there),
   `--muted-ambient` #4B4842 (small text sitting directly on the backdrop, ≥5.6:1 even where all three blobs
   overlap), `--muted-3`, `--line`, `--mark-bg`, `--selection`; ink-grey `--accent`/`--accent-rgb`/
-  `--accent-text`/`--accent-halo` (#57534E light; #C2B29A dark with `--accent-text` #D6C8AE — accent text
+  `--accent-text`/`--accent-halo` (#57534E light; #9FB3C8 dark with `--accent-text` #B7C7D8 — accent text
   only on cards); `--blob-*`; glass `--glass-*` (incl. `--glass-tint-strong` for the scrolled header),
-  `--pop-*`, `--seg-selected-*`; surfaces `--card-*` (dark cards are a warm tint, `rgba(48,42,35,.55)`),
+  `--pop-*`, `--seg-selected-*`; surfaces `--card-*` (dark cards are a blue-grey tint, `rgba(36,42,50,.55)`),
   `--row-hover-bg`, `--chip-*`, `--tile-bg`, `--input-bg`, `--nav-hover-bg`; seals `--seal-*`,
   `--tang-*`, `--song-*`; buttons `--btn-*`/`--btn2-*`; radii `--r-*`; motion `--ease`/`--dur`; layout
   `--max` 1360, `--gutter`, `--measure`, `--capsule-h`, `--header-h/gap/space`, `--sticky-top` (sticky
