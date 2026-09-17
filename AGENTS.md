@@ -30,14 +30,17 @@ There is no build or bundling step. Things you actually run:
   directory's `index.html`, which is how the old-path redirect stubs are reached).
   Do NOT use `python -m http.server` — it crashes under the preview launcher (`os.getcwd`).
 
-- **Check** (the closest thing to lint+tests — run after touching `assets/js/**`, `sw.js`, or `data/**`):
-  `cd tools && npm run check` — `node --check` syntax-checks every frontend/tool script, runs the unit
-  tests (`node --test tests/*.test.mjs`: search ranking + line search in `search-core.test.mjs`, shared
+- **Check** (the closest thing to lint+tests — run after touching `assets/js/**`, `sw.js`, `tools/**` or `data/**`):
+  `cd tools && npm run check` = `node check.mjs` (needs Node ≥ 22.7: the tests and tools import the
+  package.json-less `assets/js/*.js` modules and rely on module-syntax detection). It walks the tree and
+  `node --check`s every `assets/js/**/*.js`, `sw.js` and `tools/**/*.mjs` (new or deleted files are picked up
+  automatically; `node_modules/`, `.cache/` and iCloud conflict copies with a space+digit in the name are skipped),
+  runs the unit tests (`node --test tests/`: search ranking + line search in `search-core.test.mjs`, shared
   HTML helpers + utils in `templates.test.mjs`, page fragments in `glass-templates.test.mjs`), then
   runs `node data/validate.mjs`, a read-only data-consistency audit (manifest counts vs search/index
   rows, id→shard round-trip for every poem, author slug→bucket hits, annotation shape + `source` rules,
   `lines.json` rows vs annotations and poem text; exits 1 on any error, only warns about annotated poems
-  not yet in `lines.json`).
+  not yet in `lines.json`). `npm run validate` / `npm run featured` run the validator / `build-featured.mjs` alone.
 
 - **Regenerate the data** (only when refreshing/rebuilding `data/**`):
   ```bash
