@@ -211,7 +211,7 @@ HTTP-cache copy of a module can never be written back next to newer ones. It pre
 the HTTP cache so a new worker never mixes old and new modules; one missing entry fails the whole install.
 **Adding/renaming a frontend module or shell means updating its `SHELL` list** (`tools/tests/shell.test.mjs`
 asserts SHELL equals the four shell pages + `assets/css/*.css` + every `assets/js/**/*.js`)**; changing any cached format
-means bumping `CACHE_NAME`** (currently `qingxin-v12`; old caches are purged on activate). Also bump it when a
+means bumping `CACHE_NAME`** (currently `qingxin-v13`; old caches are purged on activate). Also bump it when a
 module drops an export another module used to import, so the new set is precached in one step.
 `index.html` reloads the page once when an old worker hands over (it checks for `qingxin-v1…v9` caches,
 whose modules don't match this shell — e.g. a v9 `router.js` still imports the removed Kyne renderers from
@@ -248,21 +248,21 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
 (`shell.test.mjs` asserts they are byte-equal).
 - **Liquid-glass design system** lives in `assets/css/glass.css` `:root` — app-style liquid glass (Apple
   Liquid Glass + the [svg-glass-navbar-effect](https://svg-glass-navbar-effect.webflow.io/) Webflow template),
-  light by default. **Layers:** a fixed `.ambient` backdrop (three blurred radial blobs `--blob-violet/cyan/
-  peach`, drifting via transform-only keyframes; static under reduced motion) → translucent content cards
-  (`.gcard`, `.pcard`, `.ptile`, `.tab-panel`, footer card: `--card-bg`/`--card-strong`, no
+  light by default. **Layers:** a fixed `.ambient` backdrop (three blurred radial blobs `--blob-1/2/3` in
+  paper-and-ink tones, drifting via transform-only keyframes; static under reduced motion) → translucent
+  content cards (`.gcard`, `.pcard`, `.ptile`, `.tab-panel`, footer card: `--card-bg`/`--card-strong`, no
   backdrop-filter — the backdrop is already soft) → floating glass controls. **Real glass** (`.glass` span
   layers: `__effect` = backdrop-filter + `filter: url(#qx-glass)`, then `__tint`, `__shine`) is used only on
   floating controls: the three header `.capsule`s, the phone `.tabbar`, the sticky `.tabs`, the `.tools-dock`
   and the `.pager` dock; `.search` (sticky) and `.gloss-pop` blur without the SVG filter. They never stack by
   construction (z-index: header/tab bar 30, tabs/pager/search 20, popover 40).
-  Token groups: ground/ink `--paper` #F4F4F6, `--surface` #FFF (opaque fallback), `--ink` #1C1C1E
-  (+`--ink-rgb`), `--body`, `--muted` #636368 (text on cards/chips/glass only, ≥4.9:1 there),
-  `--muted-ambient` #4A4A4F (small text sitting directly on the backdrop, ≥4.8:1 even where all three blobs
-  overlap), `--muted-3`, `--line`, `--mark-bg`, `--selection`; violet `--accent`/`--accent-rgb`/
-  `--accent-text`/`--accent-halo` (#6A3FD6 light; #996AFF dark with `--accent-text` #AB87FF — accent text
+  Token groups (the 宣纸 · 松烟墨 palette): ground/ink `--paper` #F4F2ED, `--surface` #FFF (opaque fallback),
+  `--ink` #1F1D1A (+`--ink-rgb`), `--body`, `--muted` #66625B (text on cards/chips/glass only, ≥5.2:1 there),
+  `--muted-ambient` #4B4842 (small text sitting directly on the backdrop, ≥5.6:1 even where all three blobs
+  overlap), `--muted-3`, `--line`, `--mark-bg`, `--selection`; ink-grey `--accent`/`--accent-rgb`/
+  `--accent-text`/`--accent-halo` (#57534E light; #C2B29A dark with `--accent-text` #D6C8AE — accent text
   only on cards); `--blob-*`; glass `--glass-*` (incl. `--glass-tint-strong` for the scrolled header),
-  `--pop-*`, `--seg-selected-*`; surfaces `--card-*` (dark cards are a dark tint, `rgba(18,18,22,.55)`),
+  `--pop-*`, `--seg-selected-*`; surfaces `--card-*` (dark cards are a warm tint, `rgba(48,42,35,.55)`),
   `--row-hover-bg`, `--chip-*`, `--tile-bg`, `--input-bg`, `--nav-hover-bg`; seals `--seal-*`,
   `--tang-*`, `--song-*`; buttons `--btn-*`/`--btn2-*`; radii `--r-*`; motion `--ease`/`--dur`; layout
   `--max` 1360, `--gutter`, `--measure`, `--capsule-h`, `--header-h/gap/space`, `--sticky-top` (sticky

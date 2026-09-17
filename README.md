@@ -6,7 +6,7 @@
 
 线上地址：<https://mjliiii.github.io/QingXin/>
 
-界面特点：悬浮胶囊导航（手机为底部标签栏）、彩色流光背景、今日一诗加搜索的简洁首页、原文与注解分栏。
+界面特点：悬浮胶囊导航（手机为底部标签栏）、素色流光背景、今日一诗加搜索的简洁首页、原文与注解分栏。
 
 站点早先同时提供 Kyne（黑白编辑排版）和 Liquid Glass 两种界面，现只保留 Liquid Glass。旧地址 `…/QingXin/kyne/`、`…/QingXin/liquidglass/`（含 `#/poem/…` 等路由）会自动跳到根地址的同一页。
 
