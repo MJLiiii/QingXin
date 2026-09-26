@@ -1,4 +1,4 @@
-/* annotate-scrape.mjs 与 crawl-all-authors.mjs 共用的命令行解析。
+/* annotate-scrape.mjs、crawl-all-authors.mjs 与 build-timezones.mjs 共用的命令行解析。
    （annotate-import.mjs 的 --src 多值、--limit 无守卫等语义不同，自带解析，不并入。） */
 export function flag(argv, name) {
   return argv.includes(name);

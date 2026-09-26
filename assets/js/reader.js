@@ -1,15 +1,25 @@
 /* 阅读体验：主题 / 字号 / 竖排偏好、原文工具栏（复制、分享）与注释浮层。
-   仅在浏览器中使用；偏好键 qingxin:prefs 与 index.html 的首帧脚本共用（诗文页标签另存 tab 键，见 glass-ui.js）。 */
+   仅在浏览器中使用；偏好键 qingxin:prefs 与 index.html 的首帧脚本共用（诗文页标签另存 tab 键，见 glass-ui.js）。
+   夜读随当地日出日落自动切换：手动选择存 theme + themeUntil（管到下一次日出或日落），其余时候当地入夜即夜读、
+   白天跟随系统；「当地」是本机时区的代表城市，坐标缓存在 qingxin:place。规则与天文计算见 daylight.js。 */
+import { fetchJSON } from './data.js';
+import { chosenTheme, localZone, matchPlace, themeFor, toggleOverride } from './daylight.js';
+
 var PREFS_KEY = 'qingxin:prefs';
+var PLACE_KEY = 'qingxin:place';
 var SCALES = [0.9, 1, 1.12, 1.25];
+var RECHECK_MS = 60 * 1000;
 
 var currentPoem = null;
 var pop = null;
 var popTrigger = null;
 var popScroller = null;
 var statusTimer = null;
+var sessionPrefs = null; // 存储写不进去（隐私模式、禁用网站数据）时本次会话的偏好
+var lookedUp = '';       // 本次会话已查过坐标表的时区
 
 export function readPrefs() {
+  if (sessionPrefs) return Object.assign({}, sessionPrefs);
   try {
     var prefs = JSON.parse(window.localStorage.getItem(PREFS_KEY));
     return prefs && typeof prefs === 'object' ? prefs : {};
@@ -18,18 +28,65 @@ export function readPrefs() {
   }
 }
 
+// 合并写入，值为 undefined 的键即删除；存储写不进去时只在本次会话生效（readPrefs 改读内存副本）。
 export function writePrefs(patch) {
-  var prefs = Object.assign(readPrefs(), patch);
+  var prefs = JSON.parse(JSON.stringify(Object.assign(readPrefs(), patch)));
   try {
     window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-  } catch (e) { /* 隐私模式等：仅本次会话生效 */ }
+    sessionPrefs = null;
+  } catch (e) {
+    sessionPrefs = prefs;
+  }
   return prefs;
+}
+
+function systemDark() {
+  return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
 }
 
 function isDark() {
   var theme = document.documentElement.getAttribute('data-theme');
   if (theme) return theme === 'dark';
-  return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  return systemDark();
+}
+
+// 本机时区代表城市的坐标（qingxin:place，时区对得上才用）→ {lat, lon} 或 null。
+function readPlace() {
+  try {
+    return matchPlace(JSON.parse(window.localStorage.getItem(PLACE_KEY)), localZone());
+  } catch (e) {
+    return null;
+  }
+}
+
+// 查 data/timezones.json 得到本机时区代表城市的坐标，存进 qingxin:place（首帧脚本下次直接用）后重算。
+// 每个时区每次会话只查一次；查不到（UTC 等）、取表失败或存不进去都不缓存，下次加载再说，其间按钟点。
+function learnPlace() {
+  var zone = localZone();
+  if (!zone || zone === lookedUp) return;
+  lookedUp = zone;
+  fetchJSON('data/timezones.json').then(function (table) {
+    var c = table && table.zones && table.zones[zone];
+    if (!Array.isArray(c)) return;
+    window.localStorage.setItem(PLACE_KEY, JSON.stringify({ zone: zone, lat: c[0], lon: c[1] }));
+    applyTheme();
+  }).catch(function () { /* 离线、存储被禁等 */ });
+}
+
+// 按手动选择与当地昼夜写 <html data-theme>（与首帧脚本同一规则），顺带清掉到期或旧版的手动选择。
+function applyTheme() {
+  var now = Date.now();
+  var prefs = readPrefs();
+  if ((prefs.theme !== undefined || prefs.themeUntil !== undefined) && !chosenTheme(prefs, now)) {
+    prefs = writePrefs({ theme: undefined, themeUntil: undefined });
+  }
+  var place = readPlace();
+  if (!place) learnPlace();
+  var theme = themeFor(prefs, place, now);
+  var root = document.documentElement;
+  if (!theme) root.removeAttribute('data-theme');
+  else if (root.getAttribute('data-theme') !== theme) root.setAttribute('data-theme', theme);
+  syncControls();
 }
 
 function scaleIndex() {
@@ -60,14 +117,22 @@ export function initReader() {
     var media = window.matchMedia('(prefers-color-scheme: dark)');
     if (media.addEventListener) media.addEventListener('change', syncControls);
   }
-  syncControls();
+  applyTheme();
+  // 页面开着跨过日出日落、手动选择到期：每分钟重算；切回前台、从往返缓存恢复、别的标签页改了偏好时立即重算。
+  window.setInterval(applyTheme, RECHECK_MS);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) applyTheme();
+  });
+  window.addEventListener('pageshow', applyTheme);
+  window.addEventListener('storage', function (e) {
+    if (e.key === null || e.key === PREFS_KEY || e.key === PLACE_KEY) applyTheme();
+  });
 }
 
+// 手动切换管到下一次日出或日落；切到与此刻自动结果相同的一边即回到自动（daylight.js toggleOverride）。
 function toggleTheme() {
-  var next = isDark() ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
-  writePrefs({ theme: next });
-  syncControls();
+  writePrefs(toggleOverride(isDark(), systemDark(), readPlace(), Date.now()));
+  applyTheme();
 }
 
 function stepScale(delta) {

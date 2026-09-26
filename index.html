@@ -7,11 +7,26 @@
   <meta name="description" content="情心 — 液态玻璃质感的古诗文赏读。今日一诗、诗集与诗人卡片，原文与注释、译文、赏析分栏对读。">
   <script>
     // 首帧前应用阅读偏好（主题 / 字号 / 竖排），避免闪烁；键名与 assets/js/reader.js 一致。
+    // 夜读：未到期的手动选择（theme，管到 themeUntil，即下一次日出或日落）优先；否则本机时区的代表城市
+    // （qingxin:place，reader.js 查表后存下）已入夜即夜读，没有坐标时按钟点 18:00–6:00；白天不写，跟随系统。
+    // 规则与算式抄自 assets/js/daylight.js（themeFor / matchPlace / isNight），tools/tests/theme-script.test.mjs 逐点核对。
     (function () {
+      var root = document.documentElement;
+      var prefs = {};
+      var place = null;
+      var zone = '';
+      try { prefs = JSON.parse(localStorage.getItem('qingxin:prefs')) || {}; } catch (e) {}
+      try { place = JSON.parse(localStorage.getItem('qingxin:place')); } catch (e) {}
+      try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
       try {
-        var prefs = JSON.parse(localStorage.getItem('qingxin:prefs')) || {};
-        var root = document.documentElement;
-        if (prefs.theme === 'dark' || prefs.theme === 'light') root.setAttribute('data-theme', prefs.theme);
+        var now = Date.now();
+        var until = prefs.themeUntil;
+        if (!(place && zone && place.zone === zone && Number.isFinite(place.lat) && Number.isFinite(place.lon))) place = null;
+        if ((prefs.theme === 'dark' || prefs.theme === 'light') && now < until && until - now <= 1728e5) {
+          root.setAttribute('data-theme', prefs.theme);
+        } else if (isNight(now, place)) {
+          root.setAttribute('data-theme', 'dark');
+        }
         var scale = Number(prefs.scale);
         if (scale >= 0.8 && scale <= 1.5) root.style.setProperty('--reading-scale', String(scale));
         if (prefs.vertical === true) root.setAttribute('data-vertical', '1');
@@ -22,6 +37,24 @@
           window.history.replaceState(window.history.state, '', window.location.pathname + window.location.hash);
         }
       } catch (e) {}
+
+      // 此刻是否已入夜：p = 本机时区代表城市的坐标时看太阳高度（USNO 近似太阳坐标），p 为 null 时看钟点。
+      function isNight(t, p) {
+        if (!p) {
+          var hour = new Date(t).getHours();
+          return hour >= 18 || hour < 6;
+        }
+        var r = Math.PI / 180;
+        var d = t / 864e5 - 10957.5;
+        var g = (357.529 + 0.98560028 * d) * r;
+        var l = (280.459 + 0.98564736 * d + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * r;
+        var e = (23.439 - 3.6e-7 * d) * r;
+        var ra = Math.atan2(Math.cos(e) * Math.sin(l), Math.cos(l));
+        var dec = Math.asin(Math.sin(e) * Math.sin(l));
+        var h = (280.46061837 + 360.98564736629 * d + p.lon) * r - ra;
+        var phi = p.lat * r;
+        return Math.asin(Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(h)) / r < -0.833;
+      }
     })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -60,7 +93,7 @@
       <a class="site-nav__link" href="#/authors" data-nav="authors">诗人</a>
       <a class="site-nav__link" href="#/about" data-nav="about">关于</a>
     </nav>
-    <button class="capsule theme-btn" type="button" data-action="theme" aria-pressed="false">
+    <button class="capsule theme-btn" type="button" data-action="theme" aria-pressed="false" title="日落后自动夜读、日出后恢复；手动切换保持到下一次日出或日落">
       <span class="glass" aria-hidden="true"><span class="glass__effect"></span><span class="glass__tint"></span><span class="glass__shine"></span></span>
       <svg class="icon theme-btn__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8"/><path class="fill" d="M12 4a8 8 0 0 1 0 16z"/></svg>
       <span class="theme-btn__label">夜读</span>

@@ -18,7 +18,7 @@
 - 搜索词写入地址栏：从结果进入诗词再返回，搜索词、结果和滚动位置都会保留；链接可在新标签页打开。
 - 诗人页支持按作品数浏览全部作者、近似姓名搜索，并可进入作者详情页。
 - 诗词详情页固定展示原文、注释、译文、赏析、创作背景五个板块；原文与词序中的注释词可点按查看释义，无内容的栏目标明“未收录”。宽屏上左栏钉住原文，右栏用分段标签切换注解，并记住上次看的栏目。
-- 阅读工具：复制全文、分享链接、原文竖排、字号调节，以及跟随系统或手动切换的夜读模式。
+- 阅读工具：复制全文、分享链接、原文竖排、字号调节，以及夜读模式：按本机时区代表城市的日出日落自动切换（例如上海夏天约 19 点、冬天约 17 点入夜；系统为深色时一直夜读），不向任何第三方发请求；手动切换保持到下一次日出或日落，之后恢复自动。
 - 注释、译文、赏析、创作背景使用独立叠加层维护，不需要修改大体量原文数据。
 - 可直接部署到 GitHub Pages、Netlify、Vercel 或任意静态文件服务。
 
@@ -107,7 +107,8 @@ QingXin/
 │       ├── glass-ui.js       # 界面交互：分段标签、首页搜索、钉住的阅读栏
 │       ├── pages.js          # 搜索 / 分页 / 今日一诗 / 诗文数据等辅助函数
 │       ├── weather.js        # 首页的当地天气（GeoJS 定位 + Open-Meteo）与天气标签
-│       ├── reader.js         # 阅读偏好、原文工具栏与注释浮层
+│       ├── reader.js         # 阅读偏好、夜读自动切换、原文工具栏与注释浮层
+│       ├── daylight.js       # 日出日落计算与夜读规则（纯函数）
 │       ├── glass-templates.js # 页面 HTML 片段构建
 │       ├── templates.js      # 通用 HTML 小工具（路由链接、命中高亮、注释词定位等）
 │       ├── search*.js        # 标题 / 作者 / 名句检索（含 Web Worker）
@@ -119,6 +120,7 @@ QingXin/
 │   ├── lines.json            # 名句检索语料：有注释诗词的正文
 │   ├── featured.json         # 首页精选池
 │   ├── weather.json          # 首页天气子池：各天气标签下的精选诗 id
+│   ├── timezones.json        # 时区 → 代表城市坐标（夜读按日出日落切换用，取自 IANA tzdata）
 │   ├── authors-index.json    # 作者索引，按作品数排序
 │   ├── about.json            # 关于页文案
 │   ├── index/page-*.json     # 诗集浏览索引，500 条/文件
@@ -131,6 +133,7 @@ QingXin/
     ├── data/
     │   ├── prep.mjs          # 从 chinese-poetry 生成 data/**
     │   ├── build-featured.mjs # 生成首页精选池、天气子池与名句检索语料
+    │   ├── build-timezones.mjs # 从 tzdata 生成时区坐标表
     │   └── validate.mjs      # 只读数据一致性校验
     ├── annotations/
     │   ├── annotate-import.mjs   # 从 chinese-gushiwen 数据集导入
@@ -140,7 +143,7 @@ QingXin/
     │   ├── gushiwen-client.mjs   # 礼貌的 HTTP 客户端（节流、重试、磁盘缓存）
     │   ├── gushiwen-parse.mjs    # 纯 HTML 解析
     │   └── annotate-lib.mjs      # 归一化、相似度、语料匹配、字段转换
-    ├── lib/                  # 脚本共用：路径、id/分桶/分片公式、参数解析、天气词表
+    ├── lib/                  # 脚本共用：路径、id/分桶/分片公式、参数解析、天气词表、tzdata 解析
     ├── tests/                # node:test 单元测试
     ├── check.mjs             # npm run check：语法检查 + 单元测试 + 数据校验
     └── package.json          # 工具脚本入口与依赖
@@ -154,7 +157,7 @@ QingXin/
 - `tools/server/` 放本地静态服务器。
 - `tools/data/` 放主数据生成脚本。
 - `tools/annotations/` 放注释导入、抓取、匹配和归一化脚本。
-- `tools/lib/` 放脚本共用的小模块（路径、id 公式、参数解析、天气词表）；id / 分桶公式直接复用前端的 `assets/js/data.js`，天气标签名复用 `assets/js/weather.js`。
+- `tools/lib/` 放脚本共用的小模块（路径、id 公式、参数解析、天气词表、tzdata 解析）；id / 分桶公式直接复用前端的 `assets/js/data.js`，天气标签名复用 `assets/js/weather.js`。
 
 ## 数据模型
 

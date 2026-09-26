@@ -125,7 +125,8 @@
 }
 
 /* 夜读：Rosé Pine Moon。只重定义 token；官方色直接用，淡墨 / 正文 / 宋印字色是向 Moon text 提亮的派生色。
-   默认跟随系统；页眉「夜读」写入 data-theme 后以其为准。 */
+   没有 data-theme 时跟随系统；当地入夜（dark）或手动切换（dark / light，管到下一次日出或日落）时由
+   index.html 首帧脚本与 reader.js 写入 data-theme，以其为准（规则见 assets/js/daylight.js）。 */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --paper: #232136;

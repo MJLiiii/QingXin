@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /* 只读数据一致性校验。
-   覆盖 manifest/search/index/poems/authors/annotations/featured/lines/weather 的运行时约束，
+   覆盖 manifest/search/index/poems/authors/annotations/featured/lines/weather/timezones 的运行时约束，
    不写入任何文件，适合放进 npm run check。
    严重度按影响分级：featured.json 缺失或为空 = error（首页 renderHome 直接 fetch 它，缺了页面就报错）；
    lines.json 缺失 = warning（诗集搜索只是退化为标题/作者匹配）；weather.json 缺失 = warning（首页回落到按日期选诗）。
-   三者都由 build-featured.mjs 生成。 */
+   三者都由 build-featured.mjs 生成。timezones.json（build-timezones.mjs 生成）缺失 = warning（夜读只能按钟点切换）。 */
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DATA } from '../lib/paths.mjs';
@@ -339,7 +339,42 @@ if (weather !== null) {
   }
 }
 
-console.log(`validate: poems=${searchIds.size}, indexRows=${indexRows}, authors=${authorIndex.length}, annotations=${annFiles.length}, featured=${featuredById.size}, lines=${lines ? lines.length : 0}, weather=${weatherIds}`);
+/* data/timezones.json（夜读按本机时区的日出日落自动切换，build-timezones.mjs 生成）：{tzdata, zones: {时区名: [纬度, 经度]}}。
+   缺失只报 warning（夜读回落到按钟点 18:00–6:00）；结构不对、坐标越界、项数过少、缺常用时区是 error；
+   本机 Node 的 ICU 报得出、表里却查不到的时区（UTC、Etc/* 除外）报 warning——那里的读者只能按钟点。 */
+let timezones = null;
+try {
+  timezones = await readJson(join(DATA, 'timezones.json'));
+} catch (e) {
+  if (e.code === 'ENOENT') {
+    addWarning('缺少 data/timezones.json(夜读只能按钟点 18:00–6:00 切换),请运行 node tools/data/build-timezones.mjs');
+  } else {
+    addError(`无法解析 data/timezones.json: ${e.message}`);
+  }
+}
+let timezoneCount = 0;
+if (timezones !== null) {
+  const zones = timezones && timezones.zones;
+  if (typeof timezones?.tzdata !== 'string' || !zones || typeof zones !== 'object' || isArray(zones)) {
+    addError('data/timezones.json 必须是 {tzdata: 版本, zones: {时区名: [纬度, 经度]}}');
+  } else {
+    for (const [name, c] of Object.entries(zones)) {
+      const ok = isArray(c) && c.length === 2 && c.every((x) => Number.isFinite(x)) && Math.abs(c[0]) <= 90 && Math.abs(c[1]) <= 180;
+      if (!ok) addError(`timezones.json ${name} 的坐标不是 [纬度, 经度]: ${JSON.stringify(c)}`);
+    }
+    timezoneCount = Object.keys(zones).length;
+    if (timezoneCount < 400) addError(`timezones.json 只有 ${timezoneCount} 个时区(应有 500 余个),生成时是否缺了 zone.tab`);
+    if (!zones['Asia/Shanghai']) addError('timezones.json 缺少 Asia/Shanghai');
+    if (!zones['Asia/Calcutta']) addError('timezones.json 缺少 Asia/Calcutta(V8 报的旧名,说明链接没有解析)');
+    const missing = Intl.supportedValuesOf('timeZone').filter((z) => !zones[z] && !/^(?:Etc\/|UTC$|GMT)/.test(z));
+    if (missing.length) {
+      addWarning(`timezones.json 查不到 ${missing.length} 个时区(如 ${missing.slice(0, 5).join(', ')}),那里的夜读只能按钟点;` +
+        '可用新版 tzdata 重跑 node tools/data/build-timezones.mjs');
+    }
+  }
+}
+
+console.log(`validate: poems=${searchIds.size}, indexRows=${indexRows}, authors=${authorIndex.length}, annotations=${annFiles.length}, featured=${featuredById.size}, lines=${lines ? lines.length : 0}, weather=${weatherIds}, timezones=${timezoneCount}`);
 for (const w of warnings) console.warn(`warning: ${w}`);
 if (errors.length) {
   for (const e of errors.slice(0, 50)) console.error(`error: ${e}`);

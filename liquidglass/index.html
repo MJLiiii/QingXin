@@ -9,9 +9,17 @@
   <script>
     // 旧地址（两套界面并存时的 kyne/、liquidglass/）：带着 #/… 路由跳到站点根目录，不留历史项。
     (function () {
+      // 跳转前一瞬间的底色：未到期的手动选择照用，否则按钟点 18:00–6:00 粗算夜读（等价于
+      // assets/js/daylight.js 的 themeFor(prefs, null, now)；日出日落留给根目录的首帧脚本，这里不再抄一份）。
+      var prefs = {};
+      try { prefs = JSON.parse(localStorage.getItem('qingxin:prefs')) || {}; } catch (e) {}
       try {
-        var prefs = JSON.parse(localStorage.getItem('qingxin:prefs')) || {};
-        if (prefs.theme === 'dark' || prefs.theme === 'light') document.documentElement.setAttribute('data-theme', prefs.theme);
+        var now = Date.now();
+        var until = prefs.themeUntil;
+        var hour = new Date(now).getHours();
+        var theme = (prefs.theme === 'dark' || prefs.theme === 'light') && now < until && until - now <= 1728e5
+          ? prefs.theme : (hour >= 18 || hour < 6 ? 'dark' : '');
+        if (theme) document.documentElement.setAttribute('data-theme', theme);
       } catch (e) {}
       // 旧版 Worker（qingxin-v1…v9）缓存里的根目录可能还是界面选择页，它会把 #/… 转回这里：
       // 从根目录转来时改去 ../?（缓存里没有的地址，只能取网络上的新页面），免得来回跳。
