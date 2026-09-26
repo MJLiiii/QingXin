@@ -11,6 +11,7 @@
     "serve": "node server/serve.mjs",
     "prep": "node data/prep.mjs",
     "featured": "node data/build-featured.mjs",
+    "timezones": "node data/build-timezones.mjs",
     "validate": "node data/validate.mjs",
     "annotate:import": "node annotations/annotate-import.mjs",
     "annotate:scrape": "node annotations/annotate-scrape.mjs",

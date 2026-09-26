@@ -8,7 +8,7 @@
    改动缓存格式时 bump CACHE_NAME，旧缓存在 activate 清除。
    Worker 放在站点根目录，由 index.html 以相对路径注册，作用域覆盖整站（GitHub Pages 子路径 /QingXin/ 亦可）；
    旧地址 kyne/、liquidglass/ 只剩跳转页，也预缓存，离线时旧链接照样能跳到根目录。 */
-const CACHE_NAME = 'qingxin-v13';
+const CACHE_NAME = 'qingxin-v14';
 const SHELL = [
   './',
   './index.html',
@@ -16,6 +16,7 @@ const SHELL = [
   './liquidglass/',
   './assets/css/glass.css',
   './assets/js/data.js',
+  './assets/js/daylight.js',
   './assets/js/glass-app.js',
   './assets/js/glass-pages.js',
   './assets/js/glass-templates.js',

@@ -41,14 +41,20 @@ There is no build or bundling step. Things you actually run:
   `glass-css.test.mjs`, the annotation matcher/parsers in `annotate-lib.test.mjs` + `gushiwen-parse.test.mjs`,
   the poem-page parts, 今日一诗 pick and weather pool in `pages.test.mjs`, the route keys in `router.test.mjs`, the
   weather-code mapping in `weather.test.mjs`, the weather lexicon in `weather-tags.test.mjs`, the id/bucket/shard
-  formulas against `data/manifest.json` plus the argv/readJson helpers in `ids.test.mjs`), then
+  formulas against `data/manifest.json` plus the argv/readJson helpers in `ids.test.mjs`, the sun math and 夜读
+  rules in `daylight.test.mjs`, the inline copies of those rules in the `index.html` head script and the redirect
+  stubs (run in `node:vm`, compared with `themeFor` point by point) in `theme-script.test.mjs`, the tzdata parser in
+  `tzdata.test.mjs`), then
   runs `node data/validate.mjs`, a read-only data-consistency audit (manifest counts vs search/index
   rows, id→shard round-trip for every poem, author slug→bucket hits, annotation shape + `source` rules,
   `featured.json` rows vs search/index (missing or empty = error, the home page fetches it directly),
   `lines.json` rows vs annotations and poem text, `weather.json` shape/tags/ids vs `featured.json`,
+  `timezones.json` shape and coordinate ranges (≥ 400 names; Asia/Shanghai and the legacy Asia/Calcutta must be there),
   `manifest.subChunkSize`/`pageSize` vs the `data.js` constants;
-  exits 1 on any error; warnings only for annotated poems not yet in `lines.json`, a missing `lines.json` or
-  `weather.json`, a `weather.json` that no longer matches the lexicon, and the poem-shard coverage estimate). `npm run validate` / `npm run featured` run the validator / `build-featured.mjs` alone.
+  exits 1 on any error; warnings only for annotated poems not yet in `lines.json`, a missing `lines.json`,
+  `weather.json` or `timezones.json`, a `weather.json` that no longer matches the lexicon, time zones Node's ICU
+  reports that `timezones.json` lacks, and the poem-shard coverage estimate). `npm run validate` / `npm run featured` /
+  `npm run timezones` run the validator / `build-featured.mjs` / `build-timezones.mjs` alone.
 
 - **Regenerate the data** (only when refreshing/rebuilding `data/**`):
   ```bash
@@ -59,6 +65,12 @@ There is no build or bundling step. Things you actually run:
   otherwise keep stale position-based ids) and does **not** rebuild them, so `build-featured.mjs` must follow —
   until it does the home page 404s and `npm run check` errors. `--include-song-shi` is not implemented:
   passing it exits 1 (宋诗 ~255k was never wired up).
+
+- **Refresh the timezone table** (only to pick up a newer tzdata): `cd tools && npm run timezones` rewrites
+  `data/timezones.json` from `/usr/share/zoneinfo` (`zone.tab` + `zone1970.tab` coordinates, `tzdata.zi` links) or
+  from `--zoneinfo <dir>` (an IANA source tree, links in `backward` etc.); a zoneinfo without link data (macOS) is
+  refused, since the legacy names V8 reports (Asia/Calcutta, Asia/Saigon, Europe/Kiev…) would be missing.
+  `prep.mjs` leaves the file alone.
 
 - **Fetch annotations** (optional, only when expanding 注释/译文/赏析/创作背景 coverage):
   `cd tools && node annotations/annotate-scrape.mjs <backfill|expand|id|authors …>` scrapes 古诗文网;
@@ -89,7 +101,10 @@ There is no build or bundling step. Things you actually run:
    identical (author, text) siblings collapsed — the corpus for 名句 line search) and `data/weather.json`
    (`{tags: {rain|snow|fog|wind|cloud|clear|moon|cold|heat: [featured id, …]}}`, the weather sub-pools of the
    home page, tagged by the keyword lexicon in `tools/lib/weather-tags.mjs`). All three derived files
-   come from `node tools/data/build-featured.mjs`; rerun it after coverage or lexicon changes.
+   come from `node tools/data/build-featured.mjs`; rerun it after coverage or lexicon changes. Separately,
+   `data/timezones.json` (`{tzdata, zones: {name: [lat, lon]}}`, one compact line: 542 IANA zone names, legacy
+   aliases included, → the zone's representative city from `zone.tab`, 0.1°; built by `tools/data/build-timezones.mjs`
+   via `tools/lib/tzdata.mjs`, where a zone's own coordinates always beat a link) lets 夜读 follow the local sun.
 
 **Poem IDs encode storage location:** `t<chunk>-<i>` (唐) / `c<chunk>-<i>` (宋词), where `i` is the
 0–999 position within the id-block, resolves to `data/poems/<chunk>-<⌊i/100⌋>.json[i%100]` — no
@@ -160,14 +175,33 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   scroll handler keeps an open popover on a pinned term (`repositionGloss()`, closes it if the term leaves
   the viewport) and toggles `.site-header[data-scrolled]`.
 - `reader.js` — browser-only reading layer: preferences in localStorage `qingxin:prefs`
-  (`theme`, `scale`, `vertical`, `tab`; `readPrefs`/`writePrefs` merge; an `open` key left by Kyne is
-  ignored), toolbar actions, and the single note popover (`openGloss`/`closeGloss`/`repositionGloss`; the k-th
+  (`theme` + `themeUntil`, `scale`, `vertical`, `tab`; `readPrefs`/`writePrefs` merge, a key patched to
+  `undefined` is deleted, and when `setItem` throws (private mode, site data blocked) the merged prefs live in
+  memory for the session; an `open` key left by Kyne is ignored), the automatic 夜读 (`applyTheme()` writes or
+  removes `<html data-theme>` from `themeFor()`, clearing an expired or old permanent `theme`; it runs at start-up,
+  every 60 s, on `visibilitychange`/`pageshow` and on `storage` events; `learnPlace()` fetches
+  `data/timezones.json` once per zone per session and caches the zone's coordinates in localStorage
+  `qingxin:place` = `{zone, lat, lon}`; nothing is cached for zones without coordinates; the 夜读 button writes
+  `toggleOverride()`), toolbar actions, and the single note popover (`openGloss`/`closeGloss`/`repositionGloss`; the k-th
   `.gloss` term maps to the k-th `.notes__row`; the popover is absolute in document coordinates, or `fixed`
   when its term sits inside a `[data-pinned]` column; it keeps clear of `--pop-inset-top/-bottom`, lengths
   `glass.css` registers with `@property` for the floating header and tab bar). `expandNotes` (查看全部注释)
   dispatches a bubbling `qx:expand-notes` event on the notes section before scrolling to it. The inline
-  `<head>` script in `index.html` applies theme/scale/vertical before first paint (the redirect stubs apply
-  only the theme) — keep its key and fields in sync with `reader.js`.
+  `<head>` script in `index.html` applies theme/scale/vertical before first paint, carrying its own copy of
+  `themeFor`/`matchPlace`/`isNight` (the modules have not loaded yet); the redirect stubs apply only the theme,
+  with the clock rule instead of the sun. Keep the keys and fields in sync with `reader.js` and the rules in sync
+  with `daylight.js` — `tools/tests/theme-script.test.mjs` runs the inline scripts and fails on any drift.
+- `daylight.js` — the automatic 夜读, all pure functions: `sunAltitude()` (USNO approximate solar
+  coordinates, sunrise/sunset within a minute), `isNight(ms, place)` (sun below −0.833°; without coordinates the
+  local clock, 18:00–6:00), `nextChange()` (the next sunrise/sunset, or `null` in polar day/night),
+  `localZone()`, `matchPlace()` (a cached place counts only for the zone it was looked up for), `chosenTheme()`
+  (a manual choice counts only while `now < themeUntil ≤ now + 48 h`), `themeFor(prefs, place, now)` (valid
+  manual choice, else `'dark'` at night, else `null` = leave it to `prefers-color-scheme`) and
+  `toggleOverride()` (the 夜读 button: pressing to the side the automatic rule would pick right now clears the
+  choice; otherwise it holds until the next sunrise/sunset, 24 h in polar day/night). So 夜读 turns on when the
+  system is dark or the sun has set at the representative city of the device's time zone; no request leaves the
+  site. To preview, pick a time zone in DevTools' Sensors panel; a place cached for another zone is ignored and
+  refetched.
 - `data.js` — `fetchJSON()` (memoized via a `Map`; errors carry `status`; `data/…` paths resolve against
   the site root via `import.meta.url`, not the page),
   `parseId()`/`loadPoem()` (`SUB_CHUNK` = poems per sub-file, must equal `manifest.subChunkSize`),
@@ -196,8 +230,9 @@ See `parseId()`/`loadPoem()` in `assets/js/data.js`. The flagship 水调歌头 i
   `emptyState`, `glossTerm`/`glossLines`, `errorSection` (the router's render-failure fallback),
   `searchBoxHTML`); `utils.js` — `esc()`,
   `hashPath()`/`hrefFor()`,
-  `groupStanzas()`, `idle()`, `localDateKey()`, `seededRandom()`. These, `glass-templates.js`, `pages.js`, `weather.js` and
-  `router.js` (and therefore everything they import: `data.js`, `search.js`, `search-core.js`, `reader.js`) are
+  `groupStanzas()`, `idle()`, `localDateKey()`, `seededRandom()`. These, `glass-templates.js`, `pages.js`, `weather.js`,
+  `daylight.js` and `router.js` (and therefore everything they import: `data.js`, `search.js`, `search-core.js`,
+  `reader.js`) are
   imported by the Node unit tests, so they must not touch `window`/`document`/`localStorage` at import time —
   browser globals may only be read inside functions.
 
@@ -211,7 +246,7 @@ HTTP-cache copy of a module can never be written back next to newer ones. It pre
 the HTTP cache so a new worker never mixes old and new modules; one missing entry fails the whole install.
 **Adding/renaming a frontend module or shell means updating its `SHELL` list** (`tools/tests/shell.test.mjs`
 asserts SHELL equals the four shell pages + `assets/css/*.css` + every `assets/js/**/*.js`)**; changing any cached format
-means bumping `CACHE_NAME`** (currently `qingxin-v13`; old caches are purged on activate). Also bump it when a
+means bumping `CACHE_NAME`** (currently `qingxin-v14`; old caches are purged on activate). Also bump it when a
 module drops an export another module used to import, so the new set is precached in one step.
 `index.html` reloads the page once when an old worker hands over (it checks for `qingxin-v1…v9` caches,
 whose modules don't match this shell — e.g. a v9 `router.js` still imports the removed Kyne renderers from
@@ -290,6 +325,8 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
   `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {…} }` and
   `:root[data-theme="dark"] {…}` — so never hard-code a color: add a token to `:root` and to both dark
   blocks (`tools/tests/glass-css.test.mjs` asserts the two blocks declare the same tokens with the same values).
+  Nothing in CSS knows about the automatic switch: with no `data-theme` the system decides, and the head script /
+  `reader.js` write `data-theme="dark"` after local sunset or `dark`/`light` for a manual choice (see `daylight.js`).
   Reading text sizes are `calc(<px> * var(--reading-scale))` (including the mobile media
   queries). Vertical 原文 is `:root[data-vertical="1"] .original__body` — the scroll container itself is
   `vertical-rl`, so it opens on the first column (left-aligned, `margin: 0`), and a left-edge shadow
