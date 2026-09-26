@@ -2,80 +2,82 @@
    情心 · 古诗文网站 —— Liquid Glass 界面
    应用式悬浮布局：玻璃胶囊控件浮在内容之上（页眉三胶囊、手机底部标签栏、
    分段标签、工具 / 分页胶囊），素色流光背景，今日一诗 + 搜索的首页与卡片网格。
-   标记由 glass-pages.js / glass-templates.js 生成；浅色默认 + 夜读同构；宣纸 · 松烟墨配色
+   标记由 glass-pages.js / glass-templates.js 生成；浅色默认 + 夜读同构；Rosé Pine Dawn / Moon 配色
    =========================================================== */
 
+/* 白天：Rosé Pine Dawn（https://rosepinetheme.com/）。官方色直接用；只有官方色在最坏底色上达不到本站
+   对比度下限的几处（淡墨、点缀文字、印章字色）用同色相加深的派生色，注释里写明出处。 */
 :root {
-  --paper: #F4F2ED;   /* 宣纸底色（经 body 传到画布） */
-  --surface: #FFFFFF; /* 不透明浮层：玻璃的兜底色（无 backdrop-filter / 降低透明度） */
-  --ink: #1F1D1A;     /* 墨色：标题与强调 */
-  --ink-rgb: 31, 29, 26; /* = --ink 的 RGB 分量，供半透明墨色 rgba(var(--ink-rgb), α) 复用 */
-  --body: #3B3833;    /* 正文墨 */
-  --muted: #66625B;   /* 淡墨：只用在卡片 / 胶囊 / 玻璃上（最坏底色约 5.3:1） */
-  --muted-ambient: #4B4842; /* 直接压在流光背景上的小字（三团光叠加处仍约 5.7:1） */
-  --muted-3: #46433E; /* 注释墨 */
+  --paper: #FAF4ED;   /* Dawn base（经 body 传到画布） */
+  --surface: #FFFAF3; /* Dawn surface：不透明浮层，玻璃的兜底色（无 backdrop-filter / 降低透明度） */
+  --ink: #464261;     /* Dawn text（v4）：标题与强调 */
+  --ink-rgb: 70, 66, 97; /* = --ink 的 RGB 分量，供半透明墨色 rgba(var(--ink-rgb), α) 复用 */
+  --body: #575279;    /* Dawn text：正文 */
+  --muted: #605C7A;   /* subtle 向 text 加深：只用在卡片 / 胶囊 / 玻璃上（最坏底色约 5.4:1） */
+  --muted-ambient: #464261; /* 直接压在流光背景上的小字（三团光叠加处仍约 6.3:1） */
+  --muted-3: #575279; /* 注释字色 */
   --line: rgba(var(--ink-rgb), 0.1);           /* 1px 结构细线 */
   --mark-bg: rgba(var(--accent-rgb), 0.14);    /* 搜索命中、注释词悬停 */
   --selection: rgba(var(--accent-rgb), 0.2);
 
-  /* 松烟墨点缀：只做小面积提示，状态永远另有下划线 / 填充 / 虚线等非颜色线索 */
-  --accent: #57534E;       /* 非文字界面：焦点环、描边、下划线 */
-  --accent-rgb: 87, 83, 78;
-  --accent-text: #57534E;  /* 作文字用的点缀色（卡片上 ≥5:1；不直接压在背景上） */
+  /* Iris 点缀：只做小面积提示，状态永远另有下划线 / 填充 / 虚线等非颜色线索 */
+  --accent: #907AA9;       /* Dawn iris：非文字界面：焦点环、描边、下划线 */
+  --accent-rgb: 144, 122, 169;
+  --accent-text: #60567A;  /* iris 加深，作文字用的点缀色（卡片上 ≥5:1；不直接压在背景上） */
   --accent-halo: rgba(var(--accent-rgb), 0.18);
 
-  /* 流光背景：三团柔光（米黄 / 石灰 / 麻色），只动 transform */
-  --blob-1: rgba(196, 180, 150, 0.34);
-  --blob-2: rgba(160, 165, 160, 0.26);
-  --blob-3: rgba(214, 196, 168, 0.3);
+  /* 流光背景：三团柔光（rose / iris / gold），只动 transform */
+  --blob-1: rgba(215, 130, 126, 0.16);
+  --blob-2: rgba(144, 122, 169, 0.14);
+  --blob-3: rgba(234, 157, 52, 0.12);
 
   /* 玻璃（悬浮控件 / 注释浮层） */
-  --glass-tint: rgba(255, 255, 255, 0.66);
-  --glass-tint-strong: rgba(255, 255, 255, 0.8);
-  --glass-tint-solid: rgba(255, 255, 255, 0.94);
-  --glass-shine-1: rgba(255, 255, 255, 0.75);
-  --glass-shine-2: rgba(255, 255, 255, 0.95);
+  --glass-tint: rgba(255, 250, 243, 0.66);
+  --glass-tint-strong: rgba(255, 250, 243, 0.8);
+  --glass-tint-solid: rgba(255, 250, 243, 0.94);
+  --glass-shine-1: rgba(255, 250, 243, 0.75);
+  --glass-shine-2: rgba(255, 250, 243, 0.95);
   --glass-border: rgba(var(--ink-rgb), 0.08);
   --glass-shadow: 0 0 20px rgba(0, 0, 0, 0.05), 0 6px 16px rgba(0, 0, 0, 0.08);
   --glass-blur: 4px;
   --glass-saturate: 1.6;
-  --pop-tint: rgba(255, 255, 255, 0.86);
+  --pop-tint: rgba(255, 250, 243, 0.86);
   --pop-blur: 20px;
   --pop-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
-  --seg-selected-bg: rgba(255, 255, 255, 0.96);
+  --seg-selected-bg: rgba(255, 250, 243, 0.96);
   --seg-selected-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 3px 10px rgba(0, 0, 0, 0.06);
 
   /* 内容卡片：半透明（背景本身是柔光，不必再模糊） */
-  --card-bg: rgba(255, 255, 255, 0.68);
-  --card-bg-hover: rgba(255, 255, 255, 0.86);
-  --card-strong: rgba(255, 255, 255, 0.82); /* 今日一诗、原文、资料卡 */
+  --card-bg: rgba(255, 250, 243, 0.68);
+  --card-bg-hover: rgba(255, 250, 243, 0.86);
+  --card-strong: rgba(255, 250, 243, 0.82); /* 今日一诗、原文、资料卡 */
   --card-border: rgba(var(--ink-rgb), 0.07);
   --card-border-hover: rgba(var(--ink-rgb), 0.2);
-  --card-shine: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px -12px rgba(60, 50, 35, 0.16);
-  --card-glow: rgba(196, 180, 150, 0.16);
-  --card-glow-2: rgba(160, 165, 160, 0.12);
+  --card-shine: inset 0 1px 0 rgba(255, 250, 243, 0.9);
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px -12px rgba(70, 66, 97, 0.16);
+  --card-glow: rgba(215, 130, 126, 0.14);
+  --card-glow-2: rgba(144, 122, 169, 0.12);
   --row-hover-bg: rgba(var(--ink-rgb), 0.04);
-  --chip-bg: rgba(255, 255, 255, 0.72);
+  --chip-bg: rgba(255, 250, 243, 0.72);
   --chip-border: rgba(var(--ink-rgb), 0.12);
   --tile-bg: rgba(var(--ink-rgb), 0.04);
-  --input-bg: rgba(255, 255, 255, 0.72);
+  --input-bg: rgba(255, 250, 243, 0.72);
   --nav-hover-bg: rgba(var(--ink-rgb), 0.06);
 
-  /* 印章头像（唐墨灰 / 宋茶褐） */
+  /* 印章头像（唐 pine / 宋 love，字色各自加深） */
   --seal-bg: rgba(var(--ink-rgb), 0.06);
   --seal-fg: var(--ink);
-  --tang-bg: rgba(87, 83, 78, 0.1);
-  --tang-fg: #45413C;
-  --song-bg: rgba(150, 120, 80, 0.12);
-  --song-fg: #6B5335;
+  --tang-bg: rgba(40, 105, 131, 0.1);
+  --tang-fg: #285B74;
+  --song-bg: rgba(180, 99, 122, 0.1);
+  --song-fg: #74465D;
 
   /* 按钮：主按钮（填充）/ 次按钮（点缀色描边） */
-  --btn-bg: #1F1D1A;
-  --btn-bg-hover: #3B3833;
-  --btn-fg: #FFFFFF;
-  --btn2-bg: rgba(255, 255, 255, 0.72);
-  --btn2-bg-hover: #FFFFFF;
+  --btn-bg: #464261;
+  --btn-bg-hover: #575279;
+  --btn-fg: #FFFAF3;
+  --btn2-bg: rgba(255, 250, 243, 0.72);
+  --btn2-bg-hover: #FFFAF3;
 
   /* 圆角 / 动效 */
   --r-sm: 8px;
@@ -122,122 +124,123 @@
   initial-value: 0px;
 }
 
-/* 夜读（黛蓝夜：冷调蓝灰深底，文字保留宣纸的米白）：只重定义 token。默认跟随系统；页眉「夜读」写入 data-theme 后以其为准。 */
+/* 夜读：Rosé Pine Moon。只重定义 token；官方色直接用，淡墨 / 正文 / 宋印字色是向 Moon text 提亮的派生色。
+   默认跟随系统；页眉「夜读」写入 data-theme 后以其为准。 */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #191D22;
-    --surface: #232830;
-    --ink: #ECE8E0;
-    --ink-rgb: 236, 232, 224;
-    --body: #CCCAC4;
-    --muted: #A7ADB4;
-    --muted-ambient: #CDD1D6;
-    --muted-3: #CDD1D6;
+    --paper: #232136;
+    --surface: #2A273F;
+    --ink: #E0DEF4;
+    --ink-rgb: 224, 222, 244;
+    --body: #D4D2E9;
+    --muted: #ACA9C4;
+    --muted-ambient: #CCCAE2;
+    --muted-3: #CCCAE2;
     --line: rgba(var(--ink-rgb), 0.12);
     --mark-bg: rgba(var(--accent-rgb), 0.26);
     --selection: rgba(var(--accent-rgb), 0.4);
-    --accent: #9FB3C8;
-    --accent-rgb: 159, 179, 200;
-    --accent-text: #B7C7D8;
+    --accent: #C4A7E7;
+    --accent-rgb: 196, 167, 231;
+    --accent-text: #C4A7E7;
     --accent-halo: rgba(var(--accent-rgb), 0.28);
-    --blob-1: rgba(90, 120, 160, 0.2);
-    --blob-2: rgba(100, 130, 140, 0.14);
-    --blob-3: rgba(140, 140, 150, 0.1);
-    --glass-tint: rgba(28, 33, 40, 0.72);
-    --glass-tint-strong: rgba(28, 33, 40, 0.84);
-    --glass-tint-solid: rgba(28, 33, 40, 0.95);
-    --glass-shine-1: rgba(235, 240, 250, 0.3);
-    --glass-shine-2: rgba(235, 240, 250, 0.3);
-    --glass-border: rgba(220, 230, 245, 0.1);
+    --blob-1: rgba(196, 167, 231, 0.12);
+    --blob-2: rgba(62, 143, 176, 0.14);
+    --blob-3: rgba(234, 154, 151, 0.08);
+    --glass-tint: rgba(35, 33, 54, 0.72);
+    --glass-tint-strong: rgba(35, 33, 54, 0.84);
+    --glass-tint-solid: rgba(35, 33, 54, 0.95);
+    --glass-shine-1: rgba(224, 222, 244, 0.3);
+    --glass-shine-2: rgba(224, 222, 244, 0.3);
+    --glass-border: rgba(224, 222, 244, 0.1);
     --glass-shadow: 0 0 20px rgba(0, 0, 0, 0.1), 0 6px 6px rgba(0, 0, 0, 0.2);
-    --pop-tint: rgba(34, 40, 48, 0.9);
+    --pop-tint: rgba(42, 39, 63, 0.9);
     --pop-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
-    --seg-selected-bg: rgba(235, 240, 250, 0.14);
-    --seg-selected-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(235, 240, 250, 0.12);
-    --card-bg: rgba(36, 42, 50, 0.55);
-    --card-bg-hover: rgba(48, 55, 65, 0.7);
-    --card-strong: rgba(36, 42, 50, 0.72);
-    --card-border: rgba(220, 230, 245, 0.1);
-    --card-border-hover: rgba(220, 230, 245, 0.3);
-    --card-shine: inset 0 1px 0 rgba(235, 240, 250, 0.06);
+    --seg-selected-bg: rgba(224, 222, 244, 0.14);
+    --seg-selected-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(224, 222, 244, 0.12);
+    --card-bg: rgba(42, 39, 63, 0.55);
+    --card-bg-hover: rgba(57, 53, 82, 0.7);
+    --card-strong: rgba(42, 39, 63, 0.72);
+    --card-border: rgba(224, 222, 244, 0.1);
+    --card-border-hover: rgba(224, 222, 244, 0.3);
+    --card-shine: inset 0 1px 0 rgba(224, 222, 244, 0.06);
     --card-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.5);
-    --card-glow: rgba(90, 120, 160, 0.16);
-    --card-glow-2: rgba(100, 130, 140, 0.1);
-    --row-hover-bg: rgba(220, 230, 245, 0.06);
-    --chip-bg: rgba(36, 42, 50, 0.55);
-    --chip-border: rgba(220, 230, 245, 0.16);
-    --tile-bg: rgba(220, 230, 245, 0.05);
-    --input-bg: rgba(36, 42, 50, 0.55);
-    --nav-hover-bg: rgba(220, 230, 245, 0.08);
-    --seal-bg: rgba(220, 230, 245, 0.08);
-    --tang-bg: rgba(159, 179, 200, 0.16);
-    --tang-fg: #D6E0EA;
-    --song-bg: rgba(190, 170, 140, 0.16);
-    --song-fg: #E6DCCB;
-    --btn-bg: #ECE8E0;
-    --btn-bg-hover: #D8D4CC;
-    --btn-fg: #191D22;
-    --btn2-bg: #1F242B;
-    --btn2-bg-hover: #2A3039;
+    --card-glow: rgba(196, 167, 231, 0.12);
+    --card-glow-2: rgba(62, 143, 176, 0.1);
+    --row-hover-bg: rgba(224, 222, 244, 0.06);
+    --chip-bg: rgba(42, 39, 63, 0.55);
+    --chip-border: rgba(224, 222, 244, 0.16);
+    --tile-bg: rgba(224, 222, 244, 0.05);
+    --input-bg: rgba(42, 39, 63, 0.55);
+    --nav-hover-bg: rgba(224, 222, 244, 0.08);
+    --seal-bg: rgba(224, 222, 244, 0.08);
+    --tang-bg: rgba(62, 143, 176, 0.18);
+    --tang-fg: #9CCFD8;
+    --song-bg: rgba(234, 154, 151, 0.14);
+    --song-fg: #E6B5BC;
+    --btn-bg: #E0DEF4;
+    --btn-bg-hover: #C8C5DE;
+    --btn-fg: #232136;
+    --btn2-bg: #2A273F;
+    --btn2-bg-hover: #393552;
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --paper: #191D22;
-  --surface: #232830;
-  --ink: #ECE8E0;
-  --ink-rgb: 236, 232, 224;
-  --body: #CCCAC4;
-  --muted: #A7ADB4;
-  --muted-ambient: #CDD1D6;
-  --muted-3: #CDD1D6;
+  --paper: #232136;
+  --surface: #2A273F;
+  --ink: #E0DEF4;
+  --ink-rgb: 224, 222, 244;
+  --body: #D4D2E9;
+  --muted: #ACA9C4;
+  --muted-ambient: #CCCAE2;
+  --muted-3: #CCCAE2;
   --line: rgba(var(--ink-rgb), 0.12);
   --mark-bg: rgba(var(--accent-rgb), 0.26);
   --selection: rgba(var(--accent-rgb), 0.4);
-  --accent: #9FB3C8;
-  --accent-rgb: 159, 179, 200;
-  --accent-text: #B7C7D8;
+  --accent: #C4A7E7;
+  --accent-rgb: 196, 167, 231;
+  --accent-text: #C4A7E7;
   --accent-halo: rgba(var(--accent-rgb), 0.28);
-  --blob-1: rgba(90, 120, 160, 0.2);
-  --blob-2: rgba(100, 130, 140, 0.14);
-  --blob-3: rgba(140, 140, 150, 0.1);
-  --glass-tint: rgba(28, 33, 40, 0.72);
-  --glass-tint-strong: rgba(28, 33, 40, 0.84);
-  --glass-tint-solid: rgba(28, 33, 40, 0.95);
-  --glass-shine-1: rgba(235, 240, 250, 0.3);
-  --glass-shine-2: rgba(235, 240, 250, 0.3);
-  --glass-border: rgba(220, 230, 245, 0.1);
+  --blob-1: rgba(196, 167, 231, 0.12);
+  --blob-2: rgba(62, 143, 176, 0.14);
+  --blob-3: rgba(234, 154, 151, 0.08);
+  --glass-tint: rgba(35, 33, 54, 0.72);
+  --glass-tint-strong: rgba(35, 33, 54, 0.84);
+  --glass-tint-solid: rgba(35, 33, 54, 0.95);
+  --glass-shine-1: rgba(224, 222, 244, 0.3);
+  --glass-shine-2: rgba(224, 222, 244, 0.3);
+  --glass-border: rgba(224, 222, 244, 0.1);
   --glass-shadow: 0 0 20px rgba(0, 0, 0, 0.1), 0 6px 6px rgba(0, 0, 0, 0.2);
-  --pop-tint: rgba(34, 40, 48, 0.9);
+  --pop-tint: rgba(42, 39, 63, 0.9);
   --pop-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
-  --seg-selected-bg: rgba(235, 240, 250, 0.14);
-  --seg-selected-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(235, 240, 250, 0.12);
-  --card-bg: rgba(36, 42, 50, 0.55);
-  --card-bg-hover: rgba(48, 55, 65, 0.7);
-  --card-strong: rgba(36, 42, 50, 0.72);
-  --card-border: rgba(220, 230, 245, 0.1);
-  --card-border-hover: rgba(220, 230, 245, 0.3);
-  --card-shine: inset 0 1px 0 rgba(235, 240, 250, 0.06);
+  --seg-selected-bg: rgba(224, 222, 244, 0.14);
+  --seg-selected-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(224, 222, 244, 0.12);
+  --card-bg: rgba(42, 39, 63, 0.55);
+  --card-bg-hover: rgba(57, 53, 82, 0.7);
+  --card-strong: rgba(42, 39, 63, 0.72);
+  --card-border: rgba(224, 222, 244, 0.1);
+  --card-border-hover: rgba(224, 222, 244, 0.3);
+  --card-shine: inset 0 1px 0 rgba(224, 222, 244, 0.06);
   --card-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.5);
-  --card-glow: rgba(90, 120, 160, 0.16);
-  --card-glow-2: rgba(100, 130, 140, 0.1);
-  --row-hover-bg: rgba(220, 230, 245, 0.06);
-  --chip-bg: rgba(36, 42, 50, 0.55);
-  --chip-border: rgba(220, 230, 245, 0.16);
-  --tile-bg: rgba(220, 230, 245, 0.05);
-  --input-bg: rgba(36, 42, 50, 0.55);
-  --nav-hover-bg: rgba(220, 230, 245, 0.08);
-  --seal-bg: rgba(220, 230, 245, 0.08);
-  --tang-bg: rgba(159, 179, 200, 0.16);
-  --tang-fg: #D6E0EA;
-  --song-bg: rgba(190, 170, 140, 0.16);
-  --song-fg: #E6DCCB;
-  --btn-bg: #ECE8E0;
-  --btn-bg-hover: #D8D4CC;
-  --btn-fg: #191D22;
-  --btn2-bg: #1F242B;
-  --btn2-bg-hover: #2A3039;
+  --card-glow: rgba(196, 167, 231, 0.12);
+  --card-glow-2: rgba(62, 143, 176, 0.1);
+  --row-hover-bg: rgba(224, 222, 244, 0.06);
+  --chip-bg: rgba(42, 39, 63, 0.55);
+  --chip-border: rgba(224, 222, 244, 0.16);
+  --tile-bg: rgba(224, 222, 244, 0.05);
+  --input-bg: rgba(42, 39, 63, 0.55);
+  --nav-hover-bg: rgba(224, 222, 244, 0.08);
+  --seal-bg: rgba(224, 222, 244, 0.08);
+  --tang-bg: rgba(62, 143, 176, 0.18);
+  --tang-fg: #9CCFD8;
+  --song-bg: rgba(234, 154, 151, 0.14);
+  --song-fg: #E6B5BC;
+  --btn-bg: #E0DEF4;
+  --btn-bg-hover: #C8C5DE;
+  --btn-fg: #232136;
+  --btn2-bg: #2A273F;
+  --btn2-bg-hover: #393552;
   color-scheme: dark;
 }
 

@@ -249,20 +249,24 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
 - **Liquid-glass design system** lives in `assets/css/glass.css` `:root` — app-style liquid glass (Apple
   Liquid Glass + the [svg-glass-navbar-effect](https://svg-glass-navbar-effect.webflow.io/) Webflow template),
   light by default. **Layers:** a fixed `.ambient` backdrop (three blurred radial blobs `--blob-1/2/3` in
-  paper-and-ink tones, drifting via transform-only keyframes; static under reduced motion) → translucent
+  Rosé Pine tones — rose/iris/gold light, iris/pine/rose dark — drifting via transform-only keyframes;
+  static under reduced motion) → translucent
   content cards (`.gcard`, `.pcard`, `.ptile`, `.tab-panel`, footer card: `--card-bg`/`--card-strong`, no
   backdrop-filter — the backdrop is already soft) → floating glass controls. **Real glass** (`.glass` span
   layers: `__effect` = backdrop-filter + `filter: url(#qx-glass)`, then `__tint`, `__shine`) is used only on
   floating controls: the three header `.capsule`s, the phone `.tabbar`, the sticky `.tabs`, the `.tools-dock`
   and the `.pager` dock; `.search` (sticky) and `.gloss-pop` blur without the SVG filter. They never stack by
   construction (z-index: header/tab bar 30, tabs/pager/search 20, popover 40).
-  Token groups (the 宣纸 · 松烟墨 palette): ground/ink `--paper` #F4F2ED, `--surface` #FFF (opaque fallback),
-  `--ink` #1F1D1A (+`--ink-rgb`), `--body`, `--muted` #66625B (text on cards/chips/glass only, ≥5.2:1 there),
-  `--muted-ambient` #4B4842 (small text sitting directly on the backdrop, ≥5.6:1 even where all three blobs
-  overlap), `--muted-3`, `--line`, `--mark-bg`, `--selection`; ink-grey `--accent`/`--accent-rgb`/
-  `--accent-text`/`--accent-halo` (#57534E light; #9FB3C8 dark with `--accent-text` #B7C7D8 — accent text
-  only on cards); `--blob-*`; glass `--glass-*` (incl. `--glass-tint-strong` for the scrolled header),
-  `--pop-*`, `--seg-selected-*`; surfaces `--card-*` (dark cards are a blue-grey tint, `rgba(36,42,50,.55)`),
+  Token groups (the [Rosé Pine](https://rosepinetheme.com/) palette: **Dawn** light, **Moon** for 夜读; official
+  hex values wherever they meet the contrast floors below, same-hue darkened (Dawn) / lightened (Moon) shades
+  only where they don't — muted text, accent text, seal glyphs): ground/ink `--paper` #FAF4ED (Dawn base),
+  `--surface` #FFFAF3 (opaque fallback), `--ink` #464261 (+`--ink-rgb`), `--body` #575279, `--muted` #605C7A
+  (text on cards/chips/glass only, ≥5.2:1 there), `--muted-ambient` #464261 (small text sitting directly on the
+  backdrop, ≥5.6:1 even where all three blobs overlap), `--muted-3`, `--line`, `--mark-bg`, `--selection`;
+  iris `--accent`/`--accent-rgb`/`--accent-text`/`--accent-halo` (#907AA9 light with `--accent-text` #60567A;
+  #C4A7E7 dark for both — accent text only on cards); `--blob-*`; glass `--glass-*` (incl. `--glass-tint-strong`
+  for the scrolled header), `--pop-*`, `--seg-selected-*`; surfaces `--card-*` (dark cards are a Moon surface
+  tint, `rgba(42,39,63,.55)`),
   `--row-hover-bg`, `--chip-*`, `--tile-bg`, `--input-bg`, `--nav-hover-bg`; seals `--seal-*`,
   `--tang-*`, `--song-*`; buttons `--btn-*`/`--btn2-*`; radii `--r-*`; motion `--ease`/`--dur`; layout
   `--max` 1360, `--gutter`, `--measure`, `--capsule-h`, `--header-h/gap/space`, `--sticky-top` (sticky
@@ -272,7 +276,7 @@ faint AI disclaimer line (`aiNotice()` in `pages.js`).
   `--latin` Inter, upright, for Latin letters and digits only, and `--sans` Noto Sans SC for labels, nav and
   buttons — keep `--sans` Chinese-first: Inter's Google subset covers `·` and `—…“”`. Only the loaded
   weights exist (Inter 400–600, Sans 400/500/600, Serif 400/500/600/700).
-  **Violet is an accent, never the only signal:** current nav/tab-bar item = raised pill + underline (tab
+  **Iris is an accent, never the only signal:** current nav/tab-bar item = raised pill + underline (tab
   bar: filled icon), selected tab = raised pill + underlined label, pressed 夜读 = filled capsule + flipped
   icon, pressed toolbar buttons = fill + underline, empty tabs = dashed outline, 唐/宋 swatches differ in
   shape (circle/square), search hits = tint + underline, open note terms = dotted → solid underline.
